@@ -31,7 +31,7 @@ generate_cert() {
 
   # Generate a private key
   echo "create: ${CONTEXT}-key-temp.pem"
-  openssl genrsa -out "${CONTEXT}-key-temp.pem" 2048
+  openssl genrsa -out "$OUTPUT_FOLDER/${CONTEXT}-key-temp.pem" 2048
 
   echo "create: ${CONTEXT}-key.pem"
   openssl pkcs8 -inform PEM -outform PEM \
