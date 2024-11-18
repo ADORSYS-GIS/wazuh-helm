@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 # Check if folder argument is provided
 if [ -z "$1" ]; then
