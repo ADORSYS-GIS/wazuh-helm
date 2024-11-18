@@ -1,0 +1,17 @@
+{{- with .Values.secretjob }}
+{{- if .enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "common.names.fullname" $ }}-secret-manager-binding
+  namespace: {{ include "common.names.namespace" $ }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "common.names.fullname" $ }}-job-secret
+    namespace: {{ include "common.names.namespace" $ }}
+roleRef:
+  kind: Role
+  name: {{ include "common.names.fullname" $ }}-secret-manager-role
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}

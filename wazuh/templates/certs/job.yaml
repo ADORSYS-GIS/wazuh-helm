@@ -1,0 +1,51 @@
+{{- with .Values.secretjob }}
+{{- if .enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-one-time-job
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    {{ include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+spec:
+  template:
+    spec:
+      serviceAccountName: {{ include "common.names.fullname" $ }}-job-secret
+      restartPolicy: Never
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-job-secret-config
+      containers:
+        - name: secret-creator
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Creating secret from certificates folder..."
+              SECRET_NAME={{ include "common.names.fullname" $ }}-certificates
+              NAMESPACE={{ include "common.names.namespace" $ }}
+              TEMP_DIR="/certificates/"
+
+              echo "Writing config into /config/certs.yml"
+              echo "{{ $.Values.secretjob.config }}" > /config/certs.yml
+
+              # Check if directory exists
+              if [ -d "$TEMP_DIR" ]; then
+                # Build the kubectl command dynamically
+                kubectl create secret generic $SECRET_NAME --dry-run=client -o yaml \
+                $(find $TEMP_DIR -type f -exec bash -c 'printf -- "--from-file={} " "$@"' _ {} \;) | kubectl apply -f -
+                echo "Secret $SECRET_NAME created successfully."
+              else
+                echo "Directory $TEMP_DIR does not exist or is empty!"
+                exit 1
+              fi
+  backoffLimit: 0
+{{- end }}
+{{- end }}
