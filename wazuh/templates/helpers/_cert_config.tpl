@@ -23,5 +23,6 @@ generate_cert "dashboard" \
 
 generate_cert "admin" "admin"
 
+ls -la "$OUTPUT_FOLDER"
 rm "$OUTPUT_FOLDER/*.temp.pem"
 {{- end -}}
