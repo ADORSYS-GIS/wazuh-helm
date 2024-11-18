@@ -1,3 +1,7 @@
 .idea
 
 test.yaml
+*.pem
+*.key
+*.csr
+*.srl
