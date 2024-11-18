@@ -18,9 +18,6 @@ spec:
       serviceAccountName: {{ include "common.names.fullname" $ }}-job-secret
       restartPolicy: Never
       volumes:
-        - name: config-volume
-          configMap:
-            name: {{ include "common.names.fullname" $ }}-job-secret-config
         - name: certificates
           emptyDir: { }
       containers:
