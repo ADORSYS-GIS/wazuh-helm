@@ -1,11 +1,25 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 set -ex
 
+# Check if folder argument is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <output-folder>"
+  exit 1
+fi
+
+OUTPUT_FOLDER="$1"
+
+# Create the folder if it doesn't exist
+mkdir -p "$OUTPUT_FOLDER"
+
 # Generate Root CA
 echo "Root CA"
-openssl genrsa -out root-ca-key.pem 2048
-openssl req -days 3650 -new -x509 -sha256 -key root-ca-key.pem -out root-ca.pem -subj "/C=DE/L=Bayern/O=Adorsys/CN=root-ca"
+openssl genrsa -out "$OUTPUT_FOLDER/root-ca-key.pem" 2048
+openssl req -days 3650 -new -x509 -sha256 \
+  -key "$OUTPUT_FOLDER/root-ca-key.pem" \
+  -out "$OUTPUT_FOLDER/root-ca.pem" \
+  -subj "/C=DE/L=Bayern/O=Adorsys/CN=root-ca"
 
 # Function to generate certificates for different contexts
 generate_cert() {
@@ -20,12 +34,15 @@ generate_cert() {
   openssl genrsa -out "${CONTEXT}-key-temp.pem" 2048
 
   echo "create: ${CONTEXT}-key.pem"
-  openssl pkcs8 -inform PEM -outform PEM -in "${CONTEXT}-key-temp.pem" -topk8 -nocrypt -v1 PBE-SHA1-3DES -out "${CONTEXT}-key.pem"
+  openssl pkcs8 -inform PEM -outform PEM \
+    -in "$OUTPUT_FOLDER/${CONTEXT}-key-temp.pem" \
+    -topk8 -nocrypt -v1 PBE-SHA1-3DES \
+    -out "$OUTPUT_FOLDER/${CONTEXT}-key.pem"
 
-  echo "create: ${CONTEXT}.csr"
+  echo "create: $OUTPUT_FOLDER/${CONTEXT}.csr"
 
   # Use OpenSSL to generate the CSR directly from stdin
-  openssl req -new -days 3650 -key "${CONTEXT}-key.pem" -out "${CONTEXT}.csr" -config <(
+  openssl req -new -days 3650 -key "$OUTPUT_FOLDER/${CONTEXT}-key.pem" -out "$OUTPUT_FOLDER/${CONTEXT}.csr" -config <(
     cat <<EOL
 [req]
 default_bits = 2048
@@ -50,8 +67,13 @@ EOL
     done
   )
 
-  echo "create: ${CONTEXT}.pem"
-  openssl x509 -req -days 3650 -in "${CONTEXT}.csr" -CA root-ca.pem -CAkey root-ca-key.pem -CAcreateserial -sha256 -out "${CONTEXT}.pem"
+  echo "create: $OUTPUT_FOLDER/${CONTEXT}.pem"
+  openssl x509 -req -days 3650 \
+    -in "$OUTPUT_FOLDER/${CONTEXT}.csr" \
+    -CA "$OUTPUT_FOLDER/root-ca.pem" \
+    -CAkey "$OUTPUT_FOLDER/root-ca-key.pem" \
+    -CAcreateserial -sha256 \
+    -out "$OUTPUT_FOLDER/${CONTEXT}.pem"
 
-  echo "Certificate for ${CONTEXT} created: ${CONTEXT}.pem"
+  echo "Certificate for '$OUTPUT_FOLDER/${CONTEXT}' created: '$OUTPUT_FOLDER/${CONTEXT}.pem'"
 }
