@@ -30,12 +30,12 @@ spec:
           volumeMounts:
             - mountPath: /certificates
               name: certificates
-            - mountPath: /bin
+            - mountPath: /scripts/gen_certs.sh
               name: scripts
               subPath: gen_certs.sh
           command:
             - /bin/sh
-            - /gen_certs.sh
+            - /scripts/gen_certs.sh
             - /certificates
       containers:
         - name: secret-creator
