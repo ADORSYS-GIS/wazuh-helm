@@ -7,7 +7,7 @@ metadata:
   namespace: {{ include "common.names.namespace" $ }}
   annotations:
     "helm.sh/hook": pre-install
-    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-weight": "4"
     {{ include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
@@ -20,13 +20,28 @@ spec:
       volumes:
         - name: certificates
           emptyDir: { }
+        - name: config
+          emptyDir: { }
       containers:
+        - name: config-generator
+          image: alpine
+          volumeMounts:
+            - mountPath: /config
+              name: config
+          command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Writing config into /config/certs.yml"
+            echo {{ include "wazuh.cert_config" $ | quote }} > /config/certs.yml
         - name: cert-generator
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
           volumeMounts:
             - mountPath: /certificates
               name: certificates
+            - mountPath: /config
+              name: config
         - name: secret-creator
           {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $secretImageTpl "context" $) | quote }}
@@ -41,9 +56,6 @@ spec:
               SECRET_NAME={{ include "common.names.fullname" $ }}-certificates
               NAMESPACE={{ include "common.names.namespace" $ }}
               TEMP_DIR="/certificates/"
-
-              echo "Writing config into /config/certs.yml"
-              echo {{ include "wazuh.cert_config" $ | quote }} > /config/certs.yml
 
               # Check if directory exists
               if [ -d "$TEMP_DIR" ]; then
