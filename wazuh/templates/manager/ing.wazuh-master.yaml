@@ -1,0 +1,33 @@
+{{- if and (.Values.master.ingress.enabled) (eq .Values.master.service.type "ClusterIP") }}
+{{ with .Values.master.ingress -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .name }}
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge dict $.Values.commonIngressAnnotations .annotations) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+spec:
+  {{ with .className -}}
+  ingressClassName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ include "common.tplvalues.render" (dict "value" .host "context" $) }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "common.names.fullname" $ }}-manager
+                port:
+                  number: {{ include "common.tplvalues.render" (dict "value" $.Values.master.service.port "context" $) }}
+  {{ if .tls }}
+  tls:
+    - hosts:
+        - {{ include "common.tplvalues.render" (dict "value" .host "context" $) }}
+  {{ end }}
+{{- end }}
+{{- end }}

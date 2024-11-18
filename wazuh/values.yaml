@@ -1,3 +1,83 @@
+global:
+  ##
+  ##
+  domain: wazuh.example.com
+  ##
+  ##
+  version: "4.8.2"
+  ##
+  ##
+  imageRegistry: ""
+  ## E.g.
+  ## imagePullSecrets:
+  ##   - myRegistryKeySecretName
+  ##
+  imagePullSecrets: [ ]
+  ##
+  ##
+  storageClassName: ""
+
+## @param kubeVersion Override Kubernetes version
+##
+kubeVersion: ""
+## @param nameOverride String to partially override common.names.fullname template (will maintain the release name)
+##
+nameOverride: ""
+## @param fullnameOverride String to fully override common.names.fullname template
+##
+fullnameOverride: ""
+## @param commonLabels Labels to add to all deployed resources
+##
+commonLabels: { }
+## @param commonAnnotations Annotations to add to all deployed resources
+##
+commonAnnotations:
+  "kubernetes.io/description": "wazuh component"
+## @param commonIngressAnnotations Annotations to add to all Ingress resources
+##
+commonIngressAnnotations: { }
+
+##
+##
+storageClass:
+  ##
+  ##
+  enabled: true
+  ##
+  ##
+  name: ""
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
+  ##
+  ##
+  provisioner: ""
+  ##
+  ##
+  parameters: { }
+  ##
+  ##
+  volumeBindingMode: ""
+  ##
+  ##
+  reclaimPolicy: Delete
+
+##
+##
+apiCred:
+  ##
+  ##
+  auth:
+    ##
+    ##
+    username: wazuh-wui
+    ##
+    ##
+    password: "9Y0m^%^Cx4zx@6=X"
+
 secretjob:
   enabled: true
   additionalAnnotations:
@@ -29,6 +109,8 @@ secretjob:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: [ ]
+  ##
+  ##
   secretImage:
     ##
     ##
@@ -55,20 +137,403 @@ secretjob:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: [ ]
+  ##
+  ##
   serviceAccount:
+    ##
+    ##
     name: wazuh-certs
-  # Warning: This value should be set to 1 if you are using a single-node cluster
-  maxIndexer: 10
-  # Warning: This value should be set to 1 if you are using a single-node cluster
-  maxWorker: 10
-  # Warning: This value should be set to 1 if you are using a single-node cluster
-  maxMaster: 1
 
 indexer:
-  replicaCount: 3
+  ##
+  ##
+  replicaCount: 2
+  ##
+  ##
+  auth:
+    ##
+    ##
+    username: admin
+    ##
+    ##
+    password: "rU40Fm%0GnK£iqQN"
+
+  ##
+  ##
+  service:
+    ##
+    ##
+    api:
+      ##
+      ##
+      type: ClusterIP
+      ##
+      ##
+      annotations: { }
+      ##
+      ##
+      additionalLabels: { }
+    ##
+    ##
+    main:
+      ##
+      ##
+      type: ClusterIP
+      ##
+      ##
+      annotations: { }
 
 worker:
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
+  ##
+  ##
   replicaCount: 3
+  ##
+  ##
+  updateStrategy:
+    type: RollingUpdate
+  ##
+  ##
+  nameOverride: ""
+  ##
+  ##
+  image:
+    ##
+    ##
+    registry: docker.io
+    ##
+    ##
+    repository: wazuh/wazuh-manager
+    ##
+    ##
+    tag: '{{ .Values.global.version }}'
+    ##
+    ##
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+
+  ##
+  ##
+  volumeMounts: [ ]
+
+  ##
+  ##
+  initContainers: [ ]
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  volumes: [ ]
+  ##
+  ##
+  podManagementPolicy: Parallel
+  ##
+  ##
+  service:
+    ##
+    ##
+    type: ClusterIP
+    ##
+    ##
+    additionalLabels: { }
+    ##
+    ##
+    annotations: { }
+    ##
+    ##
+    loadBalancerClass: ""
+    ##
+    ##
+    port: 1514
+
+  ##
+  ##
+  persistence:
+    ##
+    ##
+    size: 200Mi
+    ##
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 master:
   replicaCount: 1
+  ##
+  ##
+  nameOverride: ""
+  ##
+  ##
+  image:
+    registry: docker.io
+    repository: wazuh/wazuh-manager
+    tag: '{{ .Values.global.version }}'
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+  ##
+  ##
+  service:
+    ##
+    ##
+    type: ClusterIP
+    ##
+    ##
+    additionalLabels: { }
+    ##
+    ##
+    annotations: { }
+    ##
+    ##
+    loadBalancerClass: ""
+    ##
+    ##
+    port: 1515
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
+  ##
+  ##
+  persistence:
+    ##
+    ##
+    size: 200Mi
+    ##
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+  ##
+  ##
+  ingress:
+    ##
+    ##
+    enabled: false
+    ##
+    ##
+    name: "wazuh-master"
+    ##
+    ##
+    className: ""
+    ##
+    ##
+    annotations: { }
+    ##
+    ##
+    host: "{{ .Values.global.domain }}"
+    ##
+    ##
+    tls: true
+
+    additionalLabels: { }
+
+  ##
+  ##
+  podManagementPolicy: Parallel
+
+  ##
+  ##
+  updateStrategy:
+    type: RollingUpdate
+  ##
+  initContainers: [ ]
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  volumes:
+    - name: snort-alerts
+      persistentVolumeClaim:
+        claimName: snort-alerts
+    - name: owasp-zap-alerts
+      persistentVolumeClaim:
+        claimName: owasp-zap-alerts
+
+  volumeMounts:
+    - name: snort-alerts
+      mountPath: /var/log/snort/
+    - name: owasp-zap-alerts
+      mountPath: /var/log/owasp-zap/
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+##
+##
+dashboard:
+  ##
+  ##
+  nameOverride: ""
+  ##
+  ##
+  image:
+    ##
+    ##
+    registry: docker.io
+    ##
+    ##
+    repository: wazuh/wazuh-dashboard
+    tag: '{{ .Values.global.version }}'
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+
+  ##
+  ##
+  additionalAnnotations: { }
+  additionalLabels: { }
+  resources: { }
+  #    requests:
+  #      cpu: 200m
+  #      memory: 512Mi
+  #    limits:
+  #      cpu: 400m
+  #      memory: 2Gi
+  service:
+    additionalLabels: { }
+    ##
+    ##
+    type: ClusterIP # LoadBalancer
+    ##
+    ##
+    port: 5601
+    ##
+    ##
+    targetPort: 5601
+    ##
+    ##
+    annotations: { }
+    ##
+    ##
+    loadBalancerIP: null
+    ##
+    ##
+    allocateLoadBalancerNodePorts: null
+    ##
+    ##
+    clusterIP: null
+  ##
+  ##
+  auth:
+    ##
+    ##
+    username: kibanaserver
+    ##
+    ##
+    password: "mS05mw_0a?-nMGfM"
+  ##
+  ##
+  ingress:
+    ##
+    ##
+    additionalLabels: { }
+    ##
+    ##
+    enabled: false
+    ##
+    ##
+    name: "wazuh-dashboard"
+    ##
+    ##
+    className: ""
+    ##
+    ##
+    annotations: { }
+    ##
+    ##
+    host: "{{ .Values.global.domain }}"
+  ports:
+    - containerPort: 5601
+      name: dashboard
+  volumes: [ ]
+  volumeMounts: [ ]
+  env: [ ]
+  envFrom: [ ]
+
+
+service:
+  ##
+  ##
+  type: ClusterIP
+  ##
+  ##
+  additionalLabels: { }
+  ##
+  ##
+  annotations: { }
+  ##
+  ##
+  loadBalancerClass: ""
+
+cluster:
+  auth:
+    key: "rU40Fm%"
+  config:
+    smtp:
+      server: smtp.example.wazuh.com
+      from: ossecm@example.wazuh.com
+      to: recipient@example.wazuh.com
+      max_per_hour: 12

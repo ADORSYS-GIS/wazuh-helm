@@ -62,7 +62,7 @@ spec:
               set -e
 
               echo "Creating secret from certificates folder..."
-              SECRET_NAME={{ include "common.names.fullname" $ }}-certificates
+              SECRET_NAME={{ include "wazuh.cert_secret_name" $ }}
               NAMESPACE={{ include "common.names.namespace" $ }}
               TEMP_DIR="/certificates/"
 

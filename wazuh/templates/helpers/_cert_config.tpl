@@ -2,7 +2,7 @@
 Cert generation script
 */}}
 {{- define "wazuh.cert_script" -}}
-{{ $.Files.Get "scripts/gen_certs.sh" }}
+{{ $.Files.Get "files/scripts/gen_certs.sh" }}
 
 # Generate certificates
 generate_cert "indexer" \
@@ -14,6 +14,10 @@ generate_cert "indexer" \
 generate_cert "server" \
     "{{ include "common.names.fullname" $ }}-manager" \
     "*.{{ include "common.names.fullname" $ }}-manager" \
+    "{{ include "common.names.fullname" $ }}-cluster" \
+    "*.{{ include "common.names.fullname" $ }}-cluster" \
+    "{{ include "common.names.fullname" $ }}-master" \
+    "*.{{ include "common.names.fullname" $ }}-master" \
     "{{ include "common.names.fullname" $ }}" \
     "*.{{ include "common.names.fullname" $ }}"
 
@@ -22,4 +26,11 @@ generate_cert "dashboard" \
     "*.{{ include "common.names.fullname" $ }}-dashboard"
 
 generate_cert "admin" "admin"
+{{- end -}}
+
+{{/*
+Cert secret name
+*/}}
+{{- define "wazuh.cert_secret_name" -}}
+{{ include "common.names.fullname" $ }}-certificates
 {{- end -}}
