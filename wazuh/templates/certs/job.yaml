@@ -35,8 +35,12 @@ spec:
               subPath: gen_certs.sh
           command:
             - /bin/sh
-            - /scripts/gen_certs.sh
-            - /certificates
+            - -c
+            - |
+              apk add --no-cache \
+                  openssl \
+                  bash
+              /bin/sh /scripts/gen_certs.sh /certificates
       containers:
         - name: secret-creator
           {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}
