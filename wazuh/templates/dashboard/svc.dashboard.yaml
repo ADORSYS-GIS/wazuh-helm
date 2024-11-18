@@ -1,0 +1,30 @@
+{{ with .Values.dashboard.service }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.names.fullname" $ }}-dashboard
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+    app: {{ include "common.names.fullname" $ }}-dashboard
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .annotations "context" $ ) | nindent 4 }}
+spec:
+  type: {{ .type }}
+  selector:
+    {{- include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+    app: {{ include "common.names.fullname" $ }}-dashboard
+  ports:
+    - name: dashboard
+      port: {{ include "common.tplvalues.render" (dict "value" .port "context" $) }}
+      targetPort: {{ include "common.tplvalues.render" (dict "value" .targetPort "context" $) }}
+  {{ with .loadBalancerIP }}
+  loadBalancerIP: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  {{ with .allocateLoadBalancerNodePorts }}
+  allocateLoadBalancerNodePorts: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  {{ with .clusterIP }}
+  clusterIP: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+{{- end -}}

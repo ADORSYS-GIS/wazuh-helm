@@ -1,0 +1,30 @@
+# Copyright (C) 2019, Wazuh Inc.
+#
+# This program is a free software; you can redistribute it
+# and/or modify it under the terms of the GNU General Public
+# License (version 2) as published by the FSF - Free Software
+# Foundation.
+
+# Indexer service: API
+
+{{ with .Values.indexer.service.api }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.names.fullname" $ }}-indexer-api
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+    app: {{ include "common.names.fullname" $ }}-indexer
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .annotations "context" $ ) | nindent 4 }}
+spec:
+  type: {{ include "common.tplvalues.render" (dict "value" .type "context" $) }}
+  selector:
+    {{- include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+    app: {{ include "common.names.fullname" $ }}-indexer
+  ports:
+    - name: indexer-rest
+      port: 9200
+      targetPort: 9200
+{{- end -}}

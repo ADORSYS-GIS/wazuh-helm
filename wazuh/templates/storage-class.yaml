@@ -1,0 +1,34 @@
+{{- if and (not .Values.global.storageClassName) .Values.storageClass.enabled }}
+{{ with .Values.storageClass }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ include "wazuh.storageClassName" $ }}
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+{{ with .provisioner -}}
+provisioner: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+{{- end }}
+{{ with .parameters -}}
+parameters: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+{{- end }}
+{{ with .volumeBindingMode -}}
+volumeBindingMode: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+{{- end }}
+{{ with .reclaimPolicy -}}
+reclaimPolicy: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+{{- end }}
+{{ with .allowedTopologies -}}
+allowedTopologies: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+{{- end }}
+{{ with .allowVolumeExpansion -}}
+allowVolumeExpansion: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+{{- end }}
+{{ with .mountOptions -}}
+mountOptions: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+{{- end }}
+{{- end }}
+{{- end }}
