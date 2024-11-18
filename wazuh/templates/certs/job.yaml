@@ -39,9 +39,11 @@ spec:
             - -c
             - |
               set -ex
-              apk add --no-cache \
-                openssl \
-                bash
+
+              # Install openssl and bash
+              apk add --no-cache openssl bash
+
+              # Generate certificates
               /bin/bash /scripts/gen_certs.sh /certificates
 
               # Adjust file permissions to be readable by other users
