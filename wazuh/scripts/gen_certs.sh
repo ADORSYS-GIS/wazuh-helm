@@ -76,4 +76,6 @@ EOL
     -out "$OUTPUT_FOLDER/${CONTEXT}.pem"
 
   echo "Certificate for '$OUTPUT_FOLDER/${CONTEXT}' created: '$OUTPUT_FOLDER/${CONTEXT}.pem'"
+
+  rm "$OUTPUT_FOLDER/${CONTEXT}-key-temp.pem"
 }
