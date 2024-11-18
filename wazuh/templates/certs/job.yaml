@@ -57,11 +57,13 @@ spec:
               NAMESPACE={{ include "common.names.namespace" $ }}
               TEMP_DIR="/certificates/"
 
-              # Check if directory exists
+              echo "Listing files in $TEMP_DIR"
+              ls -la $TEMP_DIR
+
+              echo "Check if directory exists"
               if [ -d "$TEMP_DIR" ]; then
-                # Build the kubectl command dynamically
-                kubectl create secret generic $SECRET_NAME --dry-run=client -o yaml \
-                $(find $TEMP_DIR -type f -exec bash -c 'printf -- "--from-file={} " "$@"' _ {} \;) | kubectl apply -f -
+                echo "Build the kubectl command dynamically"
+                kubectl create secret generic $SECRET_NAME --from-file=$TEMP_DIR -n $NAMESPACE
                 echo "Secret $SECRET_NAME created successfully."
               else
                 echo "Directory $TEMP_DIR does not exist or is empty!"
