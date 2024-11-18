@@ -5,6 +5,12 @@ kind: RoleBinding
 metadata:
   name: {{ include "common.names.fullname" $ }}-secret-manager-binding
   namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "common.names.fullname" $ }}-job-secret
