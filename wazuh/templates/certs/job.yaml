@@ -45,10 +45,7 @@ spec:
               /bin/bash /scripts/gen_certs.sh /certificates
 
               # Adjust file permissions to be readable by other users
-              chmod -R 644 /certificates
-
-              # (Optional) Change ownership of files to a non-root user (if needed)
-              chown -R 1000:1000 /certificates
+              chmod -R 775 /certificates/*
       containers:
         - name: secret-creator
           {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}
