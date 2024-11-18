@@ -36,7 +36,12 @@ spec:
             - /bin/sh
             - -c
             - |
-              apt install -y openssl
+              set -ex
+              apt-get update && apt-get install -y \
+                openssl \
+                bash \
+                && apt-get clean
+
               /bin/sh /scripts/gen_certs.sh /certificates
       containers:
         - name: secret-creator
