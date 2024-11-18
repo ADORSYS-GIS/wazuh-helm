@@ -42,7 +42,7 @@ spec:
                 bash \
                 && apt-get clean
 
-              /bin/sh /scripts/gen_certs.sh /certificates
+              /bin/bash /scripts/gen_certs.sh /certificates
       containers:
         - name: secret-creator
           {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}
