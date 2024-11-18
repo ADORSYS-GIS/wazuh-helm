@@ -8,10 +8,10 @@ secretjob:
     registry: docker.io
     ##
     ##
-    repository: wazuh/wazuh-certs-generator
+    repository: ubuntu
     ##
     ##
-    tag: 0.0.2
+    tag: latest
     ##
     ##
     digest: ""

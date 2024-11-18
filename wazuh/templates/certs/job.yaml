@@ -26,18 +26,17 @@ spec:
         - name: cert-generator
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          workingDir: /certificates
           volumeMounts:
             - mountPath: /certificates
               name: certificates
-            - mountPath: /config
-              name: config
           command:
             - /bin/sh
             - -c
             - |
-              echo "Writing config into /config/certs.yml"
-              echo {{ include "wazuh.cert_config" $ | quote }} > /config/certs.yml
-              /entrypoint.sh
+              echo "Writing script into /gen_sh.sh"
+              echo {{ include "wazuh.cert_script" $ | quote }} > /gen_sh.sh
+              bash /gen_sh.sh
       containers:
         - name: secret-creator
           {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}

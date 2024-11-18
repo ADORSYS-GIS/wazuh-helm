@@ -1,31 +1,27 @@
-{{/**
-Config file for the Wazuh Certificates genrator
+{{/*
+Cert generation script
 */}}
-{{- define "wazuh.cert_config" -}}
-nodes:
-  # Wazuh indexer server nodes
-  indexer:
-    {{- range $i := until ((.Values.secretjob.maxIndexer | default 1) | int) }}
-    - name: {{ include "common.names.fullname" $ }}-indexer-{{ $i }}.{{ include "common.names.fullname" $ }}-indexer
-      ip: {{ include "common.names.fullname" $ }}-indexer-{{ $i }}.{{ include "common.names.fullname" $ }}-indexer
-    {{- end }}
+{{- define "wazuh.cert_script" -}}
+{{ $.Files.Get "scripts/gen_certs.sh" }}
 
-  # Wazuh server nodes
-  # Use node_type only with more than one Wazuh manager
-  server:
-    {{- range $i := until ((.Values.secretjob.maxMaster | default 1) | int) }}
-    - name: {{ include "common.names.fullname" $ }}-manager-master-{{ $i }}.{{ include "common.names.fullname" $ }}-cluster
-      ip: {{ include "common.names.fullname" $ }}-manager-master-{{ $i }}.{{ include "common.names.fullname" $ }}-cluster
-      node_type: master
-    {{- end }}
-    {{- range $i := until ((.Values.secretjob.maxWorker | default 1) | int) }}
-    - name: {{ include "common.names.fullname" $ }}-manager-worker-{{ $i }}.{{ include "common.names.fullname" $ }}-cluster
-      ip: {{ include "common.names.fullname" $ }}-manager-worker-{{ $i }}.{{ include "common.names.fullname" $ }}-cluster
-      node_type: worker
-    {{- end }}
+# Generate certificates
+generate_cert "indexer" \
+    "*.{{ include "common.names.fullname" $ }}-indexer" \
+    "{{ include "common.names.fullname" $ }}-indexer" \
+    "*.{{ include "common.names.fullname" $ }}-indexer-api" \
+    "{{ include "common.names.fullname" $ }}-indexer-api"
 
-  # Wazuh dashboard node
-  dashboard:
-    - name: {{ include "common.names.fullname" $ }}-dashboard
-      ip: {{ include "common.names.fullname" $ }}-dashboard
+generate_cert "server" \
+    "*.{{ include "common.names.fullname" $ }}-manager" \
+    "{{ include "common.names.fullname" $ }}-manager" \
+    "*.{{ include "common.names.fullname" $ }}" \
+    "{{ include "common.names.fullname" $ }}"
+
+generate_cert "dashboard" \
+    "*.{{ include "common.names.fullname" $ }}-dashboard" \
+    "{{ include "common.names.fullname" $ }}-dashboard"
+
+generate_cert "admin" "admin"
+
+rm *.temp.pem
 {{- end -}}
