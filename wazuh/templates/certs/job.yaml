@@ -12,6 +12,7 @@ metadata:
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
 spec:
+  backoffLimit: 0
   template:
     spec:
       serviceAccountName: {{ include "common.names.fullname" $ }}-job-secret
@@ -34,7 +35,7 @@ spec:
               TEMP_DIR="/certificates/"
 
               echo "Writing config into /config/certs.yml"
-              echo "{{ $.Values.secretjob.config }}" > /config/certs.yml
+              echo {{ include "wazuh.cert_config" $ | quote }} > /config/certs.yml
 
               # Check if directory exists
               if [ -d "$TEMP_DIR" ]; then
@@ -46,6 +47,5 @@ spec:
                 echo "Directory $TEMP_DIR does not exist or is empty!"
                 exit 1
               fi
-  backoffLimit: 0
 {{- end }}
 {{- end }}
