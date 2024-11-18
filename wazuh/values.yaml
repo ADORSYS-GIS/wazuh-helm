@@ -1,6 +1,8 @@
 secretjob:
   enabled: true
   additionalAnnotations: { }
+  #additionalAnnotations:
+  #  "helm.sh/hook": pre-install
   additionalLabels: { }
   image:
     ##

@@ -6,7 +6,6 @@ metadata:
   name: {{ include "common.names.fullname" $ }}-secret-manager-binding
   namespace: {{ include "common.names.namespace" $ }}
   annotations:
-    "helm.sh/hook": pre-install
     "helm.sh/hook-weight": "3"
     {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
   labels:
