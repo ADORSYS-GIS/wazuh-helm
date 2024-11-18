@@ -20,8 +20,9 @@ spec:
       volumes:
         - name: certificates
           emptyDir: { }
-        - name: config
-          emptyDir: { }
+        - name: scripts
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-job-secret-script
       initContainers:
         - name: cert-generator
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -29,20 +30,12 @@ spec:
           volumeMounts:
             - mountPath: /certificates
               name: certificates
+            - mountPath: /bin
+              name: scripts
+              subPath: gen_certs.sh
           command:
-            - /bin/bash
-            - -c
-            - |
-              #!/bin/bash
-              set -ex
-
-              echo "Writing script into /gen_sh.sh..."
-              echo {{ include "wazuh.cert_script" $ | quote }} > /gen_sh.sh
-
-              echo "Running script /gen_sh.sh..."
-              /bin/bash /gen_sh.sh /certificates
-
-              echo "Script executed successfully!"
+            - /bin/gen_certs.sh
+            - /certificates
       containers:
         - name: secret-creator
           {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}

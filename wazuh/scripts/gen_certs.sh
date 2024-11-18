@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 # Check if folder argument is provided
 if [ -z "$1" ]; then
@@ -8,7 +8,7 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-OUTPUT_FOLDER="$1"
+OUTPUT_FOLDER="\$1"
 
 # Create the folder if it doesn't exist
 mkdir -p "$OUTPUT_FOLDER"

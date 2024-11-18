@@ -1,0 +1,17 @@
+{{- with .Values.secretjob }}
+{{- if .enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-job-secret-script
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+data:
+  "gen_certs.sh": {{ include "wazuh.cert_script" $ | quote }}
+{{- end }}
+{{- end }}
