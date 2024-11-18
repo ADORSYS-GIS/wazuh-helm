@@ -22,18 +22,7 @@ spec:
           emptyDir: { }
         - name: config
           emptyDir: { }
-      containers:
-        - name: config-generator
-          image: alpine
-          volumeMounts:
-            - mountPath: /config
-              name: config
-          command:
-          - /bin/sh
-          - -c
-          - |
-            echo "Writing config into /config/certs.yml"
-            echo {{ include "wazuh.cert_config" $ | quote }} > /config/certs.yml
+      initContainers:
         - name: cert-generator
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
@@ -42,6 +31,14 @@ spec:
               name: certificates
             - mountPath: /config
               name: config
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Writing config into /config/certs.yml"
+              echo {{ include "wazuh.cert_config" $ | quote }} > /config/certs.yml
+              /entrypoint.sh
+      containers:
         - name: secret-creator
           {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $secretImageTpl "context" $) | quote }}
