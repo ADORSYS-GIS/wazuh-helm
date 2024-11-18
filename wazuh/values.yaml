@@ -10,7 +10,7 @@ secretjob:
     registry: docker.io
     ##
     ##
-    repository: ubuntu
+    repository: alpine
     ##
     ##
     tag: latest
