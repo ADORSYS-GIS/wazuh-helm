@@ -1,0 +1,238 @@
+{{ with .Values.master }}
+{{- $name := printf "%s-manager-master" (include "common.names.fullname" $) -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+spec:
+  {{ with .replicaCount -}}
+  replicas: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  {{ with .updateStrategy -}}
+  updateStrategy: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 6 }}
+      app: {{ include "common.names.fullname" $ }}-manager
+      node-type: master
+  serviceName: {{ include "common.names.fullname" $ }}-cluster
+  {{ with .podManagementPolicy -}}
+  podManagementPolicy: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-manager
+        node-type: master
+      name: {{ $name }}
+      annotations:
+        {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
+    spec:
+      volumes:
+        - name: wazuh-config-temp
+          emptyDir: { }
+        - name: config
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-wazuh-conf'
+        - name: certs
+          secret:
+            secretName: {{ include "wazuh.cert_secret_name" $ }}
+        {{ with .volumes -}}
+        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+        {{- end }}
+      initContainers:
+        - name: increase-the-vm-max-map-count
+          image: busybox
+          command:
+            - sysctl
+            - -w
+            - vm.max_map_count=262144
+          securityContext:
+            privileged: true
+        - name: wazuh-init
+          ##
+          image: busybox
+          ##
+          imagePullPolicy: IfNotPresent
+          ##
+          command:
+            - "/bin/sh"
+            - "/entrypoint-scripts/wazuh.replace-var.sh"
+            - "/tmp/template.config.conf"
+            - "/wazuh/tmp/ossec.conf"
+          ##
+          env:
+            - name: NODE_TYPE
+              value: "master"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          ##
+          ##
+          envFrom:
+            - secretRef:
+                name: '{{ include "common.names.fullname" $ }}-common-config'
+          ##
+          ##
+          volumeMounts:
+            - name: config
+              mountPath: /tmp/template.config.conf
+              subPath: template.config.conf
+              readOnly: true
+            - name: wazuh-config-temp
+              mountPath: /wazuh/tmp
+            - name: config
+              mountPath: /entrypoint-scripts/wazuh.replace-var.sh
+              subPath: wazuh.replace-var.sh
+              readOnly: true
+      {{ with .initContainers -}}
+      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 6}}
+      {{- end }}
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: wazuh-manager
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          {{ with .resources -}}
+          resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+          securityContext:
+            capabilities:
+              add: [ "SYS_CHROOT" ]
+          volumeMounts:
+            - name: {{ $name }}
+              mountPath: /var/ossec/api/configuration
+              subPath: wazuh/var/ossec/api/configuration
+            - name: {{ $name }}
+              mountPath: /var/ossec/etc
+              subPath: wazuh/var/ossec/etc
+            - name: {{ $name }}
+              mountPath: /var/ossec/logs
+              subPath: wazuh/var/ossec/logs
+            - name: {{ $name }}
+              mountPath: /var/ossec/queue
+              subPath: wazuh/var/ossec/queue
+            - name: {{ $name }}
+              mountPath: /var/ossec/var/multigroups
+              subPath: wazuh/var/ossec/var/multigroups
+            - name: {{ $name }}
+              mountPath: /var/ossec/integrations
+              subPath: wazuh/var/ossec/integrations
+            - name: {{ $name }}
+              mountPath: /var/ossec/active-response/bin
+              subPath: wazuh/var/ossec/active-response/bin
+            - name: {{ $name }}
+              mountPath: /var/ossec/agentless
+              subPath: wazuh/var/ossec/agentless
+            - name: {{ $name }}
+              mountPath: /var/ossec/wodles
+              subPath: wazuh/var/ossec/wodles
+            - name: {{ include "common.names.fullname" $ }}-manager-data
+              mountPath: /var/ossec/backup
+              subPath: wazuh/var/ossec/backup
+            - name: {{ $name }}
+              mountPath: /etc/filebeat
+              subPath: filebeat/etc/filebeat
+            - name: {{ $name }}
+              mountPath: /var/lib/filebeat
+              subPath: filebeat/var/lib/filebeat
+
+            - name: wazuh-config-temp
+              mountPath: /wazuh-config-mount/etc/ossec.conf
+              subPath: ossec.conf
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
+              subPath: local_rules.xml
+              readOnly: true
+            - name: config
+              mountPath: /wazuh-config-mount/etc/decoders/local_decoder.xml
+              subPath: local_decoder.xml
+              readOnly: true
+            - name: config
+              mountPath: /wazuh-config-mount/etc/decoders/0004-owasp-zap.xml
+              subPath: 0004-owasp-zap.xml
+              readOnly: true
+
+            - name: certs
+              mountPath: /etc/ssl/root-ca.pem
+              readOnly: true
+              subPath: root-ca.pem
+            - name: certs
+              mountPath: /etc/ssl/filebeat.pem
+              subPath: server.pem
+              readOnly: true
+            - name: certs
+              mountPath: /etc/ssl/filebeat.key
+              subPath: server-key.pem
+              readOnly: true
+          {{ with .volumeMounts -}}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+          ports:
+            - containerPort: 1514
+              name: agents-events
+            - containerPort: 1515
+              name: registration
+            - containerPort: 1516
+              name: cluster
+            - containerPort: 55000
+              name: api
+          env:
+            - name: FILEBEAT_SSL_VERIFICATION_MODE
+              value: 'full'
+            - name: SSL_CERTIFICATE_AUTHORITIES
+              value: /etc/ssl/root-ca.pem
+            - name: SSL_CERTIFICATE
+              value: /etc/ssl/filebeat.pem
+            - name: SSL_KEY
+              value: /etc/ssl/filebeat.key
+          {{ with .env -}}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+          ##
+          ##
+          envFrom:
+            - secretRef:
+                name: '{{ include "common.names.fullname" $ }}-api-cred'
+            - secretRef:
+                name: '{{ include "common.names.fullname" $ }}-indexer-cred'
+            - secretRef:
+                name: '{{ include "common.names.fullname" $ }}-cluster-key'
+            - secretRef:
+                name: '{{ include "common.names.fullname" $ }}-common-config'
+          {{ with .envFrom -}}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ $name }}
+      spec:
+        {{ with .persistence.accessModes -}}
+        accessModes: {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10 }}
+        {{- end }}
+        storageClassName: {{ include "wazuh.storageClassName" $ }}
+        resources:
+          requests:
+            storage: {{ .persistence.size }}
+    - metadata:
+        name: {{ include "common.names.fullname" $ }}-manager-data
+      spec:
+        {{ with .persistence.accessModes -}}
+        accessModes: {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10 }}
+        {{- end }}
+        storageClassName: {{ include "wazuh.storageClassName" $ }}
+        resources:
+          requests:
+            storage: 10Gi
+{{- end -}}
