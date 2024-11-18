@@ -21,10 +21,21 @@ spec:
         - name: config-volume
           configMap:
             name: {{ include "common.names.fullname" $ }}-job-secret-config
+        - name: certificates
+          emptyDir: { }
       containers:
-        - name: secret-creator
+        - name: cert-generator
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          volumeMounts:
+            - mountPath: /certificates
+              name: certificates
+        - name: secret-creator
+          {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $secretImageTpl "context" $) | quote }}
+          volumeMounts:
+            - mountPath: /certificates
+              name: certificates
           command:
             - /bin/sh
             - -c

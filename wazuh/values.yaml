@@ -28,6 +28,32 @@ secretjob:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: [ ]
+  secretImage:
+    ##
+    ##
+    registry: docker.io
+    ##
+    ##
+    repository: bitnami/kubectl
+    ##
+    ##
+    tag: latest
+    ##
+    ##
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
   serviceAccount:
     name: wazuh-certs
   # Warning: This value should be set to 1 if you are using a single-node cluster
