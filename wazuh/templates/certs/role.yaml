@@ -5,6 +5,12 @@ kind: Role
 metadata:
   name: {{ include "common.names.fullname" $ }}-secret-manager-role
   namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "1"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
