@@ -30,28 +30,18 @@ secretjob:
     pullSecrets: [ ]
   serviceAccount:
     name: wazuh-certs
-  config:
-    nodes:
-      # Wazuh indexer server nodes
-      indexer:
-        - name: wazuh1.indexer
-          ip: wazuh1.indexer
-        - name: wazuh2.indexer
-          ip: wazuh2.indexer
-        - name: wazuh3.indexer
-          ip: wazuh3.indexer
+  # Warning: This value should be set to 1 if you are using a single-node cluster
+  maxIndexer: 10
+  # Warning: This value should be set to 1 if you are using a single-node cluster
+  maxWorker: 10
+  # Warning: This value should be set to 1 if you are using a single-node cluster
+  maxMaster: 1
 
-      # Wazuh server nodes
-      # Use node_type only with more than one Wazuh manager
-      server:
-        - name: wazuh.master
-          ip: wazuh.master
-          node_type: master
-        - name: wazuh.worker
-          ip: wazuh.worker
-          node_type: worker
+indexer:
+  replicaCount: 3
 
-      # Wazuh dashboard node
-      dashboard:
-        - name: wazuh.dashboard
-          ip: wazuh.dashboard
+worker:
+  replicaCount: 3
+
+master:
+  replicaCount: 1
