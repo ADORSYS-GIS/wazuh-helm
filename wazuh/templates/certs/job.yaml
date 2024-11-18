@@ -37,11 +37,9 @@ spec:
             - -c
             - |
               set -ex
-              apt-get update && apt-get install -y \
+              apk add --no-cache \
                 openssl \
-                bash \
-                && apt-get clean
-
+                bash
               /bin/bash /scripts/gen_certs.sh /certificates
       containers:
         - name: secret-creator
