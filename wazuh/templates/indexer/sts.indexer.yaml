@@ -55,7 +55,7 @@ spec:
             - '-c'
             - 'chown -R 1000:1000 /var/lib/wazuh-indexer'
           volumeMounts:
-            - name: wazuh-indexer
+            - name: {{ include "common.names.fullname" $ }}-indexer
               mountPath: /var/lib/wazuh-indexer
         - name: increase-the-vm-max-map-count
           image: busybox
