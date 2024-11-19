@@ -3,5 +3,4 @@ kind: ConfigMap
 metadata:
   name: {{ include "common.names.fullname" $ }}-dashboard-conf
 data:
-  "opensearch_dashboards.yml": |-
-      {{ $.Files.Get "files/configs/opensearch_dashboards.yml" | trim }}
+  "opensearch_dashboards.yml": {{ $.Files.Get "files/configs/opensearch_dashboards.yml" | quote }}
