@@ -49,8 +49,9 @@ generate_cert() {
 default_bits = 2048
 prompt = no
 default_md = sha256
-distinguished_name = dn
 req_extensions = req_ext
+x509_extensions = v3_ca
+distinguished_name = req_distinguished_name
 
 [dn]
 C = DE
