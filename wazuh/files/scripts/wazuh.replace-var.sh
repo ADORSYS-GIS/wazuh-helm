@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -e
+set -ex
 
 # Function to replace variables
 replace_variables() {
