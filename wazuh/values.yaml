@@ -469,8 +469,6 @@ master:
           mkdir -p /var/ossec/backup/db
           chown -R 1000:1000 /var/ossec/backup
           chmod -R a+w /var/ossec/backup
-          ls -la /var/ossec/backup
-          ls -la /var/ossec/backup/db
       volumeMounts:
         - name: manager-backup
           mountPath: /var/ossec/backup
