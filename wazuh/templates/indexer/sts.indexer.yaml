@@ -1,0 +1,159 @@
+{{ with .Values.indexer }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "common.names.fullname" $ }}-indexer
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+spec:
+  {{ with .replicas -}}
+  replicas: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  {{ with .updateStrategy -}}
+  updateStrategy: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 6 }}
+      app: {{ include "common.names.fullname" $ }}-indexer
+  serviceName: {{ include "common.names.fullname" $ }}-indexer
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-indexer
+      name: {{ include "common.names.fullname" $ }}-indexer
+    spec:
+      securityContext:
+        fsGroup: 1000
+      # Set the indexer volume permissions so the indexer user can use it
+      volumes:
+        - name: certs
+          secret:
+            secretName: {{ include "wazuh.cert_secret_name" $ }}
+        - name: indexer-conf
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-indexer-conf'
+        {{ with .volumes -}}
+        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+        {{- end }}
+      initContainers:
+        - name: volume-mount-hack
+          image: busybox
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 100m
+              memory: 256Mi
+          command:
+            - sh
+            - '-c'
+            - 'chown -R 1000:1000 /var/lib/wazuh-indexer'
+          volumeMounts:
+            - name: wazuh-indexer
+              mountPath: /var/lib/wazuh-indexer
+        - name: increase-the-vm-max-map-count
+          image: busybox
+          command:
+            - sysctl
+            - -w
+            - vm.max_map_count=262144
+          securityContext:
+            privileged: true
+      containers:
+        - name: wazuh-indexer
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          {{ with .resources }}
+          resources:
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          env:
+            - name: OPENSEARCH_JAVA_OPTS
+              value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
+            - name: CLUSTER_NAME
+              value: {{ include "common.names.fullname" $ }}
+            - name: NETWORK_HOST
+              value: "0.0.0.0"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: DISCOVERY_SERVICE
+              value: {{ include "common.names.fullname" $ }}-indexer
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DISABLE_INSTALL_DEMO_CONFIG
+              value: 'true'
+          {{ with .env }}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          securityContext:
+            capabilities:
+              add: [ "SYS_CHROOT" ]
+            runAsUser: 1000
+            runAsGroup: 1000
+          volumeMounts:
+            - name: {{ include "common.names.fullname" $ }}-indexer
+              mountPath: /var/lib/wazuh-indexer
+
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/certs/indexer-key.pem
+              subPath: indexer-key.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/certs/indexer.pem
+              subPath: indexer.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/certs/root-ca.pem
+              subPath: root-ca.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/certs/admin.pem
+              subPath: admin.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/certs/admin-key.pem
+              subPath: admin-key.pem
+              readOnly: true
+
+            - name: indexer-conf
+              mountPath: /usr/share/wazuh-indexer/opensearch.yml
+              subPath: opensearch.yml
+              readOnly: true
+            - name: indexer-conf
+              mountPath: /usr/share/wazuh-indexer/opensearch-security/internal_users.yml
+              subPath: internal_users.yml
+              readOnly: true
+          {{ with .volumeMounts }}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          {{ with .envFrom }}
+          envFrom:
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          ports:
+            - containerPort: 9200
+              name: indexer-rest
+            - containerPort: 9300
+              name: indexer-nodes
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ include "common.names.fullname" $ }}-indexer
+      spec:
+        {{ with .persistence.accessModes -}}
+        accessModes: {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10 }}
+        {{- end }}
+        storageClassName: {{ include "wazuh.storageClassName" $ }}
+        resources:
+          requests:
+            storage: {{ .persistence.size }}
+{{- end -}}

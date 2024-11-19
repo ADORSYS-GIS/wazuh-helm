@@ -1,0 +1,42 @@
+{{- range .Values.extraVolumeConfigs }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ include "common.names.namespace" $}}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+spec:
+  {{ with .accessModes }}
+  accessModes: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+  {{ with .resources }}
+  resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+  {{ with .storageClassName }}
+  storageClassName: {{ include "common.tplvalues.render" (dict "value" . "context" $)}}
+  {{ else }}
+  storageClassName: {{ include "wazuh.storageClassName" $ }}
+  {{- end }}
+  {{ with .dataSource }}
+  dataSource: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+  {{ with .volumeName }}
+  volumeName: {{ include "common.tplvalues.render" (dict "value" . "context" $)}}
+  {{- end }}
+  {{ with .volumeMode }}
+  volumeMode: {{ include "common.tplvalues.render" (dict "value" . "context" $)}}
+  {{- end }}
+  {{ with .volumeAttributesClassName }}
+  volumeAttributesClassName: {{ include "common.tplvalues.render" (dict "value" . "context" $)}}
+  {{- end }}
+  {{ with .dataSourceRef }}
+  dataSourceRef: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+  {{ with .selector }}
+  selector: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+---
+{{- end }}
