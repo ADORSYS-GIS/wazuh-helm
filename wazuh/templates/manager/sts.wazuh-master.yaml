@@ -64,6 +64,8 @@ spec:
             - |
               set -ex
               mkdir -p /var/ossec/backup/db
+              ls -la /var/ossec/backup
+              ls -la /var/ossec/backup/db
           securityContext:
             privileged: true
           volumeMounts:
