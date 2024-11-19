@@ -56,6 +56,18 @@ spec:
             - vm.max_map_count=262144
           securityContext:
             privileged: true
+        - name: create-db-backup-folder
+          image: alpine
+          command:
+            - mkdir
+            - -p
+            - /var/ossec/backup/db
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: {{ include "common.names.fullname" $ }}-manager-data
+              mountPath: /var/ossec/backup
+              subPath: wazuh/var/ossec/backup
         - name: wazuh-init
           ##
           image: busybox
