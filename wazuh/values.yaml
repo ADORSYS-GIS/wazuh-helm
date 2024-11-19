@@ -147,7 +147,7 @@ secretjob:
 indexer:
   ##
   ##
-  replicas: 3
+  replicas: 2
   ##
   ##
   nameOverride: ""
@@ -258,7 +258,7 @@ worker:
   additionalLabels: { }
   ##
   ##
-  replicaCount: 3
+  replicaCount: 2
   ##
   ##
   updateStrategy:
