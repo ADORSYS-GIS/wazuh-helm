@@ -59,9 +59,11 @@ spec:
         - name: create-db-backup-folder
           image: alpine
           command:
-            - mkdir
-            - -p
-            - /var/ossec/backup/db
+            - /bin/sh
+            - -c
+            - |
+              set -ex
+              mkdir -p /var/ossec/backup/db
           securityContext:
             privileged: true
           volumeMounts:
