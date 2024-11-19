@@ -22,6 +22,8 @@ plugins.security.check_snapshot_restore_write_privileges: true
 plugins.security.enable_snapshot_restore_privilege: true
 plugins.security.nodes_dn:
   - CN=*.${RELEASE_FULLNAME}-indexer-api,O=Adorsys,L=Bayern,C=DE
+  - CN=${RELEASE_FULLNAME}-indexer-api,O=Adorsys,L=Bayern,C=DE
+  - CN=*.${RELEASE_FULLNAME}-indexer,O=Adorsys,L=Bayern,C=DE
   - CN=${RELEASE_FULLNAME}-indexer,O=Adorsys,L=Bayern,C=DE
 plugins.security.restapi.roles_enabled:
   - "all_access"
