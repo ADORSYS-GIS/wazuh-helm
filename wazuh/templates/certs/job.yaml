@@ -57,7 +57,7 @@ spec:
             - /bin/sh
             - -c
             - |
-              set -e
+              set -ex
 
               echo "Creating secret from certificates folder..."
               SECRET_NAME={{ include "wazuh.cert_secret_name" $ }}
