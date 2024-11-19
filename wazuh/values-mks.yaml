@@ -1,6 +1,7 @@
 storageClass:
-  provisioner: rancher.io/local-path
+  provisioner: microk8s.io/hostpath
   volumeBindingMode: WaitForFirstConsumer
+  reclaimPolicy: Delete
 
 dashboard:
   service:
@@ -11,18 +12,20 @@ master:
     type: LoadBalancer
   resources:
     requests:
-      memory: 2Gi
+      memory: 1Gi
     limits:
-      memory: 4Gi
+      memory: 2Gi
 worker:
+  replicaCount: 1
   resources:
     requests:
-      memory: 2Gi
+      memory: 1Gi
     limits:
-      memory: 4Gi
+      memory: 2Gi
 indexer:
+  replicas: 2
   resources:
     requests:
-      memory: 2Gi
+      memory: 1Gi
     limits:
-      memory: 4Gi
+      memory: 2Gi
