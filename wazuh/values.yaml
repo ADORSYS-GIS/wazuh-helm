@@ -452,7 +452,7 @@ master:
     type: RollingUpdate
   ##
   initContainers:
-    - name: create-db-backup-folder
+    - name: permission-fix
       image: busybox
       resources:
         requests:

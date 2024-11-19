@@ -66,7 +66,9 @@ spec:
           command:
             - sh
             - '-c'
-            - 'chown -R 1000:1000 /var/lib/wazuh'
+            - |
+              set -ex
+              chown -R 1000:1000 /var/lib/wazuh
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/lib/wazuh
