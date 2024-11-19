@@ -80,8 +80,8 @@ apiCred:
 
 secretjob:
   enabled: true
-  #additionalAnnotations:
-  #  "helm.sh/hook": pre-install
+  additionalAnnotations:
+    "helm.sh/hook": pre-install
   additionalLabels: { }
   image:
     ##
