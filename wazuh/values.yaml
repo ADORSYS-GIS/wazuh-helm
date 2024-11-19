@@ -468,7 +468,7 @@ master:
           set -ex
           # Change owner of the common directories
           chown -R 1000:1000 /var/lib/backup
-          chmod -R a+w /var/ossec/backup
+          chmod -R a+w /var/lib/backup
           
           chown -R 1000:1000 /var/lib/snort
           chown -R 1000:1000 /var/lib/owasp-zap
