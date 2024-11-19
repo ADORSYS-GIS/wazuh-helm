@@ -63,7 +63,7 @@ spec:
           ports: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
           env:
-            - name: OPENSEARCH_HOSTS
+            - name: INDEXER_URL
               value: 'https://{{ include "common.names.fullname" $ }}-indexer-api:9200'
             - name: WAZUH_API_URL
               value: 'https://{{ include "common.names.fullname" $ }}-manager'
