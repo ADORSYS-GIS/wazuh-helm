@@ -14,7 +14,7 @@ OUTPUT_FOLDER="$1"
 mkdir -p "$OUTPUT_FOLDER"
 
 # Generate Root CA
-echo "Root CA"
+echo "Generating Root CA"
 openssl genrsa -out "$OUTPUT_FOLDER/root-ca-key.pem" 2048
 openssl req -days 3650 -new -x509 -sha256 \
   -key "$OUTPUT_FOLDER/root-ca-key.pem" \
@@ -24,26 +24,25 @@ openssl req -days 3650 -new -x509 -sha256 \
 # Function to generate certificates for different contexts
 generate_cert() {
   local CONTEXT=$1
-  shift
-  local DOMAINS=("$@")
+  local DOMAINS_FILE="$2"
 
   echo "* Generating certificate for context: $CONTEXT"
 
+  # Read domains from file or command-line arguments
+  if [ -f "$DOMAINS_FILE" ]; then
+    DOMAINS=$(cat "$DOMAINS_FILE")
+  else
+    DOMAINS="$2"
+  fi
+
+  # Split domains into an array
+  IFS=',' read -ra DOMAINS_ARRAY <<< "$DOMAINS"
+
   # Generate a private key
-  echo "create: ${CONTEXT}-key-temp.pem"
-  openssl genrsa -out "$OUTPUT_FOLDER/${CONTEXT}-key-temp.pem" 2048
-
-  echo "create: ${CONTEXT}-key.pem"
-  openssl pkcs8 -inform PEM -outform PEM \
-    -in "$OUTPUT_FOLDER/${CONTEXT}-key-temp.pem" \
-    -topk8 -nocrypt -v1 PBE-SHA1-3DES \
-    -out "$OUTPUT_FOLDER/${CONTEXT}-key.pem"
-
-  echo "create: $OUTPUT_FOLDER/${CONTEXT}.csr"
-  CERT_CONFIG="$OUTPUT_FOLDER/openssl-san.${CONTEXT}.cnf"
+  openssl genrsa -out "$OUTPUT_FOLDER/${CONTEXT}-key.pem" 2048
 
   # Create an OpenSSL configuration file for SAN
-  echo "Creating configuration file: '$CERT_CONFIG'"
+  CERT_CONFIG="$OUTPUT_FOLDER/openssl-san.${CONTEXT}.cnf"
   cat > "$CERT_CONFIG" <<EOL
 [req]
 default_bits = 2048
@@ -57,7 +56,7 @@ req_extensions = req_ext
 C = DE
 L = Bayern
 O = Adorsys
-CN = ${DOMAINS[0]}
+CN = ${DOMAINS_ARRAY[0]}
 
 [req_ext]
 subjectAltName = @alt_names
@@ -66,14 +65,14 @@ subjectAltName = @alt_names
 EOL
 
   # Append SAN entries
-  for i in "${!DOMAINS[@]}"; do
-    echo "DNS.$((i + 1)) = ${DOMAINS[$i]}" >> "$CERT_CONFIG"
+  for i in "${!DOMAINS_ARRAY[@]}"; do
+    echo "DNS.$((i + 1)) = ${DOMAINS_ARRAY[$i]}" >> "$CERT_CONFIG"
   done
 
-  # Use the configuration file to generate the CSR
+  # Generate the CSR
   openssl req -new -days 3650 -key "$OUTPUT_FOLDER/${CONTEXT}-key.pem" -out "$OUTPUT_FOLDER/${CONTEXT}.csr" -config "$CERT_CONFIG"
 
-  echo "create: $OUTPUT_FOLDER/${CONTEXT}.pem"
+  # Sign the CSR
   openssl x509 -req -days 3650 \
     -in "$OUTPUT_FOLDER/${CONTEXT}.csr" \
     -CA "$OUTPUT_FOLDER/root-ca.pem" \
@@ -83,6 +82,6 @@ EOL
 
   echo "Certificate for '$OUTPUT_FOLDER/${CONTEXT}' created: '$OUTPUT_FOLDER/${CONTEXT}.pem'"
 
-  rm "$OUTPUT_FOLDER/${CONTEXT}-key-temp.pem"
   rm "$OUTPUT_FOLDER/${CONTEXT}.csr"
+  rm "$CERT_CONFIG"
 }
