@@ -1,0 +1,11 @@
+storageClass:
+  provisioner: rancher.io/local-path
+  volumeBindingMode: WaitForFirstConsumer
+
+dashboard:
+  service:
+    type: LoadBalancer
+    
+master:
+  service:
+    type: LoadBalancer
