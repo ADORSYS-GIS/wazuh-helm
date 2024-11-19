@@ -467,6 +467,7 @@ master:
         - |
           set -ex
           # Change owner of the common directories
+          mkdir -p /var/lib/backup/db
           chown -R 1000:1000 /var/lib/backup
           chmod -R a+w /var/lib/backup
           
