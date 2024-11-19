@@ -616,7 +616,7 @@ service:
 
 cluster:
   auth:
-    key: "rU40Fm%"
+    key: "dfbb2c1b9d679c39af94d5c1c821c952"
   config:
     smtp:
       server: smtp.example.wazuh.com
