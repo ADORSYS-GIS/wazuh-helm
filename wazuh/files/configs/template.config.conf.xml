@@ -1,11 +1,3 @@
-<!--
-Wazuh - Manager - Default configuration for ubuntu 16.04
-More info at: https://documentation.wazuh.com
-Mailing list: https://groups.google.com/forum/#!forum/wazuh
-
-Customization: TCP on port 1514
-Customization: Cluster mode enabled, ${NODE_TYPE} node
--->
 <ossec_config>
     <global>
         <jsonout_output>yes</jsonout_output>
@@ -18,7 +10,6 @@ Customization: Cluster mode enabled, ${NODE_TYPE} node
         <email_to>${SMTP_TO}</email_to>
         <email_maxperhour>${SMTP_MAX_PER_HOUR}</email_maxperhour>
         <email_log_source>alerts.log</email_log_source>
-        <queue_size>${QUEUE_SIZE}</queue_size>
         <agents_disconnection_time>${AGENTS_DISCONNECTION_TIME}</agents_disconnection_time>
         <agents_disconnection_alert_time>${AGENTS_DISCONNECTION_ALERT_TIME}</agents_disconnection_alert_time>
     </global>
