@@ -72,7 +72,8 @@ spec:
               set -ex
               mkdir -p /var/ossec/backup/db
               chown -R 1000:1000 /var/ossec/backup
-              ls -la /var/ossec/backup{,/db}
+              ls -la /var/ossec/backup
+              ls -la /var/ossec/backup/db
           volumeMounts:
             - name: {{ include "common.names.fullname" $ }}-manager-data
               mountPath: /var/ossec/backup
