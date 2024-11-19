@@ -232,5 +232,5 @@ spec:
         storageClassName: {{ include "wazuh.storageClassName" $ }}
         resources:
           requests:
-            storage: 10Gi
+            storage: {{ .persistence.backupSize }}
 {{- end -}}

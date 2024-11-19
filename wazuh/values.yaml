@@ -409,6 +409,9 @@ master:
     size: 200Mi
     ##
     ##
+    backupSize: 200Mi
+    ##
+    ##
     accessModes:
       - ReadWriteOnce
 
