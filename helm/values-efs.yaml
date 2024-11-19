@@ -1,0 +1,142 @@
+global:
+  domain: 'dev.wazuh.adorsys.team'
+  eks:
+    domain:
+      certArn: 'arn:aws:acm:eu-central-1:590183746717:certificate/731f4f9f-c4af-4770-8130-c22aeec8a3ab'
+      wildcardCertArn: 'arn:aws:acm:eu-central-1:590183746717:certificate/1de84043-a566-4195-8bd4-e7402d85fc5b'
+
+service:
+  enabled: true
+  type: LoadBalancer
+  loadBalancerClass: service.k8s.aws/nlb
+  additionalLabels:
+    dns: route53
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-name: '{{ include "common.names.fullname" $ }}'
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    external-dns.alpha.kubernetes.io/hostname: 'master.{{ .Values.global.domain }}'
+
+storageClass:
+  provisioner: efs.csi.aws.com
+  parameters:
+    basePath: /wazuh-data
+    directoryPerms: '755'
+    fileSystemId: '<fileSystemId>'
+    uid: '0'
+    gid: '0'
+    provisioningMode: efs-ap
+  reclaimPolicy: Retain
+
+indexer:
+  replicas: 3
+  persistence:
+    size: 50Gi
+    accessModes:
+      - ReadWriteMany
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+worker:
+  persistence:
+    size: 10Gi
+    accessModes:
+      - ReadWriteMany
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+
+master:
+  persistence:
+    size: 10Gi
+    accessModes:
+      - ReadWriteMany
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+cluster:
+  auth:
+    key: "e5936685316e99525aff962141335960"
+  persistence:
+    size: 10Gi
+    accessModes:
+      - ReadWriteMany
+
+dashboard:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 400m
+      memory: 2Gi
+  ingress:
+    enabled: true
+    className: alb
+    annotations:
+      alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-dashboard'
+      alb.ingress.kubernetes.io/backend-protocol: 'HTTPS'
+      alb.ingress.kubernetes.io/target-type: 'ip'
+      alb.ingress.kubernetes.io/scheme: 'internet-facing'
+      alb.ingress.kubernetes.io/listen-ports: |
+        [
+          {
+            "HTTP": 80
+          },
+          {
+            "HTTPS": 443
+          }
+        ]
+      alb.ingress.kubernetes.io/actions.forward-single: |
+        {
+          "Type": "forward",
+          "ForwardConfig": {
+            "TargetGroups": [
+              {
+                "ServiceName": "{{ include "common.names.fullname" $ }}-dashboard",
+                "ServicePort": "5601"
+              }
+            ]
+          }
+        }
+      alb.ingress.kubernetes.io/certificate-arn: '{{ .Values.global.eks.domain.certArn }}'
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+      external-dns.alpha.kubernetes.io/hostname: '{{ .Values.global.domain }}'
+
+extraVolumeConfigs:
+  - name: '{{ include "common.names.fullname" $ }}-manager-backup'
+    additionalAnnotations: { }
+    additionalLabels: { }
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: '{{ $.Values.cluster.persistence.backupSize }}'
+  - name: snort-alerts
+    accessModes:
+      - ReadWriteMany
+    resources:
+      requests:
+        storage: 10Gi
+  - name: owasp-zap-alerts
+    accessModes:
+      - ReadWriteMany
+    resources:
+      requests:
+        storage: 10Gi

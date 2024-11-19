@@ -523,7 +523,7 @@ extraVolumeConfigs:
       - ReadWriteOnce
     resources:
       requests:
-        storage: '{{ $.Values.master.persistence.backupSize }}'
+        storage: '{{ $.Values.cluster.persistence.backupSize }}'
   - name: snort-alerts
     additionalAnnotations: { }
     additionalLabels: { }
@@ -644,7 +644,8 @@ dashboard:
   env: [ ]
   envFrom: [ ]
 
-
+##
+##
 service:
   ##
   ##
@@ -668,3 +669,25 @@ cluster:
       from: ossecm@example.wazuh.com
       to: recipient@example.wazuh.com
       max_per_hour: 12
+  ##
+  ##
+  persistence:
+    ##
+    ##
+    size: 200Mi
+    ##
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+##
+##
+configmaps: [ ]
+
+##
+##
+secrets: [ ]
+
+##
+##
+remoteSecrets: { }
