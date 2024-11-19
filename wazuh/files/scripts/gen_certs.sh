@@ -82,6 +82,7 @@ EOL
     -out "$OUTPUT_FOLDER/${CONTEXT}.pem"
 
   echo "Certificate for '$OUTPUT_FOLDER/${CONTEXT}' created: '$OUTPUT_FOLDER/${CONTEXT}.pem'"
+  openssl x509 -in $OUTPUT_FOLDER/${CONTEXT}.pem -text -noout | grep -A 1 "Subject Alternative Name"
 
   rm "$OUTPUT_FOLDER/${CONTEXT}-key-temp.pem"
   rm "$OUTPUT_FOLDER/${CONTEXT}.csr"
