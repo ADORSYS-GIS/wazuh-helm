@@ -1,0 +1,10 @@
+====================
+You've successfully
+installed Wazuh!
+
+Use the service
+{{ include "common.names.fullname" $ }}-dashboard
+
+to access the Wazuh
+Dashboard.
+====================
