@@ -88,6 +88,10 @@ spec:
                   fieldPath: metadata.name
             - name: DISCOVERY_SERVICE
               value: {{ include "common.names.fullname" $ }}-indexer
+            - name: RELEASE_FULLNAME
+              value: {{ include "common.names.fullname" $ }}
+            - name: RELEASE_MAX_STORAGE_NODE
+              value: {{ .replicas | quote }}
             - name: KUBERNETES_NAMESPACE
               valueFrom:
                 fieldRef:
