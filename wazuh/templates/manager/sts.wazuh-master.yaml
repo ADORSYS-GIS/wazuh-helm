@@ -48,22 +48,6 @@ spec:
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
       initContainers:
-        - name: volume-mount-hack
-          image: busybox
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 100m
-              memory: 256Mi
-          command:
-            - sh
-            - '-c'
-            - 'chown -R 1000:1000 /var/lib/wazuh'
-          volumeMounts:
-            - name: {{ $name }}
-              mountPath: /var/lib/wazuh
         - name: increase-the-vm-max-map-count
           image: busybox
           command:
