@@ -534,13 +534,13 @@ dashboard:
   ##
   additionalAnnotations: { }
   additionalLabels: { }
-  resources: { }
-  #    requests:
-  #      cpu: 200m
-  #      memory: 512Mi
-  #    limits:
-  #      cpu: 400m
-  #      memory: 2Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
   service:
     additionalLabels: { }
     ##
