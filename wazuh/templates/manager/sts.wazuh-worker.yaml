@@ -206,8 +206,6 @@ spec:
             - secretRef:
                 name: '{{ include "common.names.fullname" $ }}-indexer-cred'
             - secretRef:
-                name: '{{ include "common.names.fullname" $ }}-cluster-key'
-            - secretRef:
                 name: '{{ include "common.names.fullname" $ }}-common-config'
           {{ with .envFrom -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
