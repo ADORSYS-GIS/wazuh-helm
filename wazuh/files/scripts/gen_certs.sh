@@ -43,7 +43,7 @@ generate_cert() {
   CERT_CONFIG="$OUTPUT_FOLDER/openssl-san.${CONTEXT}.cnf"
 
   # Create an OpenSSL configuration file for SAN
-  echo "Creating configuration file: '$OUTPUT_FOLDER/$CERT_CONFIG'"
+  echo "Creating configuration file: '$CERT_CONFIG'"
   cat > "$CERT_CONFIG" <<EOL
 [req]
 default_bits = 2048
@@ -66,11 +66,11 @@ EOL
 
   # Append SAN entries
   for i in "${!DOMAINS[@]}"; do
-    echo "DNS.$((i + 1)) = ${DOMAINS[$i]}" >> "$OUTPUT_FOLDER/$CERT_CONFIG"
+    echo "DNS.$((i + 1)) = ${DOMAINS[$i]}" >> "$CERT_CONFIG"
   done
 
   # Use the configuration file to generate the CSR
-  openssl req -new -days 3650 -key "$OUTPUT_FOLDER/${CONTEXT}-key.pem" -out "$OUTPUT_FOLDER/${CONTEXT}.csr" -config "$OUTPUT_FOLDER/$CERT_CONFIG"
+  openssl req -new -days 3650 -key "$OUTPUT_FOLDER/${CONTEXT}-key.pem" -out "$OUTPUT_FOLDER/${CONTEXT}.csr" -config "$CERT_CONFIG"
 
   echo "create: $OUTPUT_FOLDER/${CONTEXT}.pem"
   openssl x509 -req -days 3650 \
