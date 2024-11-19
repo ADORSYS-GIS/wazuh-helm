@@ -310,7 +310,10 @@ worker:
   envFrom: [ ]
   ##
   ##
-  volumes: [ ]
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
   ##
   ##
   podManagementPolicy: Parallel
@@ -448,7 +451,27 @@ master:
   updateStrategy:
     type: RollingUpdate
   ##
-  initContainers: [ ]
+  initContainers:
+    - name: create-db-backup-folder
+      image: busybox
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 100m
+          memory: 256Mi
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          mkdir -p /var/ossec/backup/db
+          chown -R 1000:1000 /var/ossec/backup
+      volumeMounts:
+        - name: manager-backup
+          mountPath: /var/ossec/backup
+          subPath: wazuh/var/ossec/backup
   ##
   ##
   env: [ ]
@@ -458,6 +481,9 @@ master:
   ##
   ##
   volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
     - name: snort-alerts
       persistentVolumeClaim:
         claimName: snort-alerts
@@ -482,6 +508,14 @@ master:
 ##
 ##
 extraVolumeConfigs:
+  - name: '{{ include "common.names.fullname" $ }}-manager-backup'
+    additionalAnnotations: { }
+    additionalLabels: { }
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: '{{ $.Values.master.persistence.backupSize }}'
   - name: snort-alerts
     additionalAnnotations: { }
     additionalLabels: { }

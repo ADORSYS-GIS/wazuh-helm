@@ -56,28 +56,6 @@ spec:
             - vm.max_map_count=262144
           securityContext:
             privileged: true
-        - name: create-db-backup-folder
-          image: busybox
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 100m
-              memory: 256Mi
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -ex
-              mkdir -p /var/ossec/backup/db
-              chown -R 1000:1000 /var/ossec/backup
-              ls -la /var/ossec/backup
-              ls -la /var/ossec/backup/db
-          volumeMounts:
-            - name: {{ include "common.names.fullname" $ }}-manager-data
-              mountPath: /var/ossec/backup
-              subPath: wazuh/var/ossec/backup
         - name: wazuh-init
           ##
           ##
@@ -118,9 +96,9 @@ spec:
               mountPath: /entrypoint-scripts/wazuh.replace-var.sh
               subPath: wazuh.replace-var.sh
               readOnly: true
-      {{ with .initContainers -}}
-      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 6}}
-      {{- end }}
+        {{ with .initContainers -}}
+        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+        {{- end }}
       securityContext:
         fsGroup: 1000
       containers:
@@ -161,15 +139,16 @@ spec:
             - name: {{ $name }}
               mountPath: /var/ossec/wodles
               subPath: wazuh/var/ossec/wodles
-            - name: {{ include "common.names.fullname" $ }}-manager-data
-              mountPath: /var/ossec/backup
-              subPath: wazuh/var/ossec/backup
             - name: {{ $name }}
               mountPath: /etc/filebeat
               subPath: filebeat/etc/filebeat
             - name: {{ $name }}
               mountPath: /var/lib/filebeat
               subPath: filebeat/var/lib/filebeat
+
+            - name: manager-backup
+              mountPath: /var/ossec/backup
+              subPath: wazuh/var/ossec/backup
 
             - name: wazuh-config-temp
               mountPath: /wazuh-config-mount/etc/ossec.conf
@@ -248,14 +227,4 @@ spec:
         resources:
           requests:
             storage: {{ .persistence.size }}
-    - metadata:
-        name: {{ include "common.names.fullname" $ }}-manager-data
-      spec:
-        {{ with .persistence.accessModes -}}
-        accessModes: {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10 }}
-        {{- end }}
-        storageClassName: {{ include "wazuh.storageClassName" $ }}
-        resources:
-          requests:
-            storage: {{ .persistence.backupSize }}
 {{- end -}}
