@@ -1,7 +1,7 @@
 cluster.name: ${CLUSTER_NAME}
 node.name: ${NODE_NAME}
 network.host: ${NETWORK_HOST}
-discovery.seed_hosts: {{ include "common.names.fullname" $ }}-indexer-0.{{ include "common.names.fullname" $ }}-indexer
+discovery.seed_hosts: ${DISCOVERY_HOST}
 cluster.initial_master_nodes: {{ include "common.names.fullname" $ }}-indexer-0
 node.max_local_storage_nodes: {{ .Values.indexer.replicas | quote }}
 path.data: /var/lib/wazuh-indexer
@@ -16,11 +16,13 @@ plugins.security.ssl.http.enabled: true
 plugins.security.ssl.transport.enforce_hostname_verification: false
 plugins.security.ssl.transport.resolve_hostname: false
 plugins.security.authcz.admin_dn:
-  - CN=admin,O=Company,L=California,C=US
+  - CN=admin,O=Adorsys,L=Bayern,C=DE
+  - CN=*.admin,O=Adorsys,L=Bayern,C=DE
 plugins.security.check_snapshot_restore_write_privileges: true
 plugins.security.enable_snapshot_restore_privilege: true
 plugins.security.nodes_dn:
-  - CN={{ include "common.names.fullname" $ }}-indexer-api,O=Company,L=California,C=US
+  - CN=*.{{ include "common.names.fullname" $ }}-indexer-api,O=Adorsys,L=Bayern,C=DE
+  - CN={{ include "common.names.fullname" $ }}-indexer,O=Adorsys,L=Bayern,C=DE
 plugins.security.restapi.roles_enabled:
   - "all_access"
   - "security_rest_api_access"
