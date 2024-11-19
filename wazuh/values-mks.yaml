@@ -6,26 +6,15 @@ storageClass:
 dashboard:
   service:
     type: LoadBalancer
+  resources: ~
 
 master:
   service:
     type: LoadBalancer
-  resources:
-    requests:
-      memory: 1Gi
-    limits:
-      memory: 2Gi
+  resources: ~
 worker:
   replicaCount: 1
-  resources:
-    requests:
-      memory: 1Gi
-    limits:
-      memory: 2Gi
+  resources: ~
 indexer:
   replicas: 2
-  resources:
-    requests:
-      memory: 1Gi
-    limits:
-      memory: 2Gi
+  resources: ~
