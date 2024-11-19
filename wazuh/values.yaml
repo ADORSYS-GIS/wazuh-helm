@@ -147,7 +147,39 @@ secretjob:
 indexer:
   ##
   ##
-  replicaCount: 2
+  replicas: 1
+  ##
+  ##
+  nameOverride: ""
+  ##
+  ##
+  image:
+    ##
+    ##
+    registry: docker.io
+    ##
+    ##
+    repository: wazuh/wazuh-indexer
+    ##
+    ##
+    tag: '{{ .Values.global.version }}'
+    ##
+    ##
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+
   ##
   ##
   auth:
@@ -170,9 +202,6 @@ indexer:
       ##
       ##
       annotations: { }
-      ##
-      ##
-      additionalLabels: { }
     ##
     ##
     main:
@@ -182,6 +211,71 @@ indexer:
       ##
       ##
       annotations: { }
+  ##
+  ##
+  persistence:
+    ##
+    ##
+    size: 500Mi
+    ##
+    ##
+    accessModes:
+      - ReadWriteOnce
+  ##
+  ##
+  updateStrategy:
+    ##
+    ##
+    type: RollingUpdate
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  volumes: [ ]
+  ##
+  ##
+  volumeMounts:
+    - name: indexer-certs
+      mountPath: /usr/share/wazuh-indexer/certs/node-key.pem
+      subPath: node-key.pem
+      readOnly: true
+    - name: indexer-certs
+      mountPath: /usr/share/wazuh-indexer/certs/node.pem
+      subPath: node.pem
+      readOnly: true
+    - name: core-certs
+      mountPath: /usr/share/wazuh-indexer/certs/root-ca.pem
+      subPath: root-ca.pem
+      readOnly: true
+    - name: indexer-certs
+      mountPath: /usr/share/wazuh-indexer/certs/admin.pem
+      subPath: admin.pem
+      readOnly: true
+    - name: indexer-certs
+      mountPath: /usr/share/wazuh-indexer/certs/admin-key.pem
+      subPath: admin-key.pem
+      readOnly: true
+    - name: indexer-conf
+      mountPath: /usr/share/wazuh-indexer/opensearch.yml
+      subPath: opensearch.yml
+      readOnly: true
+    - name: indexer-conf
+      mountPath: /usr/share/wazuh-indexer/opensearch-security/internal_users.yml
+      subPath: internal_users.yml
+      readOnly: true
+  ##
+  ##
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
 
 worker:
   ##
@@ -409,6 +503,26 @@ master:
     limits:
       cpu: 500m
       memory: 512Mi
+
+##
+##
+extraVolumeConfigs:
+  - name: snort-alerts
+    additionalAnnotations: { }
+    additionalLabels: { }
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 200Mi
+  - name: owasp-zap-alerts
+    additionalAnnotations: { }
+    additionalLabels: { }
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 200Mi
 
 ##
 ##

@@ -16,8 +16,6 @@ spec:
     spec:
       serviceAccountName: {{ include "common.names.fullname" $ }}-job-secret
       restartPolicy: Never
-      securityContext:
-        fsGroup: 1000
       volumes:
         - name: certificates
           emptyDir: { }
