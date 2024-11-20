@@ -1,4 +1,6 @@
 ====================
 You've successfully
 installed Wazuh!
+
+-- v{{ .Values.global.version}}
 ====================

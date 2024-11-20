@@ -5,7 +5,7 @@ Common secret
 {{- if $.Values.cluster.secret.enabled -}}
 {{ include "common.names.fullname" $ }}-common-config
 {{- else -}}
-{{- $.Values.cluster.secret.secretName -}}
+{{- $.Values.cluster.secretName -}}
 {{- end -}}
 {{- end -}}
 
