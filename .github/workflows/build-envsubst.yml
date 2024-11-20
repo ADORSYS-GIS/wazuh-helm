@@ -7,7 +7,7 @@ on:
     tags:
       - 'v*'
     paths:
-      - '.github/workflows/build.yml'
+      - '.github/workflows/build-envsubst.yml'
       - 'utils/packages/envsubt/**'
 
 env:
