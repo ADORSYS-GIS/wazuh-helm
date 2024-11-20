@@ -1,5 +1,7 @@
 # Wazuh Helm chart
 
+[![Helm Publish](https://github.com/ADORSYS-GIS/wazuh-helm/actions/workflows/helm-publish.yml/badge.svg)](https://github.com/ADORSYS-GIS/wazuh-helm/actions/workflows/helm-publish.yml)
+
 To use this chart, you need to have first a root CA.
 To create one you can use the following commands:
 ```shell
