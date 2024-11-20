@@ -13,14 +13,6 @@ OUTPUT_FOLDER="$1"
 # Create the folder if it doesn't exist
 mkdir -p "$OUTPUT_FOLDER"
 
-# Generate Root CA
-echo "Generating Root CA"
-openssl genrsa -out "$OUTPUT_FOLDER/root-ca-key.pem" 2048
-openssl req -days 3650 -new -x509 -sha256 \
-  -key "$OUTPUT_FOLDER/root-ca-key.pem" \
-  -out "$OUTPUT_FOLDER/root-ca.pem" \
-  -subj "/C=DE/L=Bayern/O=Adorsys/CN=root-ca"
-
 # Function to generate certificates for different contexts
 generate_cert() {
   local CONTEXT=$1
@@ -48,8 +40,8 @@ generate_cert() {
 
   openssl x509 -req -days 3650 \
     -in "$OUTPUT_FOLDER/${CONTEXT}.csr" \
-    -CA "$OUTPUT_FOLDER/root-ca.pem" \
-    -CAkey "$OUTPUT_FOLDER/root-ca-key.pem" \
+    -CA "$ROOT_CA_FOLDER/root-ca.pem" \
+    -CAkey "$ROOT_CA_FOLDER/root-ca-key.pem" \
     -CAcreateserial -sha256 \
     -out "$OUTPUT_FOLDER/${CONTEXT}.pem" \
     -extfile <(
@@ -65,8 +57,6 @@ EOL
     )
 
   echo "Certificate for '$OUTPUT_FOLDER/${CONTEXT}' created: '$OUTPUT_FOLDER/${CONTEXT}.pem'"
-
-  rm "$OUTPUT_FOLDER/${CONTEXT}.csr"
 }
 
 # Example usage: Replace with your context and domain files or strings

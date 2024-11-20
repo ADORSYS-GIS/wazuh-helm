@@ -22,6 +22,9 @@ spec:
         - name: scripts
           configMap:
             name: {{ include "common.names.fullname" $ }}-job-secret-script
+        - name: root-ca-certs
+          secret:
+            secretName: {{ $.Values.cluster.rootCaSecretName }}
       initContainers:
         - name: cert-generator
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -32,6 +35,13 @@ spec:
             - mountPath: /scripts/gen_certs.sh
               name: scripts
               subPath: gen_certs.sh
+              readOnly: true
+            - mountPath: /root-certs
+              name: root-ca-certs
+              readOnly: true
+          env:
+            - name: ROOT_CA_FOLDER
+              value: /root-certs
           command:
             - /bin/sh
             - -c
