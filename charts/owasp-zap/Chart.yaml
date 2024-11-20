@@ -1,0 +1,13 @@
+apiVersion: v2
+name: owasp-zap
+description: A Helm chart for deploying a Tekton pipeline
+version: 0.1.5
+appVersion: "1.0"
+
+dependencies:
+  - name: common
+    version: '2.20.5'
+    repository: https://charts.bitnami.com/bitnami
+    tags:
+      - common
+      - bitnami-common

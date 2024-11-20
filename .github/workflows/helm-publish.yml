@@ -7,14 +7,25 @@ on:
     tags:
       - 'v*'
     paths:
-      - 'helm/Chart.yaml'
+      - 'charts/**/Chart.yaml'
       - '.github/workflows/helm-publish.yml'
 
 jobs:
 
   helm-publish:
     runs-on: ubuntu-latest
-    name: Publish Helm Chart
+    name: Publish Helm Chart ${{ matrix.chart }}
+    strategy:
+      matrix:
+        chart:
+          - argocd-apps
+          - wazuh
+          - owasp-zap
+        include:
+          - chart: wazuh
+            path: charts/wazuh
+          - chart: owasp-zap
+            path: charts/owasp-zap
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,10 +46,10 @@ jobs:
         run: helm repo add chartmuseum ${{ vars.HELM_URL }} --username ${{ secrets.HELM_USER }} --password ${{ secrets.HELM_PASS }}
 
       - name: Helm dependency update
-        run: helm dependency update helm
+        run: helm dependency update ${{ matrix.path }}
 
       - name: Helm lint
-        run: helm lint helm
+        run: helm lint ${{ matrix.path }}
 
       - name: Install Helm push plugin
         if: github.ref == 'refs/heads/main'
@@ -49,9 +60,9 @@ jobs:
         id: fetch-charts
         run: |
           helm repo update
-          CHART_VERSION=$(awk '/^version:/ {print $2}' helm/Chart.yaml | tr -d '"')
+          CHART_VERSION=$(awk '/^version:/ {print $2}' ${{ matrix.path }}/Chart.yaml | tr -d '"')
           echo "CHART_VERSION=${CHART_VERSION}" >> $GITHUB_ENV
-          helm search repo chartmuseum/wazuh --version ${CHART_VERSION} --output json > search_result.json
+          helm search repo chartmuseum/${{ matrix.chart }} --version ${CHART_VERSION} --output json > search_result.json
           cat search_result.json
 
       - name: Check chart version existence
@@ -66,4 +77,4 @@ jobs:
 
       - name: Publish Helm chart
         if: github.ref == 'refs/heads/main' && env.CHART_EXISTS == 'false'
-        run: helm cm-push helm chartmuseum
+        run: helm cm-push ${{ matrix.path }} chartmuseum
