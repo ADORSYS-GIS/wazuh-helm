@@ -35,52 +35,24 @@ indexer:
     size: 50Gi
     accessModes:
       - ReadWriteMany
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 1000m
-      memory: 2Gi
 
 worker:
   persistence:
     size: 10Gi
     accessModes:
       - ReadWriteMany
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 1Gi
-    limits:
-      cpu: 2000m
-      memory: 2Gi
 
 master:
   persistence:
     size: 10Gi
     accessModes:
       - ReadWriteMany
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 2Gi
-    limits:
-      cpu: 2000m
-      memory: 4Gi
 
 cluster:
   auth:
     key: "e5936685316e99525aff962141335960"
 
 dashboard:
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 400m
-      memory: 2Gi
   ingress:
     enabled: true
     className: alb
