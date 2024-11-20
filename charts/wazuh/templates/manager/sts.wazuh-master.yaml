@@ -117,8 +117,7 @@ spec:
           securityContext:
             capabilities:
               add: [ "SYS_CHROOT" ]
-            runAsUser: 1000
-            runAsGroup: 1000
+            privileged: true
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
