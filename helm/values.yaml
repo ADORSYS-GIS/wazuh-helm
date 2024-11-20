@@ -356,11 +356,11 @@ worker:
 
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+       cpu: 100m
+       memory: 256Mi
     limits:
-      cpu: 1000m
-      memory: 2Gi
+       cpu: 500m
+       memory: 512Mi
 
 master:
   replicaCount: 1
@@ -501,11 +501,11 @@ master:
 
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+       cpu: 100m
+       memory: 256Mi
     limits:
-      cpu: 1000m
-      memory: 2Gi
+       cpu: 500m
+       memory: 512Mi
 
   persistence:
     size: 10Gi
@@ -580,11 +580,11 @@ dashboard:
   additionalLabels: { }
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 200m
+      memory: 512Mi
     limits:
-      cpu: 1000m
-      memory: 2Gi
+     cpu: 400m
+     memory: 1Gi
   service:
     additionalLabels: { }
     ##
