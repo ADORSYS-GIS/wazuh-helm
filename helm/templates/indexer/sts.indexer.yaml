@@ -43,6 +43,9 @@ spec:
         - name: certs
           secret:
             secretName: {{ include "wazuh.cert_secret_name" $ }}
+        - name: root-certs
+          secret:
+            secretName: {{ include "wazuh.cert_root_name" $ }}
         - name: indexer-conf
           configMap:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
@@ -127,7 +130,7 @@ spec:
               mountPath: /usr/share/wazuh-indexer/certs/indexer.pem
               subPath: indexer.pem
               readOnly: true
-            - name: certs
+            - name: root-certs
               mountPath: /usr/share/wazuh-indexer/certs/root-ca.pem
               subPath: root-ca.pem
               readOnly: true

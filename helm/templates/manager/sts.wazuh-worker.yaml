@@ -183,7 +183,7 @@ spec:
               mountPath: /etc/ssl/root-ca.pem
               readOnly: true
               subPath: root-ca.pem
-            - name: root-certs
+            - name: certs
               mountPath: /etc/ssl/filebeat.pem
               subPath: server.pem
               readOnly: true
