@@ -4,11 +4,11 @@ kind: Service
 metadata:
   name: {{ include "common.names.fullname" $ }}-cluster
   namespace: {{ include "common.names.namespace" $ }}
-  annotations:
-    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
     app: {{ include "common.names.fullname" $ }}-manager
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
 spec:
   selector:
     {{- include "common.labels.matchLabels" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}

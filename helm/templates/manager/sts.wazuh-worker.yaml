@@ -27,13 +27,18 @@ spec:
   {{- end }}
   template:
     metadata:
+      annotations:
+        {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/manager/configmap.yaml") $ | sha256sum }}
+
+        {{ with $.Values.cluster -}}{{- if .secret.enabled -}}
+        checksum/secret: {{ include (print $.Template.BasePath "/manager/secret.manager-common.yaml") $ | sha256sum }}
+        {{- end -}}{{- end }}
       labels:
         {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
         app: {{ include "common.names.fullname" $ }}-manager
         node-type: worker
       name: {{ $name }}
-      annotations:
-        {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
     spec:
       affinity:
         podAntiAffinity:
@@ -70,9 +75,9 @@ spec:
           ##
           command:
             - "/bin/sh"
-            - "/entrypoint-scripts/wazuh.replace-var.sh"
-            - "/tmp/template.config.conf"
-            - "/wazuh/tmp/ossec.conf"
+            - -c
+            - |
+              envsubst < /tmp/template.config.conf > /wazuh/tmp/ossec.conf
           ##
           ##
           env:
@@ -86,7 +91,7 @@ spec:
           ##
           envFrom:
             - secretRef:
-                name: '{{ include "common.names.fullname" $ }}-common-config'
+                name: '{{ include "secret.common" $ }}'
           ##
           ##
           volumeMounts:
@@ -96,10 +101,6 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /wazuh/tmp
-            - name: config
-              mountPath: /entrypoint-scripts/wazuh.replace-var.sh
-              subPath: wazuh.replace-var.sh
-              readOnly: true
         {{ with .initContainers -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -208,9 +209,9 @@ spec:
           ##
           envFrom:
             - secretRef:
-                name: '{{ include "common.names.fullname" $ }}-indexer-cred'
+                name: '{{ include "secret.indexer-auth" $ }}'
             - secretRef:
-                name: '{{ include "common.names.fullname" $ }}-common-config'
+                name: '{{ include "secret.common" $ }}'
           {{ with .envFrom -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}

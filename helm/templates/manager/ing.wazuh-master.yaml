@@ -6,7 +6,7 @@ metadata:
   name: {{ .name }}
   namespace: {{ include "common.names.namespace" $ }}
   annotations:
-    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge dict $.Values.commonIngressAnnotations .annotations) "context" $ ) | nindent 4 }}
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
 spec:

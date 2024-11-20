@@ -2,8 +2,7 @@ global:
   domain: 'dev.wazuh.adorsys.team'
   eks:
     domain:
-      certArn: 'arn:aws:acm:eu-central-1:590183746717:certificate/731f4f9f-c4af-4770-8130-c22aeec8a3ab'
-      wildcardCertArn: 'arn:aws:acm:eu-central-1:590183746717:certificate/1de84043-a566-4195-8bd4-e7402d85fc5b'
+      certArn: '<arn-of-the-certificate>'
 
 service:
   enabled: true
@@ -25,8 +24,8 @@ storageClass:
     basePath: /wazuh-data
     directoryPerms: '755'
     fileSystemId: '<fileSystemId>'
-    uid: '0'
-    gid: '0'
+    uid: '1000'
+    gid: '1000'
     provisioningMode: efs-ap
   reclaimPolicy: Retain
 
@@ -73,10 +72,6 @@ master:
 cluster:
   auth:
     key: "e5936685316e99525aff962141335960"
-  persistence:
-    size: 10Gi
-    accessModes:
-      - ReadWriteMany
 
 dashboard:
   resources:
@@ -120,23 +115,19 @@ dashboard:
       external-dns.alpha.kubernetes.io/hostname: '{{ .Values.global.domain }}'
 
 extraVolumeConfigs:
-  - name: '{{ include "common.names.fullname" $ }}-manager-backup'
-    additionalAnnotations: { }
-    additionalLabels: { }
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: '{{ $.Values.cluster.persistence.backupSize }}'
-  - name: snort-alerts
+  '{{ include "common.names.fullname" $ }}-manager-backup':
     accessModes:
       - ReadWriteMany
     resources:
       requests:
         storage: 10Gi
-  - name: owasp-zap-alerts
+  snort-alerts:
     accessModes:
       - ReadWriteMany
+    resources:
+      requests:
+        storage: 10Gi
+  owasp-zap-alerts:
     resources:
       requests:
         storage: 10Gi

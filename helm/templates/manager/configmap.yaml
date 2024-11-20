@@ -2,9 +2,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "common.names.fullname" $ }}-wazuh-conf
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
 data:
   "template.config.conf": {{ $.Files.Get "files/configs/template.config.conf.xml" | quote }}
   "local_rules.xml": {{ $.Files.Get "files/configs/local_rules.xml" | quote }}
   "local_decoder.xml": {{ $.Files.Get "files/configs/local_decoder.xml" | quote }}
   "0004-owasp-zap.xml": {{ $.Files.Get "files/configs/owasp_zap_decoder.xml" | quote }}
-  "wazuh.replace-var.sh": {{ $.Files.Get "files/scripts/wazuh.replace-var.sh" | quote }}
