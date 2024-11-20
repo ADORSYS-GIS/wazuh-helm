@@ -4,7 +4,7 @@ storageClass:
     basePath: /wazuh-data
     directoryPerms: '775'
     fileSystemId: '<fileSystemId>'
-#    uid: '1000'
-#    gid: '1000'
+    uid: '0'
+    gid: '0'
     provisioningMode: efs-ap
   reclaimPolicy: Retain

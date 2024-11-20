@@ -1,7 +1,7 @@
 dashboard:
   resources:
     requests:
-      cpu: 400m
+      cpu: 500m
       memory: 1Gi
     limits:
       cpu: 1
@@ -10,7 +10,7 @@ master:
   resources:
     requests:
       cpu: 1
-      memory: 1Gi
+      memory: 2Gi
     limits:
       cpu: 2
       memory: 4Gi
@@ -18,7 +18,7 @@ worker:
   resources:
     requests:
       cpu: 1
-      memory: 1Gi
+      memory: 2Gi
     limits:
       cpu: 2
       memory: 4Gi
@@ -26,7 +26,7 @@ indexer:
   resources:
     requests:
       cpu: 1
-      memory: 1Gi
+      memory: 2Gi
     limits:
       cpu: 2
       memory: 4Gi
