@@ -4,7 +4,7 @@ global:
   domain: wazuh.example.com
   ##
   ##
-  version: "4.8.2"
+  version: "4.9.2"
   ##
   ##
   imageRegistry: ""
@@ -670,7 +670,7 @@ service:
 cluster:
   secret:
     enabled: true
-    secretName: ~
+  secretName: ~
   auth:
     key: "dfbb2c1b9d679c39af94d5c1c821c952"
   config:
