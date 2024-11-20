@@ -75,6 +75,8 @@ spec:
           ##
           securityContext:
             privileged: true
+          ##
+          ##
           command:
             - /bin/sh
             - -c
