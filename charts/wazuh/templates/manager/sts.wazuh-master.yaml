@@ -73,10 +73,6 @@ spec:
           imagePullPolicy: IfNotPresent
           ##
           ##
-          securityContext:
-            privileged: true
-          ##
-          ##
           command:
             - /bin/sh
             - -c
@@ -110,7 +106,7 @@ spec:
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
       securityContext:
-        fsGroup: 101
+        fsGroup: 1000
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -119,9 +115,10 @@ spec:
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
           securityContext:
-            privileged: true
             capabilities:
               add: [ "SYS_CHROOT" ]
+            runAsUser: 1000
+            runAsGroup: 1000
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
