@@ -1,8 +1,10 @@
-{{- range .Values.extraVolumeConfigs }}
+{{- range $k, $v := .Values.extraVolumeConfigs }}
+{{ if $v.enabled }}
+{{ with $v }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
   namespace: {{ include "common.names.namespace" $}}
   annotations:
     {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
@@ -39,4 +41,6 @@ spec:
   selector: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
   {{- end }}
 ---
+{{- end -}}
+{{- end -}}
 {{- end }}

@@ -22,6 +22,15 @@ spec:
   serviceName: {{ include "common.names.fullname" $ }}-indexer
   template:
     metadata:
+      annotations:
+        {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/indexer/configmap.yaml") $ | sha256sum }}
+        {{ with $.Values.apiCred.auth -}}
+        checksum/secret.api: {{ include (print $.Template.BasePath "/indexer/secret.api.yaml") $ | sha256sum }}
+        {{- end }}
+        {{ with $.Values.indexer.auth -}}
+        checksum/secret: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
+        {{- end }}
       labels:
         {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
         app: {{ include "common.names.fullname" $ }}-indexer

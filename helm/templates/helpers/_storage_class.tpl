@@ -12,7 +12,7 @@ Name of the Storage class
                 {{- $prefix }}
             {{- end }}
         {{- else }}
-            {{- .Values.externalStorageClassName }}
+            {{- $.Values.global.externalStorageClassName }}
         {{- end }}
     {{- else }}
         {{- .Values.global.storageClassName }}

@@ -15,7 +15,10 @@ global:
   imagePullSecrets: [ ]
   ##
   ##
-  storageClassName: ""
+  storageClassName: ~
+  ##
+  ##
+  externalStorageClassName: ~
 
 ## @param kubeVersion Override Kubernetes version
 ##
@@ -32,10 +35,7 @@ commonLabels: { }
 ## @param commonAnnotations Annotations to add to all deployed resources
 ##
 commonAnnotations:
-  "kubernetes.io/description": "wazuh component"
-## @param commonIngressAnnotations Annotations to add to all Ingress resources
-##
-commonIngressAnnotations: { }
+  "kubernetes.io/description": '{{ include "common.names.fullname" $ }} cluster'
 
 ##
 ##
@@ -68,6 +68,9 @@ storageClass:
 ##
 ##
 apiCred:
+  ##
+  ##
+  authSecret: ~
   ##
   ##
   auth:
@@ -179,6 +182,10 @@ indexer:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: [ ]
+
+  ##
+  ##
+  authSecret: ~
 
   ##
   ##
@@ -404,19 +411,6 @@ master:
   ##
   ##
   additionalLabels: { }
-  ##
-  ##
-  persistence:
-    ##
-    ##
-    size: 200Mi
-    ##
-    ##
-    backupSize: 200Mi
-    ##
-    ##
-    accessModes:
-      - ReadWriteOnce
 
   ##
   ##
@@ -516,15 +510,17 @@ master:
 ##
 ##
 extraVolumeConfigs:
-  - name: '{{ include "common.names.fullname" $ }}-manager-backup'
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    enabled: true
     additionalAnnotations: { }
     additionalLabels: { }
     accessModes:
       - ReadWriteOnce
     resources:
       requests:
-        storage: '{{ $.Values.cluster.persistence.backupSize }}'
-  - name: snort-alerts
+        storage: 500Mi
+  snort-alerts:
+    enabled: true
     additionalAnnotations: { }
     additionalLabels: { }
     accessModes:
@@ -532,7 +528,8 @@ extraVolumeConfigs:
     resources:
       requests:
         storage: 200Mi
-  - name: owasp-zap-alerts
+  owasp-zap-alerts:
+    enabled: true
     additionalAnnotations: { }
     additionalLabels: { }
     accessModes:
@@ -608,6 +605,9 @@ dashboard:
     clusterIP: null
   ##
   ##
+  authSecret: ~
+  ##
+  ##
   auth:
     ##
     ##
@@ -660,7 +660,12 @@ service:
   ##
   loadBalancerClass: ""
 
+##
+##
 cluster:
+  secret:
+    enabled: true
+    secretName: ~
   auth:
     key: "dfbb2c1b9d679c39af94d5c1c821c952"
   config:
@@ -669,25 +674,11 @@ cluster:
       from: ossecm@example.wazuh.com
       to: recipient@example.wazuh.com
       max_per_hour: 12
-  ##
-  ##
-  persistence:
-    ##
-    ##
-    size: 200Mi
-    ##
-    ##
-    accessModes:
-      - ReadWriteOnce
 
 ##
 ##
-configmaps: [ ]
+configmaps: { }
 
 ##
 ##
-secrets: [ ]
-
-##
-##
-remoteSecrets: { }
+secrets: { }

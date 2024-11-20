@@ -16,6 +16,12 @@ spec:
       app: {{ include "common.names.fullname" $ }}-dashboard
   template:
     metadata:
+      annotations:
+        {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/dashboard/configmap.yaml") $ | sha256sum }}
+        {{ with $.Values.dashboard.auth -}}
+        checksum/secret: {{ include (print $.Template.BasePath "/dashboard/secret.yaml") $ | sha256sum }}
+        {{- end }}
       labels:
         {{ include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
         app: {{ include "common.names.fullname" $ }}-dashboard
@@ -78,11 +84,11 @@ spec:
           {{- end }}
           envFrom:
             - secretRef:
-                name: '{{ include "common.names.fullname" $ }}-indexer-cred'
+                name: '{{ include "secret.indexer-auth" $ }}'
             - secretRef:
-                name: '{{ include "common.names.fullname" $ }}-api-cred'
+                name: '{{ include "secret.api-auth" $ }}'
             - secretRef:
-                name: '{{ include "common.names.fullname" $ }}-dashboard-cred'
+                name: '{{ include "secret.dashboard-auth" $ }}'
           {{ with .envFrom -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
