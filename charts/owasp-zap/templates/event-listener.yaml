@@ -1,0 +1,13 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: {{ include "common.names.fullname" $ }}-event-listener
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+spec:
+  serviceAccountName: {{ include "common.names.fullname" $ }}
+  triggers:
+    - triggerRef: {{ include "common.names.fullname" $ }}-trigger

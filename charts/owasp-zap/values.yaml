@@ -1,0 +1,165 @@
+cronjob:
+  schedule: "0 */6 * * *"
+  failedJobsHistoryLimit: 10
+
+params:
+  APP_URL: "http://nginx-service"
+
+## Common annotations
+commonAnnotations: { }
+
+## Common labels
+commonLabels: { }
+
+persistence:
+  enabled: true
+  name: '{{ include "owasp-zap.volumeName" $ }}'
+  additionalLabels: { }
+  additionalAnnotations: { }
+  storageClass: ""
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+externalPvcName:
+
+rolebindings:
+  - name: '{{ include "common.names.fullname" $ }}-role-binding'
+    additionalLabels: { }
+    additionalAnnotations: { }
+    subjects:
+      - kind: ServiceAccount
+        name: '{{ include "common.names.fullname" $ }}'
+        namespace: '{{ include "common.names.namespace" $ }}'
+    roleRef:
+      kind: ClusterRole
+      name: tekton-triggers-eventlistener-roles
+      apiGroup: rbac.authorization.k8s.io
+
+clusterrolebindings:
+  - name: '{{ include "common.names.fullname" $ }}-cluster-role-binding'
+    additionalLabels: { }
+    additionalAnnotations: { }
+    subjects:
+      - kind: ServiceAccount
+        name: '{{ include "common.names.fullname" $ }}'
+        namespace: '{{ include "common.names.namespace" $ }}'
+    roleRef:
+      kind: ClusterRole
+      name: tekton-triggers-eventlistener-clusterroles
+      apiGroup: rbac.authorization.k8s.io
+
+pipelines:
+  - additionalLabels: { }
+    additionalAnnotations: { }
+    name: '{{ include "common.names.fullname" $ }}-pipeline'
+    spec:
+      params:
+        - name: APP_URL
+          type: string
+      workspaces:
+        - name: shared-workspace
+        - name: memory
+      tasks:
+        - name: '{{ include "common.names.fullname" $ }}'
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-task-scan'
+          workspaces:
+            - name: output
+              workspace: shared-workspace
+            - name: memory
+              workspace: memory
+          params:
+            - name: APP_URL
+              value: $(params.APP_URL)
+
+tasks:
+  - name: '{{ include "common.names.fullname" $ }}-task-scan'
+    additionalLabels: { }
+    additionalAnnotations: { }
+    spec:
+      workspaces:
+        - name: output
+        - name: memory
+      params:
+        - name: APP_URL
+          description: The application under test URL
+          type: string
+      stepTemplate:
+        workingDir: "/zap/wrk"
+        env:
+          - name: "WORK_DIR"
+            value: "/zap/wrk"
+          - name: "REPORT_JSON"
+            value: "report.json"
+          - name: "REPORT_HTML"
+            value: "report.html"
+          - name: "OUTPUT_PATH"
+            value: "$(workspaces.output.path)"
+          - name: "MEM_PATH"
+            value: "$(workspaces.memory.path)"
+        securityContext:
+          runAsUser: 0
+      volumes:
+        - name: scripts
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-flatten'
+      steps:
+        - name: 'zap-scan'
+          image: ghcr.io/zaproxy/zaproxy:stable
+          env:
+            - name: "APP_URL"
+              value: "$(params.APP_URL)"
+          script: |
+            #!/bin/bash
+            sh ./zap-scan.sh
+          volumeMounts:
+            - name: scripts
+              mountPath: /zap/wrk/zap-scan.sh
+              subPath: zap-scan.sh
+              readOnly: true
+        - name: 'clean-report'
+          image: node
+          volumeMounts:
+            - name: scripts
+              mountPath: /zap/wrk/flatten_json.js
+              subPath: flatten_json.js
+              readOnly: true
+          script: |
+            #!/bin/bash
+            PREFIX=$(date +%Y%m%d%H%M%S)
+            OUTPUT_FILE="${OUTPUT_PATH}/${PREFIX}-${REPORT_JSON}l"
+            node /zap/wrk/flatten_json.js "${MEM_PATH}/tmp-${REPORT_JSON}" "$OUTPUT_FILE" 2
+
+pipelineruns:
+  - additionalLabels: { }
+    additionalAnnotations:
+      "helm.sh/hook": post-install,post-upgrade
+    name: '{{ include "common.names.fullname" $ }}-pipeline-run'
+    spec:
+      pipelineRef:
+        name: '{{ include "common.names.fullname" $ }}-pipeline'
+      workspaces:
+        - name: shared-workspace
+          persistentVolumeClaim:
+            claimName: '{{ include "owasp-zap.volumeName" $ }}'
+        - name: memory
+          emptyDir: { }
+      params:
+        - name: APP_URL
+          value: '{{ .Values.params.APP_URL }}'
+
+
+##
+configmaps:
+  - name: '{{ include "common.names.fullname" $ }}-flatten'
+    additionalAnnotations: { }
+    additionalLabels: { }
+    data:
+      "zap-scan.sh": '{{- $.Files.Get "files/scripts/zap-scan.sh" }}'
+      "flatten_json.js": '{{- $.Files.Get "files/scripts/flatten_json.js" }}'
+  - name: '{{ include "common.names.fullname" $ }}-cron'
+    additionalAnnotations: { }
+    additionalLabels: { }
+    data:
+      "cron-starter.sh": '{{- $.Files.Get "files/scripts/cron-starter.sh" }}'

@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.names.fullname" $ }}-cron
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    "helm.sh/hook": post-install,post-upgrade
+spec:
+  failedJobsHistoryLimit: {{ .Values.cronjob.failedJobsHistoryLimit }}
+  schedule: "{{ .Values.cronjob.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: curl-trigger
+              image: curlimages/curl
+              workingDir: /zap/wrk
+              volumeMounts:
+                - name: scripts
+                  mountPath: /zap/wrk/cron-starter.sh
+                  subPath: cron-starter.sh
+                  readOnly: true
+              command:
+                - sh
+                - ./cron-starter.sh
+          restartPolicy: OnFailure
+          volumes:
+            - name: scripts
+              configMap:
+                name: '{{ include "common.names.fullname" $ }}-cron'

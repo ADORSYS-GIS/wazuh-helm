@@ -1,0 +1,26 @@
+{{- if .Values.persistence.enabled -}}
+{{ with .Values.persistence -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  {{ with .name }}
+  name: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+      {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+  annotations:
+      {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+spec:
+  {{ with .accessModes }}
+  accessModes:
+    {{- toYaml . | nindent 4 -}}
+  {{ end }}
+  {{ with .storageClass }}
+  storageClassName: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  resources:
+    requests:
+      storage: {{ .size }}
+{{- end }}
+{{- end -}}

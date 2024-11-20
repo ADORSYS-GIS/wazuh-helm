@@ -1,0 +1,15 @@
+{{ range .Values.tasks }}
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+{{ with .spec -}}
+spec: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+{{- end }}
+---
+{{ end }}
