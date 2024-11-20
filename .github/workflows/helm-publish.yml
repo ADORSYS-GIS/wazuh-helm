@@ -18,7 +18,6 @@ jobs:
     strategy:
       matrix:
         chart:
-          - argocd-apps
           - wazuh
           - owasp-zap
         include:
