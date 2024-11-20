@@ -24,7 +24,7 @@ spec:
             name: {{ include "common.names.fullname" $ }}-job-secret-script
         - name: root-ca-certs
           secret:
-            secretName: {{ $.Values.cluster.rootCaSecretName }}
+            secretName: {{ include "wazuh.cert_root_name" $ }}
       initContainers:
         - name: cert-generator
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}

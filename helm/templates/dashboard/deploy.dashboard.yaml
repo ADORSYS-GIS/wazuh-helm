@@ -31,6 +31,9 @@ spec:
       - name: certs
         secret:
           secretName: {{ include "wazuh.cert_secret_name" $ }}
+      - name: root-certs
+        secret:
+          secretName: {{ include "wazuh.cert_root_name" $ }}
       - name: config
         configMap:
           name: '{{ include "common.names.fullname" $ }}-dashboard-conf'
@@ -46,7 +49,7 @@ spec:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
           volumeMounts:
-          - name: certs
+          - name: root-certs
             mountPath: /usr/share/wazuh-dashboard/certs/root-ca.pem
             subPath: root-ca.pem
             readOnly: true

@@ -49,6 +49,9 @@ spec:
         - name: certs
           secret:
             secretName: {{ include "wazuh.cert_secret_name" $ }}
+        - name: root-certs
+          secret:
+            secretName: {{ include "wazuh.cert_root_name" $ }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -170,7 +173,7 @@ spec:
               subPath: 0004-owasp-zap.xml
               readOnly: true
 
-            - name: certs
+            - name: root-certs
               mountPath: /etc/ssl/root-ca.pem
               readOnly: true
               subPath: root-ca.pem
