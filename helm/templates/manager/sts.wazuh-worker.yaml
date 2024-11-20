@@ -69,9 +69,18 @@ spec:
             privileged: true
         - name: wazuh-init
           ##
-          image: steinbrueckri/envsubst:latest
+          image: alpine:latest
           ##
           imagePullPolicy: IfNotPresent
+          ##
+          ##
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -ex
+              apk add --update --no-cache libintl gettext
+              envsubst < /workdir/template.config.conf > /processed/ossec.conf
           ##
           ##
           env:
