@@ -93,8 +93,8 @@ spec:
               set -ex
               apk add --update --no-cache libintl gettext apache2-utils
 
-              export INDEXER_PASSWORD_BCRYPT=$(htpasswd -bnBC 10 "" $INDEXER_PASSWORD | tr -d ':\n')
-              export DASHBOARD_USERNAME_BCRYPT=$(htpasswd -bnBC 10 "" $DASHBOARD_USERNAME | tr -d ':\n')
+              export INDEXER_PASSWORD_BCRYPT=$(htpasswd -bnBC 12 "" $INDEXER_PASSWORD | tr -d ':\n')
+              export DASHBOARD_USERNAME_BCRYPT=$(htpasswd -bnBC 12 "" $DASHBOARD_USERNAME | tr -d ':\n')
               envsubst < /workdir/internal_users.yml > /processed/internal_users.yml
 
               cat processed/internal_users.yml
