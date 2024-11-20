@@ -39,9 +39,6 @@ spec:
             - mountPath: /root-certs
               name: root-ca-certs
               readOnly: true
-          env:
-            - name: ROOT_CA_FOLDER
-              value: /root-certs
           command:
             - /bin/sh
             - -c
@@ -50,6 +47,10 @@ spec:
 
               # Install openssl and bash
               apk add --no-cache openssl bash
+
+              # Copy root CA certificates to a tmp folder
+              ROOT_CA_FOLDER=$(mktemp -d)
+              cp /root-certs/* $ROOT_CA_FOLDER
 
               # Generate certificates
               /bin/bash /scripts/gen_certs.sh /certificates
