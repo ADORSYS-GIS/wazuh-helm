@@ -16,13 +16,14 @@ service:
     external-dns.alpha.kubernetes.io/hostname: 'master.{{ .Values.global.domain }}'
 
 indexer:
-  replicas: 3
+  replicas: 2
   persistence:
     size: 50Gi
     accessModes:
       - ReadWriteOnce
 
 worker:
+  replicaCount: 2
   persistence:
     size: 10Gi
     accessModes:
