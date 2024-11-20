@@ -31,6 +31,10 @@ spec:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/manager/configmap.yaml") $ | sha256sum }}
 
+        {{ with $.Values.apiCred.auth -}}
+        checksum/secret.api: {{ include (print $.Template.BasePath "/manager/secret.api.yaml") $ | sha256sum }}
+        {{- end }}
+
         {{ with $.Values.cluster -}}{{- if .secret.enabled -}}
         checksum/secret: {{ include (print $.Template.BasePath "/manager/secret.manager-common.yaml") $ | sha256sum }}
         {{- end -}}{{- end }}
