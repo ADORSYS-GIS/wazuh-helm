@@ -120,9 +120,10 @@ spec:
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
           securityContext:
-            privileged: true
             capabilities:
               add: [ "SYS_CHROOT" ]
+            runAsUser: 1000
+            runAsGroup: 1000
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
