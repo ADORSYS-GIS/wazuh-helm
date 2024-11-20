@@ -21,7 +21,7 @@ jobs:
           - wazuh
           - owasp-zap
         include:
-          - chart: wazuh
+          - chart: wazuh-helm
             path: charts/wazuh
           - chart: owasp-zap
             path: charts/owasp-zap
