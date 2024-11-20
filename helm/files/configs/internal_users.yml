@@ -4,20 +4,20 @@
 
 _meta:
   type: "internalusers"
-  config_version: 2
+  config_version: 3
 
 # Define your internal users here
 
 ## Demo users
 
-admin:
-  hash: "$2y$10$ATWpvEaRW.S7Jc2RcrGphumITwRz74fPGjnLqqplnHp4ukOSixY4W"
+${INDEXER_USERNAME}:
+  hash: "${INDEXER_PASSWORD_BCRYPT}"
   reserved: true
   backend_roles:
     - "admin"
   description: "Demo admin user"
 
-kibanaserver:
-  hash: "$2y$10$hjkLLLJZLyhWidvsNAixF.DQzdjBb0E2yeb7xusEW9wdG/gSC01C2"
+${DASHBOARD_USERNAME}:
+  hash: "${DASHBOARD_USERNAME_BCRYPT}"
   reserved: true
   description: "Demo kibanaserver user"
