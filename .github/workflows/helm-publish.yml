@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         chart:
-          - wazuh
+          - wazuh-helm
           - owasp-zap
         include:
           - chart: wazuh-helm
