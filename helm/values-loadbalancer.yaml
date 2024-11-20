@@ -1,0 +1,7 @@
+dashboard:
+  service:
+    type: LoadBalancer
+
+master:
+  service:
+    type: LoadBalancer
