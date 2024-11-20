@@ -75,19 +75,13 @@ spec:
               NAMESPACE={{ include "common.names.namespace" $ }}
               TEMP_DIR="/certificates/"
 
-              # If the secret already exists, skip the creation
-              if kubectl get secret $SECRET_NAME -n $NAMESPACE &> /dev/null; then
-                  echo "Secret $SECRET_NAME already exists. Skipping creation."
-                  exit 0
-              fi
-
               echo "Listing files in $TEMP_DIR"
               ls -la $TEMP_DIR
 
               echo "Check if directory exists"
               if [ -d "$TEMP_DIR" ]; then
                 echo "Build the kubectl command dynamically"
-                kubectl create secret generic $SECRET_NAME --from-file=$TEMP_DIR -n $NAMESPACE
+                kubectl create secret generic $SECRET_NAME --from-file=$TEMP_DIR -n $NAMESPACE || true
                 echo "Secret $SECRET_NAME created successfully."
               else
                 echo "Directory $TEMP_DIR does not exist or is empty!"
