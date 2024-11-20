@@ -1,8 +1,5 @@
 global:
   domain: 'dev.wazuh.adorsys.team'
-  eks:
-    domain:
-      certArn: '<arn-of-the-certificate>'
 
 service:
   enabled: true
@@ -82,9 +79,8 @@ dashboard:
             ]
           }
         }
-      alb.ingress.kubernetes.io/certificate-arn: '{{ .Values.global.eks.domain.certArn }}'
       alb.ingress.kubernetes.io/ssl-redirect: '443'
-      alb.ingress.kubernetes.io/healthcheck-path: '/'
+      alb.ingress.kubernetes.io/healthcheck-path: '/app/login'
       alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
       external-dns.alpha.kubernetes.io/hostname: '{{ .Values.global.domain }}'
 
