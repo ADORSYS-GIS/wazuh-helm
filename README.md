@@ -23,3 +23,9 @@ kubectl -n $NAMESPACE create secret generic $ROOT_SECRET_NAME \
     --from-file="root-ca.pem"="$OUTPUT_FOLDER/root-ca.pem" \
     --from-file="root-ca-key.pem"="$OUTPUT_FOLDER/root-ca-key.pem"
 ```
+
+To create the namespace, use the following command:
+```shell
+NAMESPACE="wazuh" # Modify this to your needs
+kubectl create namespace $NAMESPACE
+```

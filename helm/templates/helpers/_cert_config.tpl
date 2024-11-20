@@ -23,3 +23,10 @@ Cert secret name
 {{- define "wazuh.cert_secret_name" -}}
 {{ include "common.names.fullname" $ }}-certificates
 {{- end -}}
+
+{{/*
+Root-CA Secret name
+*/}}
+{{- define "wazuh.cert_root_name" -}}
+{{ $.Values.cluster.rootCaSecretName }}
+{{- end -}}
