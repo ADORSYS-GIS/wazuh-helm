@@ -507,6 +507,11 @@ master:
       cpu: 1000m
       memory: 2Gi
 
+  persistence:
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+
 ##
 ##
 extraVolumeConfigs:
