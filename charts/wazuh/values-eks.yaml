@@ -19,21 +19,15 @@ indexer:
   replicas: 2
   persistence:
     size: 50Gi
-    accessModes:
-      - ReadWriteOnce
 
 worker:
   replicaCount: 2
   persistence:
     size: 10Gi
-    accessModes:
-      - ReadWriteOnce
 
 master:
   persistence:
     size: 10Gi
-    accessModes:
-      - ReadWriteOnce
 
 cluster:
   auth:
@@ -76,14 +70,10 @@ dashboard:
 
 extraVolumeConfigs:
   '{{ include "common.names.fullname" $ }}-manager-backup':
-    accessModes:
-      - ReadWriteMany
     resources:
       requests:
         storage: 10Gi
   snort-alerts:
-    accessModes:
-      - ReadWriteMany
     resources:
       requests:
         storage: 10Gi

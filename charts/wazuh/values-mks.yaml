@@ -1,4 +1,4 @@
-storageClass:
+storageClasses:
   provisioner: microk8s.io/hostpath
   volumeBindingMode: WaitForFirstConsumer
   reclaimPolicy: Delete

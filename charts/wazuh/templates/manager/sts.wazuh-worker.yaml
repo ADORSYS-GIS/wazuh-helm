@@ -229,7 +229,11 @@ spec:
         {{ with .persistence.accessModes -}}
         accessModes: {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10 }}
         {{- end }}
+        {{ if .persistence.storageClassName -}}
+        storageClassName: {{ include "common.tplvalues.render" (dict "value" .persistence.storageClassName "context" $) }}
+        {{- else -}}
         storageClassName: {{ include "wazuh.storageClassName" $ }}
+        {{- end }}
         resources:
           requests:
             storage: {{ .persistence.size }}

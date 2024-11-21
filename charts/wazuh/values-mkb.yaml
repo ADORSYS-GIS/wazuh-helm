@@ -1,3 +1,4 @@
-storageClass:
-  provisioner: k8s.io/minikube-hostpath
-  volumeBindingMode: WaitForFirstConsumer
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    provisioner: k8s.io/minikube-hostpath
+    volumeBindingMode: WaitForFirstConsumer

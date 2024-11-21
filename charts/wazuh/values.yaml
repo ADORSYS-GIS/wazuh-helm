@@ -13,12 +13,9 @@ global:
   ##   - myRegistryKeySecretName
   ##
   imagePullSecrets: [ ]
-  ##
+  ## @param storageClass Default StorageClass for persistent volume claims
   ##
   storageClassName: ~
-  ##
-  ##
-  externalStorageClassName: ~
 
 ## @param kubeVersion Override Kubernetes version
 ##
@@ -39,31 +36,32 @@ commonAnnotations:
 
 ##
 ##
-storageClass:
-  ##
-  ##
-  enabled: true
-  ##
-  ##
-  name: ""
-  ##
-  ##
-  additionalAnnotations: { }
-  ##
-  ##
-  additionalLabels: { }
-  ##
-  ##
-  provisioner: ""
-  ##
-  ##
-  parameters: { }
-  ##
-  ##
-  volumeBindingMode: ""
-  ##
-  ##
-  reclaimPolicy: Delete
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    ##
+    ##
+    enabled: true
+    ##
+    ##
+    name: ""
+    ##
+    ##
+    additionalAnnotations: { }
+    ##
+    ##
+    additionalLabels: { }
+    ##
+    ##
+    provisioner: ""
+    ##
+    ##
+    parameters: { }
+    ##
+    ##
+    volumeBindingMode: ""
+    ##
+    ##
+    reclaimPolicy: Delete
 
 ##
 ##
@@ -226,6 +224,9 @@ indexer:
     size: 500Mi
     ##
     ##
+    storageClassName: ~
+    ##
+    ##
     accessModes:
       - ReadWriteOnce
   ##
@@ -349,6 +350,9 @@ worker:
     ##
     ##
     size: 200Mi
+    ##
+    ##
+    storageClassName: ~
     ##
     ##
     accessModes:
@@ -508,7 +512,14 @@ master:
        memory: 512Mi
 
   persistence:
+    ##
+    ##
     size: 10Gi
+    ##
+    ##
+    storageClassName: ~
+    ##
+    ##
     accessModes:
       - ReadWriteOnce
 
@@ -524,7 +535,15 @@ extraVolumeConfigs:
     resources:
       requests:
         storage: 500Mi
+    storageClassName: ~
+    dataSource: ~
+    volumeName: ~
+    volumeMode: ~
+    volumeAttributesClassName: ~
+    dataSourceRef: ~
+    selector: ~
   snort-alerts:
+    storageClassName: ~
     enabled: true
     additionalAnnotations: { }
     additionalLabels: { }
@@ -534,6 +553,7 @@ extraVolumeConfigs:
       requests:
         storage: 200Mi
   owasp-zap-alerts:
+    storageClassName: ~
     enabled: true
     additionalAnnotations: { }
     additionalLabels: { }
