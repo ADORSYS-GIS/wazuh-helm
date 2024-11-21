@@ -1,6 +1,7 @@
-storageClass:
-  provisioner: rancher.io/local-path
-  volumeBindingMode: WaitForFirstConsumer
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    provisioner: rancher.io/local-path
+    volumeBindingMode: WaitForFirstConsumer
 
 dashboard:
   ingress:

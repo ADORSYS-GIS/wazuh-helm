@@ -1,7 +1,23 @@
-storageClass:
-  provisioner: kubernetes.io/aws-ebs
-  parameters:
-    encrypted: 'true'
-    type: gp2
-  volumeBindingMode: WaitForFirstConsumer
-  reclaimPolicy: Retain
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    enabled: false
+  '{{ include "common.names.fullname" $ }}-ebs':
+    enabled: true
+    provisioner: kubernetes.io/aws-ebs
+    parameters:
+      encrypted: 'true'
+      type: gp3
+    volumeBindingMode: WaitForFirstConsumer
+    reclaimPolicy: Retain
+
+indexer:
+  persistence:
+    storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
+
+worker:
+  persistence:
+    storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
+
+master:
+  persistence:
+    storageClassName: '{{ include "common.names.fullname" $ }}-ebs'

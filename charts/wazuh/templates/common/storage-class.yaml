@@ -1,9 +1,10 @@
-{{- if and (not .Values.global.storageClassName) .Values.storageClass.enabled }}
-{{ with .Values.storageClass }}
+{{ range $k, $v := .Values.storageClasses }}
+{{- if $v.enabled }}
+{{- with $v }}
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: {{ include "wazuh.storageClassName" $ }}
+  name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
   namespace: {{ include "common.names.namespace" $ }}
   annotations:
     {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
@@ -30,5 +31,7 @@ allowVolumeExpansion: {{ include "common.tplvalues.render" (dict "value" . "cont
 {{ with .mountOptions -}}
 mountOptions: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
 {{- end }}
+{{- end }}
+---
 {{- end }}
 {{- end }}
