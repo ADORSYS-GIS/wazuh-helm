@@ -309,7 +309,7 @@ worker:
 
   ##
   ##
-  initContainers: [ ]
+  initContainers: { }
   ##
   ##
   env: [ ]
@@ -450,7 +450,7 @@ master:
     type: RollingUpdate
   ##
   initContainers:
-    - name: permission-fix
+    permission-fix:
       image: busybox
       resources:
         requests:
