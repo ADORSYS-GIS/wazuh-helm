@@ -3,7 +3,7 @@ storageClasses:
     enabled: false
   '{{ include "common.names.fullname" $ }}-ebs':
     enabled: true
-    provisioner: kubernetes.io/aws-ebs
+    provisioner: ebs.csi.aws.com
     parameters:
       encrypted: 'true'
       type: gp3
