@@ -64,6 +64,10 @@ spec:
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
       initContainers:
+        {{ range $k, $v := .initContainers }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
+        {{- end }}
         - name: wazuh-init
           ##
           ##
@@ -102,9 +106,6 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
-        {{ with .initContainers -}}
-        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
-        {{- end }}
       securityContext:
         fsGroup: 1000
       containers:

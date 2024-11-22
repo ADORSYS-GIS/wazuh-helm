@@ -1,0 +1,45 @@
+worker:
+  initContainers:
+    # Cleanup residue files in PV
+    cleanup-pv:
+      image: busybox
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 100m
+          memory: 256Mi
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          # Clear any existing files in the persistent volume
+          rm -rf /var/ossec/*
+      volumeMounts:
+        - mountPath: /var/ossec
+          name: '{{ include "common.names.fullname" $ }}-manager-worker'
+
+master:
+  initContainers:
+    # Cleanup residue files in PV
+    cleanup-pv:
+      image: busybox
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 100m
+          memory: 256Mi
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          # Clear any existing files in the persistent volume
+          rm -rf /var/ossec/*
+      volumeMounts:
+        - mountPath: /var/ossec
+          name: '{{ include "common.names.fullname" $ }}-manager-master'
