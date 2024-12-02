@@ -36,6 +36,10 @@ spec:
         app: {{ include "common.names.fullname" $ }}-indexer
       name: {{ include "common.names.fullname" $ }}-indexer
     spec:
+      {{ with .affinity -}}
+      affinity:
+      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+      {{- end }}
       securityContext:
         fsGroup: 1000
       # Set the indexer volume permissions so the indexer user can use it

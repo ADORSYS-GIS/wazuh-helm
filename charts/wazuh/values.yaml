@@ -257,6 +257,12 @@ indexer:
       cpu: 1
       memory: 2Gi
 
+  ##
+  ##
+  affinity: ~
+
+##
+##
 worker:
   ##
   ##
@@ -365,6 +371,10 @@ worker:
     limits:
        cpu: 500m
        memory: 512Mi
+
+  ##
+  ##
+  affinity: ~
 
 master:
   replicaCount: 1
@@ -522,6 +532,10 @@ master:
     ##
     accessModes:
       - ReadWriteOnce
+
+  ##
+  ##
+  affinity: ~
 
 ##
 ##

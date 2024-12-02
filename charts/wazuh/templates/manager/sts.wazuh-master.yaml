@@ -48,6 +48,10 @@ spec:
         node-type: master
       name: {{ $name }}
     spec:
+      {{ with .affinity -}}
+      affinity:
+      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+      {{- end }}
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
