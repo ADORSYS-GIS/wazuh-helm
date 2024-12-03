@@ -126,8 +126,6 @@ spec:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
           env:
-            - name: OPENSEARCH_JAVA_OPTS
-              value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
             - name: CLUSTER_NAME
               value: {{ include "common.names.fullname" $ }}
             - name: NETWORK_HOST

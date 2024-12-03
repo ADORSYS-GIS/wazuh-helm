@@ -240,7 +240,9 @@ indexer:
   envFrom: [ ]
   ##
   ##
-  env: [ ]
+  env:
+    - name: OPENSEARCH_JAVA_OPTS
+      value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   ##
   ##
   volumes: [ ]
