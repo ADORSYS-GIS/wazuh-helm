@@ -461,35 +461,7 @@ master:
   updateStrategy:
     type: RollingUpdate
   ##
-  initContainers:
-    permission-fix:
-      image: busybox
-      resources:
-        requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          cpu: 100m
-          memory: 256Mi
-      command:
-        - /bin/sh
-        - -c
-        - |
-          set -ex
-          # Change owner of the common directories
-          mkdir -p /var/lib/backup/wazuh/var/ossec/backup/db
-          chown -R 1000:1000 /var/lib/backup
-          chmod -R a+w /var/lib/backup
-          
-          chown -R 1000:1000 /var/lib/snort
-          chown -R 1000:1000 /var/lib/owasp-zap
-      volumeMounts:
-        - name: manager-backup
-          mountPath: /var/lib/backup
-        - name: snort-alerts
-          mountPath: /var/lib/snort
-        - name: owasp-zap-alerts
-          mountPath: /var/lib/owasp-zap
+  initContainers: { }
   ##
   ##
   env: [ ]
