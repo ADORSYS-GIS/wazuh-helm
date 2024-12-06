@@ -358,8 +358,8 @@
     
     <!-- Wazuh - Slack integration -->
     <integration>
-    <name>slack</name>
-    <hook_url>https://hooks.slack.com/services/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</hook_url>
-    <alert_format>json</alert_format>
-  </integration>
+        <name>slack</name>
+        <hook_url>https://hooks.slack.com/services/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</hook_url>
+        <alert_format>json</alert_format>
+    </integration>
 </ossec_config>
