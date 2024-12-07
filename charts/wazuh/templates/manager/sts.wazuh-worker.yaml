@@ -218,6 +218,12 @@ spec:
                 name: '{{ include "secret.indexer-auth" $ }}'
             - secretRef:
                 name: '{{ include "secret.common" $ }}'
+
+            {{ if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled $.Values.notification.slack.externalSecret -}}
+            - secretRef:
+                name: '{{ include "secret.notification-slack" $ }}'
+            {{- end }}
+
           {{ with .envFrom -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}

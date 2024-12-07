@@ -696,3 +696,20 @@ configmaps: { }
 ##
 ##
 secrets: { }
+
+
+##
+##
+notification:
+  ##
+  ##
+  slack:
+    ##
+    ##
+    enabled: true
+    ##
+    ##
+    webhookUrl: https://<example1>.slack.com/services/hooks/<example2>
+    ##
+    ##
+    externalSecret: ~
