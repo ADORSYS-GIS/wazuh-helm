@@ -44,12 +44,10 @@ spec:
         node-type: worker
       name: {{ $name }}
     spec:
+      {{ with .affinity -}}
       affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                topologyKey: kubernetes.io/hostname
+      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+      {{- end }}
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
@@ -220,6 +218,12 @@ spec:
                 name: '{{ include "secret.indexer-auth" $ }}'
             - secretRef:
                 name: '{{ include "secret.common" $ }}'
+
+            {{ if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled $.Values.notification.slack.externalSecret -}}
+            - secretRef:
+                name: '{{ include "secret.notification-slack" $ }}'
+            {{- end }}
+
           {{ with .envFrom -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}

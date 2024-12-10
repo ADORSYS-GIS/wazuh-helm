@@ -355,4 +355,6 @@
         <location>/var/log/owasp-zap/*.jsonl</location>
         <log_format>json</log_format>
     </localfile>
+
+    ${SLACK_CONFIG}
 </ossec_config>

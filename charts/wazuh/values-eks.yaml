@@ -1,19 +1,31 @@
 global:
   domain: 'dev.wazuh.adorsys.team'
 
-service:
-  enabled: true
-  type: LoadBalancer
-  loadBalancerClass: service.k8s.aws/nlb
-  additionalLabels:
-    dns: route53
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-name: '{{ include "common.names.fullname" $ }}'
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
-    service.beta.kubernetes.io/aws-load-balancer-type: "external"
-    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
-    external-dns.alpha.kubernetes.io/hostname: 'master.{{ .Values.global.domain }}'
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    enabled: true
+    type: LoadBalancer
+    loadBalancerClass: service.k8s.aws/nlb
+    additionalLabels:
+      dns: route53
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-name: '{{ include "common.names.fullname" $ }}-master'
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+      service.beta.kubernetes.io/aws-load-balancer-type: "external"
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+      external-dns.alpha.kubernetes.io/hostname: 'master.{{ .Values.global.domain }}'
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: true
+    type: LoadBalancer
+    loadBalancerClass: service.k8s.aws/nlb
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-name: '{{ include "common.names.fullname" $ }}-worker'
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+      service.beta.kubernetes.io/aws-load-balancer-type: "external"
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+      external-dns.alpha.kubernetes.io/hostname: 'master.{{ .Values.global.domain }}'
 
 indexer:
   replicas: 2
@@ -23,11 +35,11 @@ indexer:
 worker:
   replicaCount: 2
   persistence:
-    size: 10Gi
+    size: 50Gi
 
 master:
   persistence:
-    size: 10Gi
+    size: 50Gi
 
 cluster:
   auth:
