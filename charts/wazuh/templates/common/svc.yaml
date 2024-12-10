@@ -1,0 +1,56 @@
+{{ range $name, $val := .Values.svcs -}}
+{{- if $val.enabled -}}
+{{- with $val }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" $name "context" $) }}
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .annotations "context" $ ) | nindent 4 }}
+spec:
+  {{ with .type }}
+  type: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  {{ if eq .type "LoadBalancer" }}
+  {{ with .loadBalancerClass }}
+  loadBalancerClass: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  {{ end }}
+  selector:
+    {{- include "common.labels.matchLabels" $ | nindent 4 }}
+    {{- include "common.tplvalues.render" (dict "value" .selector "context" $) | nindent 4 -}}
+  {{ with .ports }}
+  ports:
+  {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4 -}}
+  {{ end }}
+  {{ with .loadBalancerIP }}
+  loadBalancerIP: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  {{ with .allocateLoadBalancerNodePorts }}
+  allocateLoadBalancerNodePorts: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  {{ with .clusterIP }}
+  clusterIP: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  {{ with .externalTrafficPolicy }}
+  externalTrafficPolicy: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  {{ with .sessionAffinity }}
+  sessionAffinity: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  {{ with .externalName }}
+  externalName: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  {{ with .healthCheckNodePort }}
+  healthCheckNodePort: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+  {{ with .publishNotReadyAddresses }}
+  publishNotReadyAddresses: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{ end }}
+---
+{{- end -}}
+{{- end -}}
+{{- end }}

@@ -6,7 +6,6 @@ metadata:
   namespace: {{ include "common.names.namespace" $ }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
-    app: {{ include "common.names.fullname" $ }}-indexer
   annotations:
     {{- include "common.annotations.standard" ( dict "customAnnotations" .annotations "context" $ ) | nindent 4 }}
 spec:

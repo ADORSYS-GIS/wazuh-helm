@@ -36,6 +36,10 @@ spec:
         app: {{ include "common.names.fullname" $ }}-indexer
       name: {{ include "common.names.fullname" $ }}-indexer
     spec:
+      {{ with .affinity -}}
+      affinity:
+      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+      {{- end }}
       securityContext:
         fsGroup: 1000
       # Set the indexer volume permissions so the indexer user can use it
@@ -122,8 +126,6 @@ spec:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
           env:
-            - name: OPENSEARCH_JAVA_OPTS
-              value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
             - name: CLUSTER_NAME
               value: {{ include "common.names.fullname" $ }}
             - name: NETWORK_HOST

@@ -1,4 +1,4 @@
-{{- if and (.Values.dashboard.ingress.enabled) (eq .Values.dashboard.service.type "ClusterIP") }}
+{{- if .Values.dashboard.ingress.enabled }}
 {{ with .Values.dashboard.ingress -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -11,7 +11,7 @@ metadata:
     {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
 spec:
   {{ with .className -}}
-  ingressClassName: {{ . }}
+  ingressClassName: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
   {{- end }}
   rules:
     - host: {{ include "common.tplvalues.render" (dict "value" .host "context" $) }}
@@ -23,7 +23,7 @@ spec:
               service:
                 name: {{ include "common.names.fullname" $ }}-dashboard
                 port:
-                  number: {{ include "common.tplvalues.render" (dict "value" $.Values.dashboard.service.port "context" $) }}
+                  number: {{ include "common.tplvalues.render" (dict "value" .port "context" $) }}
   tls:
     - hosts:
         - {{ include "common.tplvalues.render" (dict "value" .host "context" $) }}
