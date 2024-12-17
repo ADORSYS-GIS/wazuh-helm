@@ -12,7 +12,7 @@
         <org_name>{{ include "common.tplvalues.render" (dict "value" . "context" $) }}</org_name>
         <api_token>{{ include "common.tplvalues.render" (dict "value" $v.secret "context" $) }}</api_token>
     </api_auth>
-    {{- end }}
+    {{ end }}
 
     <api_parameters>
         <event_type>all</event_type>
