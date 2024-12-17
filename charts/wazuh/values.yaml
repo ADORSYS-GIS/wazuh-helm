@@ -350,11 +350,11 @@ worker:
 
   resources:
     requests:
-       cpu: 100m
-       memory: 256Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-       cpu: 500m
-       memory: 512Mi
+      cpu: 500m
+      memory: 512Mi
 
   ##
   ##
@@ -453,11 +453,11 @@ master:
 
   resources:
     requests:
-       cpu: 100m
-       memory: 256Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-       cpu: 500m
-       memory: 512Mi
+      cpu: 500m
+      memory: 512Mi
 
   persistence:
     ##
@@ -555,8 +555,8 @@ dashboard:
       cpu: 200m
       memory: 512Mi
     limits:
-     cpu: 400m
-     memory: 1Gi
+      cpu: 400m
+      memory: 1Gi
 
   ##
   ##
@@ -816,3 +816,60 @@ notification:
     ##
     ##
     externalSecret: ~
+
+
+##
+##
+integration:
+  ##
+  ## https://documentation.wazuh.com/current/cloud-security/azure/platform-and-services.html#getting-access-credentials-for-microsoft-azure-storage
+  azure:
+    ##
+    ##
+    workspace: ~
+    ##
+    ##
+    domain: gisudm.onmicrosoft.com
+    ##
+    ##
+    auth:
+      ##
+      ##
+      log:
+        ##
+        ##
+        application_id: ~
+        ##
+        ##
+        application_key: ~
+      ##
+      ##
+      graph:
+        ##
+        ##
+        application_id: ~
+        ##
+        ##
+        application_key: ~
+      ##
+      ##
+      storage:
+        ##
+        ##
+        account_name: ~
+        ##
+        ##
+        account_key: ~
+
+
+  ##
+  ## https://documentation.wazuh.com/current/cloud-security/azure/storage.html
+  github: [ ]
+#    - ##
+#      ##
+#      secret: <PAT>
+#      ##
+#      ##
+#      orgs:
+#        - <ORG1>
+#        - <ORG2>
