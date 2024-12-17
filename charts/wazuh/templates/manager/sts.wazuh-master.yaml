@@ -104,12 +104,14 @@ spec:
                   fieldPath: metadata.name
             {{ if eq (include "integration.azure.exists" $) "true" -}}
             - name: AZURE_CONFIGS
-              value: {{ include "integration.azure.conf" $ | quote }}
+              value: |
+                {{ include "integration.azure.conf" $ | nindent 16 }}
             {{- end }}
 
             {{ with include "integration.github.conf" $ -}}
             - name: GITHUB_CONFIGS
-              value: {{ . | quote }}
+              value: |
+                {{ . | nindent 16 }}
             {{- end }}
 
           ##
