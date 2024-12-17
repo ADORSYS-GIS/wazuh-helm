@@ -2,7 +2,7 @@
 {{ range $k, $v := .Values.integration.github }}
 <github>
     <enabled>yes</enabled>
-    <interval>10m</interval>
+    <interval>30s</interval>
     <time_delay>30s</time_delay>
     <curl_max_size>1M</curl_max_size>
     <only_future_events>no</only_future_events>
