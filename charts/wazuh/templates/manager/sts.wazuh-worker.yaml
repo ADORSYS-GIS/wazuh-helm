@@ -81,7 +81,7 @@ spec:
             - |
               set -ex
               apk add --update --no-cache libintl gettext
-              envsubst < /workdir/template.config.conf > /processed/ossec.conf
+              envsubst < /workdir/template.config.xml > /processed/ossec.conf
           ##
           ##
           env:
@@ -105,8 +105,8 @@ spec:
           ##
           volumeMounts:
             - name: config
-              mountPath: /workdir/template.config.conf
-              subPath: template.config.conf
+              mountPath: /workdir/template.config.xml
+              subPath: template.config.xml
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed

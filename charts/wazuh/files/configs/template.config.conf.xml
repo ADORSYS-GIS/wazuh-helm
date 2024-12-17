@@ -356,5 +356,7 @@
         <log_format>json</log_format>
     </localfile>
 
-    ${SLACK_CONFIG}
+    ${AZURE_CONFIGS:""}
+    ${GITHUB_CONFIGS:""}
+    ${SLACK_CONFIG:""}
 </ossec_config>
