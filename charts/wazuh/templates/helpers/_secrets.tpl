@@ -41,3 +41,14 @@ Dashboard credentials
 {{- $.Values.dashboard.authSecret -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Slack notification credentials
+*/}}
+{{- define "secret.notification-slack" -}}
+{{- if not $.Values.notification.slack.externalSecret -}}
+{{ include "common.names.fullname" $ }}-slack-cred
+{{- else -}}
+{{- $.Values.notification.slack.externalSecret -}}
+{{- end -}}
+{{- end -}}

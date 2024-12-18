@@ -7,7 +7,11 @@ metadata:
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
 data:
-  "template.config.conf": {{ $.Files.Get "files/configs/template.config.conf.xml" | quote }}
-  "local_rules.xml": {{ $.Files.Get "files/configs/local_rules.xml" | quote }}
-  "local_decoder.xml": {{ $.Files.Get "files/configs/local_decoder.xml" | quote }}
-  "0004-owasp-zap.xml": {{ $.Files.Get "files/configs/owasp_zap_decoder.xml" | quote }}
+  "template.config.xml": |
+    {{ $.Files.Get "files/configs/template.config.conf.xml" | nindent 6 }}
+  "local_rules.xml":  |
+    {{ $.Files.Get "files/configs/local_rules.xml" | nindent 6 }}
+  "local_decoder.xml":  |
+    {{ $.Files.Get "files/configs/local_decoder.xml" | nindent 6 }}
+  "0004-owasp-zap.xml":  |
+    {{ $.Files.Get "files/configs/owasp_zap_decoder.xml" | nindent 6 }}

@@ -7,5 +7,7 @@ metadata:
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
 data:
-  "opensearch.yml": {{ $.Files.Get "files/configs/opensearch.yml" | quote }}
-  "internal_users.yml": {{ $.Files.Get "files/configs/internal_users.yml" | quote }}
+  "opensearch.yml": |
+    {{ $.Files.Get "files/configs/opensearch.yml" | nindent 4 }}
+  "internal_users.yml": |
+    {{ $.Files.Get "files/configs/internal_users.yml" | nindent 4 }}
