@@ -91,6 +91,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            {{ with include "integration.github.conf" $ -}}
+            - name: GITHUB_CONFIGS
+              value: |
+                {{ . | nindent 16 }}
+            {{- end }}
           ##
           ##
           envFrom:
