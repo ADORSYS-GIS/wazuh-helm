@@ -333,24 +333,6 @@ worker:
   ##
   ##
   podManagementPolicy: Parallel
-  ##
-  ##
-  service:
-    ##
-    ##
-    type: ClusterIP
-    ##
-    ##
-    additionalLabels: { }
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
-    loadBalancerClass: ""
-    ##
-    ##
-    port: 1514
 
   ##
   ##
@@ -368,11 +350,15 @@ worker:
 
   resources:
     requests:
-       cpu: 100m
-       memory: 256Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-       cpu: 500m
-       memory: 512Mi
+      cpu: 500m
+      memory: 512Mi
+
+  ##
+  ##
+  affinity: ~
 
   ##
   ##
@@ -403,24 +389,6 @@ master:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: [ ]
-  ##
-  ##
-  service:
-    ##
-    ##
-    type: ClusterIP
-    ##
-    ##
-    additionalLabels: { }
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
-    loadBalancerClass: ""
-    ##
-    ##
-    port: 1515
   ##
   ##
   additionalAnnotations: { }
@@ -489,11 +457,11 @@ master:
 
   resources:
     requests:
-       cpu: 100m
-       memory: 256Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-       cpu: 500m
-       memory: 512Mi
+      cpu: 500m
+      memory: 512Mi
 
   persistence:
     ##
@@ -591,31 +559,9 @@ dashboard:
       cpu: 200m
       memory: 512Mi
     limits:
-     cpu: 400m
-     memory: 1Gi
-  service:
-    additionalLabels: { }
-    ##
-    ##
-    type: ClusterIP # LoadBalancer
-    ##
-    ##
-    port: 5601
-    ##
-    ##
-    targetPort: 5601
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
-    loadBalancerIP: null
-    ##
-    ##
-    allocateLoadBalancerNodePorts: null
-    ##
-    ##
-    clusterIP: null
+      cpu: 400m
+      memory: 1Gi
+
   ##
   ##
   authSecret: ~
@@ -649,29 +595,190 @@ dashboard:
     ##
     ##
     host: "{{ .Values.global.domain }}"
+    ##
+    ##
+    port: 5601
   ports:
     - containerPort: 5601
       name: dashboard
   volumes: [ ]
   volumeMounts: [ ]
-  env: [ ]
+  env:
+    - name: OPENSEARCH_JAVA_OPTS
+      value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   envFrom: [ ]
 
-##
-##
-service:
+
+svcs:
   ##
   ##
-  type: ClusterIP
+  '{{ include "common.names.fullname" $ }}':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: LoadBalancer
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    clusterIP: ~
+
+    ##
+    ##
+    loadBalancerIP: ~
+
+    ##
+    ##
+    allocateLoadBalancerNodePorts: ~
+
+    ##
+    ##
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: master
+
+    ports:
+      - name: api
+        port: 55000
+        targetPort: api
+        protocol: TCP
+      - name: registration
+        port: 1515
+        targetPort: registration
+        protocol: TCP
+
   ##
   ##
-  additionalLabels: { }
+  '{{ include "common.names.fullname" $ }}-worker':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: LoadBalancer
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    ports:
+      - name: agents-events
+        port: 1514
+        targetPort: agents-events
+        protocol: TCP
+
+    ##
+    ##
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: worker
+
   ##
   ##
-  annotations: { }
+  '{{ include "common.names.fullname" $ }}-cluster':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: ClusterIP
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+
+    ##
+    ##
+    clusterIP: None
+
+    ##
+    ##
+    ports:
+      - name: cluster
+        port: 1516
+        protocol: TCP
+        targetPort: cluster
+
   ##
   ##
-  loadBalancerClass: ""
+  '{{ include "common.names.fullname" $ }}-dashboard':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: ClusterIP
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    selector:
+      ##
+      ##
+      app: '{{ include "common.names.fullname" $ }}-dashboard'
+
+    ##
+    ##
+    clusterIP: ~
+
+    ##
+    ##
+    ports:
+      - name: dashboard
+        port: 5601
+        protocol: TCP
+        targetPort: 5601
 
 ##
 ##
@@ -696,3 +803,77 @@ configmaps: { }
 ##
 ##
 secrets: { }
+
+
+##
+##
+notification:
+  ##
+  ##
+  slack:
+    ##
+    ##
+    enabled: false
+    ##
+    ##
+    webhookUrl: https://<example1>.slack.com/services/hooks/<example2>
+    ##
+    ##
+    externalSecret: ~
+
+
+##
+##
+integration:
+  ##
+  ## https://documentation.wazuh.com/current/cloud-security/azure/platform-and-services.html#getting-access-credentials-for-microsoft-azure-storage
+  azure:
+    ##
+    ##
+    workspace: ~
+    ##
+    ##
+    domain: gisudm.onmicrosoft.com
+    ##
+    ##
+    auth:
+      ##
+      ##
+      log:
+        ##
+        ##
+        application_id: ~
+        ##
+        ##
+        application_key: ~
+      ##
+      ##
+      graph:
+        ##
+        ##
+        application_id: ~
+        ##
+        ##
+        application_key: ~
+      ##
+      ##
+      storage:
+        ##
+        ##
+        account_name: ~
+        ##
+        ##
+        account_key: ~
+
+
+  ##
+  ## https://documentation.wazuh.com/current/cloud-security/azure/storage.html
+  github: [ ]
+#    - ##
+#      ##
+#      secret: <PAT>
+#      ##
+#      ##
+#      orgs:
+#        - <ORG1>
+#        - <ORG2>

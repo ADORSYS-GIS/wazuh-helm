@@ -78,7 +78,7 @@ spec:
             - name: INDEXER_URL
               value: 'https://{{ include "common.names.fullname" $ }}-indexer-api:9200'
             - name: WAZUH_API_URL
-              value: 'https://{{ include "common.names.fullname" $ }}-manager'
+              value: 'https://{{ include "common.names.fullname" $ }}'
             - name: SERVER_SSL_ENABLED
               value: "true"
             - name: SERVER_SSL_CERTIFICATE
