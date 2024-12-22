@@ -239,8 +239,6 @@ spec:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
           ports:
-            - containerPort: 1514
-              name: agents-events
             - containerPort: 1515
               name: registration
             - containerPort: 1516
