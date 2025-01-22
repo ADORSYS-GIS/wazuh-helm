@@ -194,6 +194,39 @@ indexer:
     ##
     ##
     password: "rU40Fm%0GnK£iqQN"
+    ##
+    ##
+    keycloak:
+      ##
+      ##
+      enabled: false
+      ##
+      ##
+      roles_key: Roles
+      ##
+      ##
+      idp:
+        entity_id: 'https://<keycloak_origin>/realms/<realm>'
+        ##
+        ##
+        metadata: ~
+        
+      ##
+      ##
+      sp:
+        ##
+        ##
+        entity_id: 'wazuh-saml'
+        ##
+        ##
+        metadata: ~
+        
+      ##
+      ##
+      exchange_key: 83236f55a4757ab9748eb7c7afa8b7c6aceddf1c008770b14ae702e31eb44865
+      ##
+      ##
+      kibana_url: "https://<WAZUH_DASHBOARD_ADDRESS>"
 
   ##
   ##
