@@ -199,7 +199,7 @@ indexer:
     keycloak:
       ##
       ##
-      enabled: true
+      enabled: false
       ##
       ##
       roles_key: Roles
