@@ -1,0 +1,30 @@
+authc:
+  basic_internal_auth_domain:
+    description: "Authenticate via HTTP Basic against internal users database"
+    http_enabled: true
+    transport_enabled: true
+    order: 0
+    http_authenticator:
+      type: "basic"
+      challenge: false
+    authentication_backend:
+      type: "intern"
+  saml_auth_domain:
+    http_enabled: true
+    transport_enabled: false
+    order: 1
+    http_authenticator:
+      type: saml
+      challenge: true
+      config:
+        idp:
+          entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.idp.entity_id "context" $) }}'
+          metadata_file: /etc/wazuh-indexer/opensearch-security/idp.metadata.xml
+        sp:
+          entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.sp.entity_id "context" $) }}'
+          metadata_file: /etc/wazuh-indexer/opensearch-security/sp.metadata.xml
+        kibana_url: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.kibana_url "context" $) }}'
+        roles_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.roles_key "context" $) }}'
+        exchange_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.exchange_key "context" $) }}'
+    authentication_backend:
+      type: noop
