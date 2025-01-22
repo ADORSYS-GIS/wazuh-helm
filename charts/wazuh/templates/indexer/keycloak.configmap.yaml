@@ -1,0 +1,30 @@
+{{ with $.Values.indexer.auth.keycloak }}
+{{- if .enabled -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "common.names.fullname" $ }}-keycloak-conf
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  {{- $config := $.Files.Get "files/configs/config.yml" }}
+  "config.yml": |
+    {{ include "common.tplvalues.render" (dict "value" $config "context" $) | nindent 4 }}
+  
+  {{- $roles_mapping := $.Files.Get "files/configs/roles_mapping.yml" }}
+  "roles_mapping.yml": |
+    {{ include "common.tplvalues.render" (dict "value" $roles_mapping "context" $) | nindent 4 }}
+  
+  {{ with .idp.metadata }}
+  "idp.metadata.xml": |
+    {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{ end }}
+  
+  {{ with .sp.metadata }}
+  "sp.metadata.xml": |
+    {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
+  {{ end }}
+{{- end -}}
+{{ end }}
