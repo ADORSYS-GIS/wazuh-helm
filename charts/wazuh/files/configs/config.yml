@@ -18,13 +18,13 @@ authc:
       challenge: true
       config:
         idp:
-          entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.idp.entity_id "context" $) }}'
+          entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.idp.entity_id "context" $) }}'
           metadata_file: /etc/wazuh-indexer/opensearch-security/idp.metadata.xml
         sp:
-          entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.sp.entity_id "context" $) }}'
+          entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.sp.entity_id "context" $) }}'
           metadata_file: /etc/wazuh-indexer/opensearch-security/sp.metadata.xml
-        kibana_url: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.kibana_url "context" $) }}'
-        roles_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.roles_key "context" $) }}'
-        exchange_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.auth.keycloak.exchange_key "context" $) }}'
+        kibana_url: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.kibana_url "context" $) }}'
+        roles_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.roles_key "context" $) }}'
+        exchange_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.exchange_key "context" $) }}'
     authentication_backend:
       type: noop

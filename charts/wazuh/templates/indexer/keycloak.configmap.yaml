@@ -1,4 +1,4 @@
-{{ with $.Values.indexer.auth.keycloak }}
+{{ with $.Values.indexer.keycloak }}
 {{- if .enabled -}}
 apiVersion: v1
 kind: Secret
