@@ -11,7 +11,7 @@ server.ssl.certificate: "/usr/share/wazuh-dashboard/certs/dashboard.pem"
 opensearch.ssl.certificateAuthorities: ["/usr/share/wazuh-dashboard/certs/root-ca.pem"]
 uiSettings.overrides.defaultRoute: /app/wz-home
   
-{{ with $.Values.indexer.auth.keycloak -}}
+{{ with $.Values.indexer.keycloak -}}
 {{- if .enabled -}}
 opensearch_security.auth.type: "saml"
 server.xsrf.allowlist: ["/_opendistro/_security/saml/acs", "/_opendistro/_security/saml/logout", "/_opendistro/_security/saml/acs/idpinitiated"]

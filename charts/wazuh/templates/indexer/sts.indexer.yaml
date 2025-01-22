@@ -56,7 +56,7 @@ spec:
           configMap:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
             
-        {{ with .auth.keycloak }}
+        {{ with .keycloak }}
         {{- if .enabled -}}
         - name: wazuh-keycloak-config
           secret:
@@ -199,7 +199,7 @@ spec:
               subPath: internal_users.yml
               readOnly: true
 
-            {{ with .auth.keycloak -}}
+            {{ with .keycloak -}}
             {{- if .enabled -}}
             - name: wazuh-keycloak-config
               mountPath: /usr/share/wazuh-indexer/opensearch-security/config.yml
