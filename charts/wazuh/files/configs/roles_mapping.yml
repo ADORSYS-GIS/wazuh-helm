@@ -1,0 +1,5 @@
+all_access:
+  reserved: false
+  hidden: false
+  backend_roles:
+    - "admin"

@@ -55,6 +55,15 @@ spec:
         - name: indexer-conf
           configMap:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
+            
+        {{ with .auth.keycloak }}
+        {{- if .enabled -}}
+        - name: wazuh-keycloak-config
+          secret:
+            secretName: '{{ include "common.names.fullname" $ }}-keycloak-conf'
+        {{- end -}}
+        {{ end }}
+        
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -189,6 +198,28 @@ spec:
               mountPath: /usr/share/wazuh-indexer/opensearch-security/internal_users.yml
               subPath: internal_users.yml
               readOnly: true
+
+            {{ with .auth.keycloak -}}
+            {{- if .enabled -}}
+            - name: wazuh-keycloak-config
+              mountPath: /usr/share/wazuh-indexer/opensearch-security/config.yml
+              subPath: config.yml
+              readOnly: true
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/idp.metadata.xml
+              subPath: idp.metadata.xml
+              readOnly: true
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/sp.metadata.xml
+              subPath: sp.metadata.xml
+              readOnly: true
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/roles_mapping.yml
+              subPath: roles_mapping.yml
+              readOnly: true
+            {{- end -}}
+            {{- end }}
+              
           {{ with .volumeMounts }}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
