@@ -1,4 +1,4 @@
-{{ with $.Values.indexer.keycloak }}
+{{ with .Values.indexer.keycloak }}
 {{- if .enabled -}}
 apiVersion: v1
 kind: Secret
@@ -8,7 +8,7 @@ metadata:
     {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
-data:
+stringData:
   {{- $config := $.Files.Get "files/configs/config.yml" }}
   "config.yml": |
     {{ include "common.tplvalues.render" (dict "value" $config "context" $) | nindent 4 }}
