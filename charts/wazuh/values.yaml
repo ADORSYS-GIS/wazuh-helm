@@ -227,7 +227,7 @@ indexer:
     exchange_key: 83236f55a4757ab9748eb7c7afa8b7c6aceddf1c008770b14ae702e31eb44865
     ##
     ##
-    kibana_url: "https://<WAZUH_DASHBOARD_ADDRESS>"
+    kibana_url: "https://{{ .Values.global.domain }}"
 
   ##
   ##
