@@ -86,8 +86,9 @@ dashboard:
           }
         }
       alb.ingress.kubernetes.io/ssl-redirect: '443'
-      alb.ingress.kubernetes.io/healthcheck-path: '/app/login'
+      alb.ingress.kubernetes.io/healthcheck-path: '/_cluster/health'
       alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+      alb.ingress.kubernetes.io/success-codes: 401
       external-dns.alpha.kubernetes.io/hostname: '{{ .Values.global.domain }}'
 
 extraVolumeConfigs:
