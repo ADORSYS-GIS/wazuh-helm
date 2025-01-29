@@ -219,6 +219,9 @@ indexer:
     ##
     ##
     scope: ~
+    ##
+    ##
+    base_redirect_url: ~
 
   ##
   ##
