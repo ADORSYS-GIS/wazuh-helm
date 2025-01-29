@@ -203,31 +203,22 @@ indexer:
     enabled: true
     ##
     ##
-    roles_key: Roles
+    roles_key: wazuh_roles
     ##
     ##
-    idp:
-      entity_id: 'https://<keycloak_origin>/realms/<realm>'
-      ##
-      ##
-      metadata: ~
-      
+    subject_key: preferred_username
     ##
     ##
-    sp:
-      ##
-      ##
-      entity_id: 'wazuh-saml'
-      ##
-      ##
-      metadata: ~
-      
+    openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
     ##
     ##
-    exchange_key: 83236f55a4757ab9748eb7c7afa8b7c6aceddf1c008770b14ae702e31eb44865
+    client_id: ~
     ##
     ##
-    kibana_url: "https://{{ .Values.global.domain }}"
+    client_secret: ~
+    ##
+    ##
+    scope: ~
 
   ##
   ##
