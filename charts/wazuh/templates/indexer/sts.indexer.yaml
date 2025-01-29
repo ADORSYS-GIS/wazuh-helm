@@ -206,14 +206,6 @@ spec:
               subPath: config.yml
               readOnly: true
             - name: wazuh-keycloak-config
-              mountPath: /etc/wazuh-indexer/opensearch-security/idp.metadata.xml
-              subPath: idp.metadata.xml
-              readOnly: true
-            - name: wazuh-keycloak-config
-              mountPath: /etc/wazuh-indexer/opensearch-security/sp.metadata.xml
-              subPath: sp.metadata.xml
-              readOnly: true
-            - name: wazuh-keycloak-config
               mountPath: /etc/wazuh-indexer/opensearch-security/roles_mapping.yml
               subPath: roles_mapping.yml
               readOnly: true
