@@ -20,6 +20,9 @@ opensearch_security.openid.client_secret: '{{ include "common.tplvalues.render" 
 {{ with .scope -}}
 opensearch_security.openid.scope: '{{ include "common.tplvalues.render" (dict "value" . "context" $) }}'
 {{- end }}
+{{ with .base_redirect_url -}}
+opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.render" (dict "value" . "context" $) }}'
+{{- end }}
 
 server.xsrf.allowlist: ["/_opendistro/_security/saml/acs", "/_opendistro/_security/saml/logout", "/_opendistro/_security/saml/acs/idpinitiated"]
 opensearch_security.session.keepalive: false
