@@ -106,25 +106,38 @@ config:
           challenge: true
         authentication_backend:
           type: intern
-#      saml_auth_domain:
-#        http_enabled: true
-#        transport_enabled: false
-#        order: 1
-#        http_authenticator:
-#          type: saml
-#          challenge: true
-#          config:
-#            idp:
-#              entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.idp.entity_id "context" $) }}'
-#              metadata_file: /etc/wazuh-indexer/opensearch-security/idp.metadata.xml
-#            sp:
-#              entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.sp.entity_id "context" $) }}'
-#              metadata_file: /etc/wazuh-indexer/opensearch-security/sp.metadata.xml
-#            kibana_url: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.kibana_url "context" $) }}'
-#            roles_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.roles_key "context" $) }}'
-#            exchange_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.exchange_key "context" $) }}'
-#        authentication_backend:
-#          type: noop
+      openid_auth_domain:
+        http_enabled: true
+        transport_enabled: true
+        order: 0
+        http_authenticator:
+          type: openid
+          challenge: false
+          config:
+            subject_key: preferred_username
+            roles_key: roles
+            openid_connect_url: https://login.wazuh.adorsys.team/realms/adorsys/.well-known/openid-configuration
+        authentication_backend:
+          type: noop
+      saml_auth_domain:
+        http_enabled: true
+        transport_enabled: false
+        order: 1
+        http_authenticator:
+          type: saml
+          challenge: true
+          config:
+            idp:
+              entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.idp.entity_id "context" $) }}'
+              metadata_file: /etc/wazuh-indexer/opensearch-security/idp.metadata.xml
+            sp:
+              entity_id: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.sp.entity_id "context" $) }}'
+              metadata_file: /etc/wazuh-indexer/opensearch-security/sp.metadata.xml
+            kibana_url: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.kibana_url "context" $) }}'
+            roles_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.roles_key "context" $) }}'
+            exchange_key: '{{ include "common.tplvalues.render" (dict "value" $.Values.indexer.keycloak.exchange_key "context" $) }}'
+        authentication_backend:
+          type: noop
       proxy_auth_domain:
         description: "Authenticate via proxy"
         http_enabled: false
@@ -142,7 +155,7 @@ config:
         description: "Authenticate via Json Web Token"
         http_enabled: false
         transport_enabled: false
-        order: 0
+        order: 7
         http_authenticator:
           type: jwt
           challenge: false
