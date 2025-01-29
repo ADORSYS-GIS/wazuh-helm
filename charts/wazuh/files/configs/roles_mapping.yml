@@ -2,4 +2,11 @@ all_access:
   reserved: false
   hidden: false
   backend_roles:
-    - "admin"
+    - "wazuh_admin"
+    
+readall:
+  reserved: false
+  hidden: false
+  backend_roles:
+    - "wazuh_viewer"
+  
