@@ -7,6 +7,7 @@ all_access:
   hidden: false
   backend_roles:
     - "wazuh_admin"
+    - "admin"
     
 readall:
   reserved: false
