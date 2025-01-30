@@ -58,29 +58,6 @@ _meta:
 
 config:
   dynamic:
-    # Set filtered_alias_mode to 'disallow' to forbid more than 2 filtered aliases per index
-    # Set filtered_alias_mode to 'warn' to allow more than 2 filtered aliases per index but warns about it (default)
-    # Set filtered_alias_mode to 'nowarn' to allow more than 2 filtered aliases per index silently
-    #filtered_alias_mode: warn
-    #do_not_fail_on_forbidden: false
-    #kibana:
-    # Kibana multitenancy
-    #multitenancy_enabled: true
-    #private_tenant_enabled: true
-    #default_tenant: ""
-    #server_username: kibanaserver
-    #index: '.kibana'
-    http:
-      anonymous_auth_enabled: false
-      xff:
-        enabled: false
-        internalProxies: '192\.168\.0\.10|192\.168\.0\.11' # regex pattern
-        #internalProxies: '.*' # trust all internal proxies, regex pattern
-        #remoteIpHeader:  'x-forwarded-for'
-        ###### see https://docs.oracle.com/javase/7/docs/api/java/util/regex/Pattern.html for regex help
-        ###### more information about XFF https://en.wikipedia.org/wiki/X-Forwarded-For
-        ###### and here https://tools.ietf.org/html/rfc7239
-        ###### and https://tomcat.apache.org/tomcat-8.0-doc/config/valve.html#Remote_IP_Valve
     authc:
       basic_internal_auth_domain:
         http_enabled: true
