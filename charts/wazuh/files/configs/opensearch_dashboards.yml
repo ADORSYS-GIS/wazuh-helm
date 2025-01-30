@@ -2,7 +2,7 @@ server.host: 0.0.0.0
 server.port: 5601
 opensearch.hosts: https://{{ include "common.names.fullname" $ }}-indexer-api:9200
 opensearch.ssl.verificationMode: none
-opensearch.requestHeadersWhitelist: [ authorization,securitytenant ]
+opensearch.requestHeadersAllowlist: ["Authorization", "securitytenant"]
 opensearch_security.multitenancy.enabled: false
 opensearch_security.readonly_mode.roles: ["kibana_read_only"]
 server.ssl.enabled: true
@@ -13,6 +13,7 @@ uiSettings.overrides.defaultRoute: /app/wz-home
   
 {{ with $.Values.indexer.keycloak -}}
 {{- if .enabled -}}
+
 opensearch_security.auth.type: "openid"
 opensearch_security.openid.connect_url: '{{ include "common.tplvalues.render" (dict "value" .openid_connect_url "context" $) }}'
 opensearch_security.openid.client_id: '{{ include "common.tplvalues.render" (dict "value" .client_id "context" $) }}'
@@ -24,7 +25,5 @@ opensearch_security.openid.scope: '{{ include "common.tplvalues.render" (dict "v
 opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.render" (dict "value" . "context" $) }}'
 {{- end }}
 
-server.xsrf.allowlist: ["/_opendistro/_security/saml/acs", "/_opendistro/_security/saml/logout", "/_opendistro/_security/saml/acs/idpinitiated"]
-opensearch_security.session.keepalive: false
 {{- end -}}
 {{- end }}
