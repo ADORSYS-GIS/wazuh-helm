@@ -29,5 +29,6 @@ opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.rend
 {{- end }}
   
 {{ with $.Values.dashboard.branding -}}
-{{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+opensearchDashboards.branding:
+  {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
 {{- end }}
