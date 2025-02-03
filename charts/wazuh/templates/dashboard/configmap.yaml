@@ -7,6 +7,6 @@ metadata:
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
 data:
-   {{- $f := include "common.tplvalues.render" (dict "value" ($.Files.Get "files/configs/opensearch_dashboards.yml") "context" $) }}
+   {{- $dashboard_config := include "common.tplvalues.render" (dict "value" ($.Files.Get "files/configs/opensearch_dashboards.yml") "context" $) }}
   "opensearch_dashboards.yml": |
-    {{ $f | nindent 4 }}
+    {{ $dashboard_config | nindent 4 }}
