@@ -194,7 +194,7 @@ indexer:
     ##
     ##
     password: "rU40Fm%0GnK£iqQN"
-    
+  
   ##
   ##
   keycloak:
@@ -638,6 +638,22 @@ dashboard:
     - name: OPENSEARCH_JAVA_OPTS
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   envFrom: [ ]
+  ## @branding more at https://opensearch.org/docs/latest/dashboards/branding/
+  ## 
+  branding:
+    opensearchDashboards.branding:
+      logo:
+        defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
+      mark:
+        defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      #   darkModeUrl: ""
+      loadingLogo:
+        defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      #   darkModeUrl: ""
+      faviconUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      applicationTitle: "Wazuh Adorsys"
+      useExpandedHeader: true
 
 
 svcs:
