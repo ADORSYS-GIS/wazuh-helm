@@ -40,11 +40,10 @@ logstash:
   users: [ ]
   and_backend_roles: [ ]
 
-readall:
+readall_and_monitor:
   reserved: true
   hidden: false
   backend_roles:
-    - "readall"
     - "wazuh_viewer"
   hosts: [ ]
   users: [ ]
