@@ -225,6 +225,9 @@ indexer:
     ##
     ##
     roles_mapping: ~
+    ##
+    ##
+    roles: ~
 
   ##
   ##

@@ -205,10 +205,21 @@ spec:
               mountPath: /usr/share/wazuh-indexer/opensearch-security/config.yml
               subPath: config.yml
               readOnly: true
+              
+              {{ if .roles_mapping }}
             - name: wazuh-keycloak-config
-              mountPath: /etc/wazuh-indexer/opensearch-security/roles_mapping.yml
-              subPath: roles_mapping.yml
+              mountPath: /etc/wazuh-indexer/opensearch-security/custom_roles_mapping.yml
+              subPath: custom_roles_mapping.yml
               readOnly: true
+              {{- end }}
+
+              {{ if .roles }}
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/custom_roles.yml
+              subPath: custom_roles.yml
+              readOnly: true
+              {{- end }}
+              
             {{- end -}}
             {{- end }}
               
