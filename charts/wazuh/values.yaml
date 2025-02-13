@@ -510,6 +510,13 @@ master:
   ##
   ##
   affinity: ~
+  
+  ##
+  ##
+  backup: 
+    ## This schedule is for the cronjob to run every day at 12AM (example).
+    ##
+    schedule: 0 2 * * *
 
 ##
 ##
