@@ -228,6 +228,9 @@ indexer:
     ##
     ##
     roles: ~
+    ##
+    ##
+    tenants: ~
 
   ##
   ##

@@ -219,6 +219,13 @@ spec:
               subPath: custom_roles.yml
               readOnly: true
               {{- end }}
+
+              {{ if .tenants }}
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/custom_tenants.yml
+              subPath: custom_tenants.yml
+              readOnly: true
+              {{- end }}
               
             {{- end -}}
             {{- end }}
