@@ -69,7 +69,7 @@ spec:
             subPath: opensearch_dashboards.yml
             readOnly: false
           {{ with .volumeMounts -}}
-          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10}}
           {{- end }}
           {{ with .ports -}}
           ports: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
