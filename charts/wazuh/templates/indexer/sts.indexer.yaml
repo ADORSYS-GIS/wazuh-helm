@@ -25,7 +25,10 @@ spec:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/indexer/configmap.yaml") $ | sha256sum }}
-        {{ with $.Values.indexer.auth -}}
+        {{ with .keycloak -}}
+        checksum/secret-kc: {{ include (print $.Template.BasePath "/indexer/keycloak.secret.yaml") $ | sha256sum }}
+        {{- end }}
+        {{ with .auth -}}
         checksum/secret: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
         {{- end }}
         {{ with $.Values.dashboard.auth -}}
