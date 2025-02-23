@@ -1,0 +1,61 @@
+{{ with .Values.master }}
+{{- $name := printf "%s-manager-backup" (include "common.names.fullname" $) -}}
+{{- $pvcName := printf "%s-manager-master-0" (include "common.names.fullname" $) -}}
+
+
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $name }}
+  namespace: {{ include "common.names.namespace" $ }}
+spec:
+  schedule: {{ .backup.schedule }}  # Runs daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backup-container
+              image: amazon/aws-cli:latest
+              command: ["/bin/sh", "-c"]
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-secrets
+                      key: aws-access-key-id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-secrets
+                      key: aws-secret-access-key
+                - name: AWS_SESSION_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-secrets
+                      key: aws-session-token
+              args:
+                - |
+                  set -ex;
+                  bkp_folder=/backup/wazuh_files_backup/$(date +%F_%H-%M);
+                  mkdir -p $bkp_folder;
+                  cp --parents \
+                    /wazuh-manager-data/wazuh/var/ossec/etc/client.keys \
+                    /wazuh-manager-data/wazuh/var/ossec/queue/db/global.db $bkp_folder;
+                  aws s3 sync $bkp_folder s3://test-wazuh-backup-bucket/$bkp_folder;
+                  echo "Backup completed.";
+              volumeMounts:
+                - name: wazuh-master-volume
+                  mountPath: /wazuh-manager-data
+                  readOnly: true
+                - name: backup-volume
+                  mountPath: /backup
+          volumes:
+            - name: wazuh-master-volume
+              persistentVolumeClaim:
+                claimName: {{ $pvcName }}
+            - name: backup-volume
+              emptyDir: {}
+          restartPolicy: Never
+{{- end }}
