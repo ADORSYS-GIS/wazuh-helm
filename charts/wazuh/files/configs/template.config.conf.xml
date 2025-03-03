@@ -298,7 +298,7 @@
         <force>
             <enabled>yes</enabled>
             <key_mismatch>yes</key_mismatch>
-            <disconnected_time enabled="yes">1h</disconnected_time>
+            <disconnected_time enabled="yes">1800h</disconnected_time>
             <after_registration_time>1h</after_registration_time>
         </force>
         <purge>no</purge>
