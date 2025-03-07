@@ -24,8 +24,11 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@v4
-        name: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: "0"
+          submodules: true
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -41,8 +44,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - id: lowercase
-        name: Lowercase image name
+      - id: string
+        name: Lowercase the name
         uses: AsZc/change-string-case-action@v6
         with:
           string: ${{ env.IMAGE_NAME }}
@@ -51,33 +54,38 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.lowercase.outputs.lowercase }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=schedule,pattern={{date 'YYYYMMDD-hhmmss' tz='Europe/Berlin'}}
+            type=semver,enable=true,priority=900,prefix=,suffix=,pattern=,value=
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=sha,format=long
+            type=sha,format=long,prefix={{branch}}
+          flavor: |
+            latest=auto
+          images: "${{ env.REGISTRY }}/${{ steps.string.outputs.lowercase }}"
 
       - name: Cache Docker layers
         uses: actions/cache@v4
+        if: always()
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
         with:
-          push: "${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}"
+          push: "true"
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64 #,linux/arm64,linux/arm/v7
+          annotations: ${{ steps.meta.outputs.annotations }}
+          platforms: linux/amd64,linux/arm64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
           context: ./utils/packages/envsubt
-
-      # Save the updated Docker cache
-      - name: Save Docker cache
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: buildx-cache
-          path: /tmp/.buildx-cache-new

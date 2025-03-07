@@ -97,7 +97,7 @@ spec:
             privileged: true
         - name: config-init
           ##
-          image: alpine:latest
+          image: ghcr.io/adorsys-gis/envsubt:latest
           ##
           imagePullPolicy: IfNotPresent
           ##
