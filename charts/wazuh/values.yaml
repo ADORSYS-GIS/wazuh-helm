@@ -835,18 +835,74 @@ svcs:
 ##
 ##
 cluster:
+  ##
+  ##
   secret:
+    ##
+    ##
     enabled: true
+  
+  ##
+  ##
   secretName: ~
+  ##
+  ##
   rootCaSecretName: "example-secret-name"
+  ##
+  ##
   auth:
+    ##
+    ##
     key: "dfbb2c1b9d679c39af94d5c1c821c952"
+  
+  ##
+  ##
   config:
+    ##
+    ##
     smtp:
+      ##
+      ##
       server: smtp.example.wazuh.com
+      ##
+      ##
       from: ossecm@example.wazuh.com
+      ##
+      ##
       to: recipient@example.wazuh.com
+      ##
+      ##
       max_per_hour: 12
+  
+  ##
+  ##
+  ## rules:
+  ##    "rules.miaou.xml": |
+  ##      <group name="miaou,">
+  ##        <rule id="100000" level="3">
+  ##          <decoded_as>miaou</decoded_as>
+  ##          <description>miaou</description>
+  ##          <field name="program">miaou</field>
+  ##        </rule>
+  ##      </group>
+  rules: { }
+  
+  ##
+  ##
+  ## decoders:
+  ##    "decoder.miaou.xml": |
+  ##      <decoder name="miaou">
+  ##          <prematch>^{\s*"@programName"\s*:\s*"ZAP"</prematch>
+  ##          <plugin_decoder>JSON_Decoder</plugin_decoder>
+  ##      </decoder>
+  ##      
+  ##      <decoder name="miaou">
+  ##          <parent>miaou</parent>
+  ##          <regex type="pcre2">\"riskcode\".*?:.*?\"(.*?)\"</regex>
+  ##          <order>riskcode</order>
+  ##      </decoder>
+  decoders: { }
+
 
 ##
 ##
