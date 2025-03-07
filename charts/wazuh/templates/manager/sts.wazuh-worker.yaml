@@ -177,17 +177,31 @@ spec:
               readOnly: true
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
-              subPath: local_rules.xml
+              mountPath: /wazuh-config-mount/etc/rules/0004-custom.rules.xml
+              subPath: 0004-custom.rules.xml
               readOnly: true
             - name: config
-              mountPath: /wazuh-config-mount/etc/decoders/local_decoder.xml
-              subPath: local_decoder.xml
+              mountPath: /wazuh-config-mount/etc/decoders/0004-custom.decoder.xml
+              subPath: 0004-custom.decoder.xml
               readOnly: true
+
+            {{ range $k, $v := $.Values.cluster.decoders -}}
+            {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+            {{- $n_k := printf "0003-%s" $k -}} 
             - name: config
-              mountPath: /wazuh-config-mount/etc/decoders/0004-owasp-zap.xml
-              subPath: 0004-owasp-zap.xml
+              mountPath: /wazuh-config-mount/etc/decoders/{{ $n_k }}
               readOnly: true
+              subPath: {{ $n_k }}
+            {{- end }}
+
+            {{ range $k, $v := $.Values.cluster.rules -}}
+            {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+            {{- $n_k := printf "0003-%s" $k -}} 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/{{ $n_k }}
+              readOnly: true
+              subPath: {{ $n_k }}
+            {{- end }}
 
             - name: root-certs
               mountPath: /etc/ssl/root-ca.pem
