@@ -25,6 +25,7 @@ data:
     {{ $.Files.Get "files/configs/rules.syscheck.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.yara.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules.overwrite.xml" | nindent 6 }}
     
   {{ range $k, $v := $.Values.cluster.rules }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
