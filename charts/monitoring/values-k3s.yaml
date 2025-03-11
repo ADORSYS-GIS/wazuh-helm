@@ -1,0 +1,10 @@
+storageClasses:
+  '{{ include "common.storage-className" $ }}':
+    provisioner: rancher.io/local-path
+    volumeBindingMode: WaitForFirstConsumer
+
+prom-stack:
+  grafana:
+    ingress:
+      enabled: true
+      ingressClassName: traefik
