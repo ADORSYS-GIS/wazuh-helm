@@ -90,11 +90,11 @@ prom-stack:
         cert-manager.io/cluster-issuer: letsencrypt-prod
         traefik.ingress.kubernetes.io/router.middlewares: oauth2-secured-oauth2@kubernetescrd
       hosts:
-        - {{ .Values.global.domain }}
+        - "{{ .Values.global.domain }}"
       tls:
         - secretName: grafana-tls
           hosts:
-            - {{ .Values.global.domain }}
+            - "{{ .Values.global.domain }}"
     sidecar:
       datasources:
         enabled: true
