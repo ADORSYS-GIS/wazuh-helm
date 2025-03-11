@@ -190,8 +190,8 @@ spec:
               readOnly: true
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/0004-custom.rules.xml
-              subPath: 0004-custom.rules.xml
+              mountPath: /wazuh-config-mount/etc/rules/0004-custom-rules.xml
+              subPath: 0004-custom-rules.xml
               readOnly: true
             - name: config
               mountPath: /wazuh-config-mount/etc/decoders/0004-custom.decoder.xml

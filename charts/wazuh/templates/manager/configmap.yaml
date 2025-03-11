@@ -20,7 +20,7 @@ data:
     {{ include "common.tplvalues.render" (dict "value" $f "context" $) | nindent 6 }}
   {{- end }}
   
-  "0004-custom.rules.xml":  |
+  "0004-custom-rules.xml":  |
     {{ $.Files.Get "files/configs/rules.snort.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.syscheck.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.trivy.xml" | nindent 6 }}
