@@ -25,7 +25,7 @@ jobs:
             path: charts/wazuh
           - chart: owasp-zap
             path: charts/owasp-zap
-          - chart: monitoring
+          - chart: wazuh-monitoring
             path: charts/monitoring
     steps:
       - name: Checkout repository
