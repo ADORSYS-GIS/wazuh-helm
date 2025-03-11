@@ -27,4 +27,4 @@ prom-stack:
             }
           ]
         alb.ingress.kubernetes.io/ssl-redirect: '443'
-        external-dns.alpha.kubernetes.io/hostname: 'grafana.{{ .Values.global.domain }}'
+        external-dns.alpha.kubernetes.io/hostname: '{{ .Values.global.domain }}'
