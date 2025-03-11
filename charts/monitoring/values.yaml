@@ -1,0 +1,122 @@
+global:
+  storageClassName: ~
+  domain: 'example.team'
+
+commonAnnotations:
+  "kubernetes.io/description": '{{ include "common.names.fullname" $ }} monitoring'
+  
+
+##
+##
+storageClasses:
+  '{{ include "common.storage-className" $ }}':
+    ##
+    ##
+    enabled: true
+    ##
+    ##
+    additionalAnnotations: { }
+    ##
+    ##
+    additionalLabels: { }
+    ##
+    ##
+    provisioner: ""
+    ##
+    ##
+    parameters: { }
+    ##
+    ##
+    volumeBindingMode: ""
+    ##
+    ##
+    reclaimPolicy: Delete
+  
+keycloak: 
+  enabled: true
+  client_id: "grafana"
+  client_secret: "some-secret"
+  url: "https://keycloak.example.me"
+  realm: "demo"
+
+prom-stack:
+  alertmanager:
+    alertmanagerSpec:
+      logLevel: error
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: '{{ include "common.storage-className" $ }}'
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+
+  prometheus:
+    prometheusSpec:
+      retention: 10d
+      logLevel: error
+      securityContext:
+        runAsGroup: 0
+        runAsNonRoot: false
+        runAsUser: 0
+        fsGroup: 0
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: '{{ include "common.storage-className" $ }}'
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+
+  grafana:
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        traefik.ingress.kubernetes.io/router.middlewares: oauth2-secured-oauth2@kubernetescrd
+      hosts:
+        - grafana.{{ .Values.global.domain }}
+      tls:
+        - secretName: grafana-tls
+          hosts:
+            - grafana.{{ .Values.global.domain }}
+    sidecar:
+      datasources:
+        enabled: true
+        label: grafana_datasource
+        isDefaultDatasource: false
+        defaultDatasourceEnabled: false
+    plugins:
+      - grafana-piechart-panel
+      - grafana-clock-panel
+    enabled: true
+    envFromSecret: '{{ $.Release.Name }}-keycloak-conf'
+    grafana.ini:
+      auth.basic:
+        enabled: false
+      auth.generic_oauth:
+        enabled: "true"
+        name: "Example login"
+        allow_sign_up: "true"
+        client_id: '$__env{KEYCLOAK_CLIENT_ID}'
+        client_secret: '$__env{KEYCLOAK_CLIENT_SECRET}'
+        scopes: "openid email profile offline_access roles"
+        email_attribute_path: "email"
+        login_attribute_path: "username"
+        name_attribute_path: "full_name"
+        auth_url: "$__env{KEYCLOAK_ISSUER}/protocol/openid-connect/auth"
+        token_url: "$__env{KEYCLOAK_ISSUER}/protocol/openid-connect/token"
+        api_url: "$__env{KEYCLOAK_ISSUER}/protocol/openid-connect/userinfo"
+        role_attribute_path: "contains(roles[*], 'admin') && 'Admin' || contains(roles[*], 'editor') && 'Editor' || 'Viewer'"
+
+loki-stack:
+  loki:
+    image:
+      tag: 2.9.8
+  promtail:
+    config:
+      clients:
+        - url: http://{{ .Release.Name }}-loki:3100/loki/api/v1/push

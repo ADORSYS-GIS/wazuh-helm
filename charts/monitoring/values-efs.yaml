@@ -1,0 +1,27 @@
+storageClasses:
+  '{{ include "common.storage-className" $ }}':
+    enabled: true
+    provisioner: efs.csi.aws.com
+    parameters:
+      basePath: /wazuh-monitoring
+      directoryPerms: '775'
+      fileSystemId: '<fileSystemId>'
+      uid: '0'
+      gid: '0'
+      provisioningMode: efs-ap
+    reclaimPolicy: Retain
+
+prom-stack:
+  alertmanager:
+    alertmanagerSpec:
+      storage:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteMany"]
+
+  prometheus:
+    prometheusSpec:
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteMany"]
