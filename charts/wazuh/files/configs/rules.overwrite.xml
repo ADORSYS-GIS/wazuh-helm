@@ -4,7 +4,7 @@
   <rule id="5402" level="0" overwrite="yes">
     <if_sid>5400</if_sid>
     <regex> ; USER=root ; COMMAND=| ; USER=root ; TSID=\S+ ; COMMAND=</regex>
-    <description>Successful sudo to ROOT executed nice.</description>
+    <description>Successful sudo to ROOT executed.</description>
     <mitre>
       <id>T1548.003</id>
     </mitre>
@@ -43,5 +43,23 @@
       <id>T1562.001</id>
     </mitre>
     <group>pci_dss_10.6.1,pci_dss_10.2.6,gpg13_10.1,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_AU.6,nist_800_53_AU.14,nist_800_53_AU.5,tsc_CC7.2,tsc_CC7.3,tsc_CC6.8,</group>
+  </rule>
+
+  <rule id="510" level="0" overwrite="yes">
+    <if_sid>509</if_sid>
+    <description>Host-based anomaly detection event (rootcheck).</description>
+    <group>rootcheck,pci_dss_10.6.1,gdpr_IV_35.7.d,</group>
+    <!-- <if_fts />  -->
+  </rule>
+
+  <rule id="553" level="0" overwrite="yes">
+    <category>ossec</category>
+    <decoded_as>syscheck_deleted</decoded_as>
+    <description>File deleted.</description>
+    <mitre>
+      <id>T1070.004</id>
+      <id>T1485</id>
+    </mitre>
+    <group>syscheck,syscheck_entry_deleted,syscheck_file,pci_dss_11.5,gpg13_4.11,gdpr_II_5.1.f,hipaa_164.312.c.1,hipaa_164.312.c.2,nist_800_53_SI.7,tsc_PI1.4,tsc_PI1.5,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
   </rule>
 </group>
