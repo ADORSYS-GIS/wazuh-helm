@@ -26,17 +26,6 @@ prom-stack:
               "HTTPS": 443
             }
           ]
-        alb.ingress.kubernetes.io/actions.forward-single: |
-          {
-            "Type": "forward",
-            "ForwardConfig": {
-              "TargetGroups": [
-                {
-                  "ServiceName": "{{ include "common.names.fullname" . }}",
-                  "ServicePort": "80"
-                }
-              ]
-            }
-          }
         alb.ingress.kubernetes.io/ssl-redirect: '443'
-        external-dns.alpha.kubernetes.io/hostname: '{{ .Values.global.domain }}'
+        external-dns.alpha.kubernetes.io/hostname: '{{ $.Values.global.domain }}'
+        alb.ingress.kubernetes.io/healthcheck-path: '/api/health'
