@@ -215,7 +215,7 @@ alloy:
           role = "ingress"
         }
         
-        loki.write "loki-main" {
+        loki.write "default" {
           endpoint {
             url = "http://{{ .Release.Name }}-loki:3100/loki/api/v1/push"
           }
