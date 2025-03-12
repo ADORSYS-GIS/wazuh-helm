@@ -103,6 +103,11 @@ prom-stack:
     enabled: true
     envFromSecret: '{{ $.Release.Name }}-keycloak-conf'
     grafana.ini:
+      server:
+        root_url: "https://{{ .Values.global.domain }}"
+        enable_gzip: true
+      auth:
+        disable_login_form: true
       auth.basic:
         enabled: false
       auth.generic_oauth:
