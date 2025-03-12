@@ -91,10 +91,6 @@ prom-stack:
         traefik.ingress.kubernetes.io/router.middlewares: oauth2-secured-oauth2@kubernetescrd
       hosts:
         - "{{ .Values.global.domain }}"
-      tls:
-        - secretName: grafana-tls
-          hosts:
-            - "{{ .Values.global.domain }}"
     sidecar:
       datasources:
         enabled: true
