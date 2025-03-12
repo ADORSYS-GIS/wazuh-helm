@@ -15,7 +15,7 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.0-rc.7
+version: 0.1.0-rc.8
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
@@ -35,6 +35,9 @@ dependencies:
     repository: https://prometheus-community.github.io/helm-charts
     alias: prom-stack
     condition: prom-stack.enabled
+    tags:
+      - prometheus
+      - grafana
   - name: loki
     condition: loki.enabled
     repository: https://grafana.github.io/helm-charts
