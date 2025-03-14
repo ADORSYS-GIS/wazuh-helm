@@ -1,10 +1,10 @@
 prom-stack:
   alertmanager:
     ingress:
-      enabled: true
+      enabled: false
       ingressClassName: alb
       annotations:
-        alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+        alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-alertmanager'
         alb.ingress.kubernetes.io/target-type: 'ip'
         alb.ingress.kubernetes.io/scheme: 'internet-facing'
         alb.ingress.kubernetes.io/listen-ports: |
@@ -27,10 +27,10 @@ prom-stack:
                 storage: 50Gi
   prometheus:
     ingress:
-      enabled: true
+      enabled: false
       ingressClassName: alb
       annotations:
-        alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+        alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-prometheus'
         alb.ingress.kubernetes.io/target-type: 'ip'
         alb.ingress.kubernetes.io/scheme: 'internet-facing'
         alb.ingress.kubernetes.io/listen-ports: |
@@ -68,10 +68,10 @@ prom-stack:
 
 alloy:
   ingress:
-    enabled: true
+    enabled: false
     ingressClassName: alb
     annotations:
-      alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+      alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-alloy'
       alb.ingress.kubernetes.io/target-type: 'ip'
       alb.ingress.kubernetes.io/scheme: 'internet-facing'
       alb.ingress.kubernetes.io/listen-ports: |
@@ -89,10 +89,10 @@ alloy:
 
 loki:
   ingress:
-    enabled: true
+    enabled: false
     ingressClassName: alb
     annotations:
-      alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+      alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-loki'
       alb.ingress.kubernetes.io/target-type: 'ip'
       alb.ingress.kubernetes.io/scheme: 'internet-facing'
       alb.ingress.kubernetes.io/listen-ports: |
