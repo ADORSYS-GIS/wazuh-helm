@@ -1,5 +1,23 @@
 prom-stack:
   alertmanager:
+    ingress:
+      enabled: true
+      ingressClassName: alb
+      annotations:
+        alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+        alb.ingress.kubernetes.io/target-type: 'ip'
+        alb.ingress.kubernetes.io/scheme: 'internet-facing'
+        alb.ingress.kubernetes.io/listen-ports: |
+          [
+            {
+              "HTTP": 80
+            },
+            {
+              "HTTPS": 443
+            }
+          ]
+        alb.ingress.kubernetes.io/ssl-redirect: '443'
+        external-dns.alpha.kubernetes.io/hostname: 'alertmanager-{{ $.Values.global.domain }}'
     alertmanagerSpec:
       storage:
         volumeClaimTemplate:
@@ -7,7 +25,26 @@ prom-stack:
             resources:
               requests:
                 storage: 50Gi
-                
+  prometheus:
+    ingress:
+      enabled: true
+      ingressClassName: alb
+      annotations:
+        alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+        alb.ingress.kubernetes.io/target-type: 'ip'
+        alb.ingress.kubernetes.io/scheme: 'internet-facing'
+        alb.ingress.kubernetes.io/listen-ports: |
+          [
+            {
+              "HTTP": 80
+            },
+            {
+              "HTTPS": 443
+            }
+          ]
+        alb.ingress.kubernetes.io/ssl-redirect: '443'
+        external-dns.alpha.kubernetes.io/hostname: 'prometheus-{{ $.Values.global.domain }}'
+                  
   grafana:
     ingress:
       enabled: true
@@ -28,3 +65,46 @@ prom-stack:
         alb.ingress.kubernetes.io/ssl-redirect: '443'
         external-dns.alpha.kubernetes.io/hostname: '{{ $.Values.global.domain }}'
         alb.ingress.kubernetes.io/healthcheck-path: '/api/health'
+
+alloy:
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+      alb.ingress.kubernetes.io/target-type: 'ip'
+      alb.ingress.kubernetes.io/scheme: 'internet-facing'
+      alb.ingress.kubernetes.io/listen-ports: |
+        [
+          {
+            "HTTP": 80
+          },
+          {
+            "HTTPS": 443
+          }
+        ]
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+      external-dns.alpha.kubernetes.io/hostname: 'alloy-{{ $.Values.global.domain }}'
+      alb.ingress.kubernetes.io/healthcheck-path: '/-/healthy'
+
+loki:
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/load-balancer-name: '{{ include "common.names.fullname" $ }}-grafana'
+      alb.ingress.kubernetes.io/target-type: 'ip'
+      alb.ingress.kubernetes.io/scheme: 'internet-facing'
+      alb.ingress.kubernetes.io/listen-ports: |
+        [
+          {
+            "HTTP": 80
+          },
+          {
+            "HTTPS": 443
+          }
+        ]
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+      external-dns.alpha.kubernetes.io/hostname: 'loki-{{ $.Values.global.domain }}'
+      alb.ingress.kubernetes.io/healthcheck-path: '/ready'
+    
