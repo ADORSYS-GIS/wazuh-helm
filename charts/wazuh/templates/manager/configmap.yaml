@@ -9,7 +9,7 @@ metadata:
 data:
   "template.config.xml": |
     {{ $.Files.Get "files/configs/template.config.conf.xml" | nindent 6 }}
-  "0004-custom.decoder.xml":  |
+  "0004-custom-decoder.xml":  |
     {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
