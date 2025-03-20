@@ -351,13 +351,25 @@
     </active-response>
     
     <command>
-        <name>yara_windows</name>
+        <name>yara_bat</name>
         <executable>yara.bat</executable>
         <timeout_allowed>no</timeout_allowed>
     </command>
 
     <active-response>
-        <command>yara_windows</command>
+        <command>yara_bat</command>
+        <location>local</location>
+        <rules_id>100302,100304</rules_id>
+    </active-response>
+    
+    <command>
+        <name>yara_powershell</name>
+        <executable>yara.ps1</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
+
+    <active-response>
+        <command>yara_powershell</command>
         <location>local</location>
         <rules_id>100302,100304</rules_id>
     </active-response>
