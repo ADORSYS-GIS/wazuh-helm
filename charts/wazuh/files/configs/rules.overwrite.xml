@@ -1,6 +1,11 @@
 <!-- Modified rules -->
 
 <group name="syslog,sudo,">
+  <rule id="5400" level="0" noalert="1" overwrite="yes">
+    <decoded_as>sudo</decoded_as>
+    <description>Initial group for sudo messages.</description>
+  </rule>
+
   <rule id="5402" level="0" overwrite="yes">
     <if_sid>5400</if_sid>
     <regex> ; USER=root ; COMMAND=| ; USER=root ; TSID=\S+ ; COMMAND=</regex>
@@ -13,6 +18,11 @@
 </group>
 
 <group name="pam,syslog,">
+  <rule id="5500" level="0" noalert="1" overwrite="yes">
+    <decoded_as>pam</decoded_as>
+    <description>Grouping of the pam_unix rules.</description>
+  </rule>
+
   <rule id="5501" level="0" overwrite="yes">
     <if_sid>5500</if_sid>
     <match>session opened for user </match>
@@ -22,10 +32,23 @@
     </mitre>
     <group>authentication_success,pci_dss_10.2.5,gpg13_7.8,gpg13_7.9,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
   </rule>
+
+  <rule id="5502" level="0" overwrite="yes">
+    <if_sid>5500</if_sid>
+    <match>session closed for user </match>
+    <description>PAM: Login session closed.</description>
+    <group>pci_dss_10.2.5,gpg13_7.8,gpg13_7.9,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+  </rule>
 </group>
  
 <group name="ossec,">
-  <rule id="504" level="0" overwrite="yes">
+  <rule id="500" level="0" overwrite="yes">
+    <category>ossec</category>
+    <decoded_as>ossec</decoded_as>
+    <description>Grouping of wazuh rules.</description>
+  </rule>
+
+  <rule id="504" level="4" overwrite="yes">
     <if_sid>500</if_sid>
     <match>Agent disconnected</match>
     <description>Wazuh agent disconnected.</description>
@@ -35,7 +58,7 @@
     <group>pci_dss_10.6.1,pci_dss_10.2.6,gpg13_10.1,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_AU.6,nist_800_53_AU.14,nist_800_53_AU.5,tsc_CC7.2,tsc_CC7.3,tsc_CC6.8,</group>
   </rule>
   
-  <rule id="506" level="3" ignore="604800" overwrite="yes">
+  <rule id="506" level="0" overwrite="yes">
     <if_sid>500</if_sid>
     <match>Agent stopped</match>
     <description>Wazuh agent stopped.</description>
@@ -43,6 +66,13 @@
       <id>T1562.001</id>
     </mitre>
     <group>pci_dss_10.6.1,pci_dss_10.2.6,gpg13_10.1,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_AU.6,nist_800_53_AU.14,nist_800_53_AU.5,tsc_CC7.2,tsc_CC7.3,tsc_CC6.8,</group>
+  </rule>
+
+  <rule id="509" level="0" overwrite="yes">
+    <category>ossec</category>
+    <decoded_as>rootcheck</decoded_as>
+    <description>Rootcheck event.</description>
+    <group>pci_dss_10.6.1,rootcheck,</group>
   </rule>
 
   <rule id="510" level="0" overwrite="yes">
@@ -61,5 +91,26 @@
       <id>T1485</id>
     </mitre>
     <group>syscheck,syscheck_entry_deleted,syscheck_file,pci_dss_11.5,gpg13_4.11,gdpr_II_5.1.f,hipaa_164.312.c.1,hipaa_164.312.c.2,nist_800_53_SI.7,tsc_PI1.4,tsc_PI1.5,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+  </rule>
+</group>
+
+<!-- Active-response rules -->
+<group name="pam,syslog,">
+  <rule id="5503" level="5" overwrite="yes">
+    <if_sid>5500</if_sid>
+    <match>authentication failure; logname=</match>
+    <description>PAM: User login failed.</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5,gpg13_7.8,gdpr_IV_35.7.d,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+  </rule>
+     
+  <rule id="120100" level="10" frequency="3" timeframe="120">
+    <if_matched_sid>5503</if_matched_sid>
+    <description>Possible password guess on $(dstuser): 3 failed logins in a short period of time</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
   </rule>
 </group>
