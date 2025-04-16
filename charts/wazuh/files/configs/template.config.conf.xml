@@ -290,6 +290,16 @@
       To enable this service, run:
       wazuh-control enable auth
     -->
+    <!-- Active-response  -->
+    <active-response>
+        <command>firewall-drop</command>
+        <location>local</location>
+        <rules_id>5712</rules_id>
+        <timeout>180</timeout>
+    </active-response>
+
+    
+
     <auth>
         <disabled>no</disabled>
         <port>1515</port>
