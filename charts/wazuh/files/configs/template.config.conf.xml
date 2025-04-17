@@ -238,6 +238,20 @@
         <executable>netsh.exe</executable>
         <timeout_allowed>yes</timeout_allowed>
     </command>
+    
+    <!-- Wazuh - Manager - Remote adorsys update -->
+    
+    <command>
+        <name>unix-update</name>
+        <executable>adorsys-update.sh</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
+    
+    <command>
+        <name>windows-update</name>
+        <executable>adorsys-update.ps1</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
 
     <!--
     <active-response>
