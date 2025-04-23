@@ -1,0 +1,23 @@
+# TriggerTemplate → v1beta1
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: wazuh-backup-trigger-template
+  namespace: wazuh
+spec:
+  params: []   # define template params here if needed
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: wazuh-backup-pipeline-run-
+      spec:
+        pipelineRef:
+          name: wazuh-backup-pipeline
+        serviceAccountName: backup-job-sa
+        workspaces:
+          - name: backup-volume
+            emptyDir: {}
+          - name: wazuh-master-volume
+            persistentVolumeClaim:
+              claimName: wazuh-manager-master-wazuh-manager-master-0

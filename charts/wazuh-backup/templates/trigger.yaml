@@ -1,0 +1,10 @@
+# templates/trigger.yaml
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: wazuh-backup-trigger
+  namespace: wazuh
+spec:
+  bindings: []                 # no parameters to bind
+  template:
+    ref: wazuh-backup-template

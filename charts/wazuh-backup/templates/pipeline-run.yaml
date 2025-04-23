@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: wazuh-backup-pipeline-run
+  namespace: wazuh
+spec:
+  pipelineRef:
+    name: wazuh-backup-pipeline
+  serviceAccountName: backup-job-sa
+  workspaces:
+    - name: backup-volume
+      emptyDir: {}
+    - name: wazuh-master-volume
+      persistentVolumeClaim:
+        claimName: wazuh-manager-master-wazuh-manager-master-0

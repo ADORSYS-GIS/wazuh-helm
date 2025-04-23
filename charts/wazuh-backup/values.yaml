@@ -1,0 +1,6 @@
+# values.yaml
+
+aws:
+  accessKeyId: KEYID
+  secretAccessKey: ACCESSKEY
+  sessionToken: SESSIONTOKEN

@@ -1,0 +1,32 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: wazuh-backup-pipeline
+  namespace: wazuh
+spec:
+  workspaces:
+    - name: backup-volume
+    - name: wazuh-master-volume
+  tasks:
+    - name: backup-prep
+      taskRef:
+        name: backup-prep-task
+      workspaces:
+        - name: backup-volume
+          workspace: backup-volume
+        - name: wazuh-master-volume
+          workspace: wazuh-master-volume
+    - name: s3-upload
+      runAfter: [backup-prep]
+      taskRef:
+        name: s3-upload-task
+      workspaces:
+        - name: backup-volume
+          workspace: backup-volume
+    - name: cleanup
+      runAfter: [s3-upload]
+      taskRef:
+        name: s3-cleanup-task
+      workspaces:
+        - name: backup-volume
+          workspace: backup-volume
