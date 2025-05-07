@@ -52,3 +52,14 @@ Slack notification credentials
 {{- $.Values.notification.slack.externalSecret -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Jira integration credentials
+*/}}
+{{- define "secret.integration-jira" -}}
+{{- if not $.Values.integration.jira.externalSecret -}}
+{{ include "common.names.fullname" $ }}-jira-cred
+{{- else -}}
+{{- $.Values.integration.jira.externalSecret -}}
+{{- end -}}
+{{- end -}}

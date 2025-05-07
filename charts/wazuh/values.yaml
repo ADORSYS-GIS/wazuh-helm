@@ -985,3 +985,18 @@ integration:
 #      orgs:
 #        - <ORG1>
 #        - <ORG2>
+  ##
+  ## https://documentation.wazuh.com/current/user-manual/manager/integration-with-external-apis.html
+  jira:
+    ##
+    ##
+    enabled: true
+    ##
+    ##
+    webhookUrl: https://<example1>.jira.com/services/hooks/<example2>
+    ##
+    ##
+    apikey: 101010
+    ##
+    ##
+    externalSecret: ~

@@ -58,7 +58,7 @@
     <group>pci_dss_10.6.1,pci_dss_10.2.6,gpg13_10.1,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_AU.6,nist_800_53_AU.14,nist_800_53_AU.5,tsc_CC7.2,tsc_CC7.3,tsc_CC6.8,</group>
   </rule>
   
-  <rule id="506" level="0" overwrite="yes">
+  <rule id="506" level="3" overwrite="yes">
     <if_sid>500</if_sid>
     <match>Agent stopped</match>
     <description>Wazuh agent stopped.</description>
@@ -91,6 +91,28 @@
       <id>T1485</id>
     </mitre>
     <group>syscheck,syscheck_entry_deleted,syscheck_file,pci_dss_11.5,gpg13_4.11,gdpr_II_5.1.f,hipaa_164.312.c.1,hipaa_164.312.c.2,nist_800_53_SI.7,tsc_PI1.4,tsc_PI1.5,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+  </rule>
+
+  <rule id="650" level="0" overwrite="yes">
+    <decoded_as>ar_log_json</decoded_as>
+    <description>Active Response JSON Messages Grouped</description>
+    <group>active_response,</group>
+  </rule>
+  
+  <rule id="651" level="4" overwrite="yes">
+    <if_sid>650</if_sid>
+    <field name="parameters.program">firewall-drop</field>
+    <field name="command">add</field>
+    <description>Host Blocked by firewall-drop Active Response</description>
+    <group>active_response,pci_dss_11.4,gpg13_4.13,gdpr_IV_35.7.d,nist_800_53_SI.4,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,tsc_CC7.4,</group>
+  </rule>
+</group>
+
+<group name="ids,">
+  <rule id="20101" level="0" overwrite="yes">
+    <category>ids</category>
+    <check_if_ignored>srcip, id</check_if_ignored>
+    <description>IDS event.</description>
   </rule>
 </group>
 
