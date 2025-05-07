@@ -127,6 +127,11 @@ spec:
             - secretRef:
                 name: '{{ include "secret.notification-slack" $ }}'
             {{- end }}
+          
+            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.integration-jira" $ }}'
+            {{- end }}
           ##
           ##
           volumeMounts:
