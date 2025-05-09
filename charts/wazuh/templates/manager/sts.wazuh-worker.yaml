@@ -60,6 +60,9 @@ spec:
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
+        - name: jira-conf
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -106,6 +109,11 @@ spec:
             - secretRef:
                 name: '{{ include "secret.notification-slack" $ }}'
             {{- end }}
+            
+            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.integration-jira" $ }}'
+            {{- end }}  
           ##
           ##
           volumeMounts:
@@ -184,6 +192,15 @@ spec:
               mountPath: /wazuh-config-mount/etc/decoders/0004-custom-decoder.xml
               subPath: 0004-custom-decoder.xml
               readOnly: true
+
+            - name: jira-conf
+              mountPath: /wazuh-config-mount/integrations/custom-jira
+              subPath: custom-jira
+              readOnly: true
+            - name: jira-conf
+              mountPath: /wazuh-config-mount/integrations/custom-jira.py
+              subPath: custom-jira.py
+              readOnly: true    
 
             {{ range $k, $v := $.Values.cluster.decoders -}}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
