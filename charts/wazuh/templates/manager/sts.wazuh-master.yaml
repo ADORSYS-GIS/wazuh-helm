@@ -64,7 +64,6 @@ spec:
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
-
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
@@ -211,7 +210,6 @@ spec:
               mountPath: /wazuh-config-mount/integrations/custom-jira
               subPath: custom-jira
               readOnly: true
-
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira.py
               subPath: custom-jira.py
