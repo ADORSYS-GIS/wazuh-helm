@@ -67,6 +67,7 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
+            defaultMode: 0755
 
         {{ if eq (include "integration.azure.exists" $) "true" -}}
         - name: azure-auth
