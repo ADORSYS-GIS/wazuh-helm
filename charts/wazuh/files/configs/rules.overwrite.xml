@@ -48,7 +48,7 @@
     <description>Grouping of wazuh rules.</description>
   </rule>
 
-  <rule id="504" level="4" overwrite="yes">
+  <rule id="504" level="10" overwrite="yes">
     <if_sid>500</if_sid>
     <match>Agent disconnected</match>
     <description>Wazuh agent disconnected.</description>
@@ -134,5 +134,13 @@
     <mitre>
       <id>T1110</id>
     </mitre>
+  </rule>
+</group>
+
+<group name="syscheck,restart,">
+  <rule id="100009" level="7">
+    <if_sid>100300</if_sid>
+    <match>ossec.conf</match>
+    <description>Changes made to the agent configuration file - $(file)</description>
   </rule>
 </group>

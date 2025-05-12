@@ -312,7 +312,19 @@
         <timeout>180</timeout>
     </active-response>
 
+    <active-response>
+       <disabled>no</disabled>
+       <command>restart-wazuh</command>
+       <location>local</location>
+       <rules_id>100009</rules_id>
+    </active-response>
     
+    <active-response>
+        <command>disable-account</command>
+        <location>local</location>
+        <rules_id>120100</rules_id>
+        <timeout>300</timeout>
+    </active-response>
 
     <auth>
         <disabled>no</disabled>
