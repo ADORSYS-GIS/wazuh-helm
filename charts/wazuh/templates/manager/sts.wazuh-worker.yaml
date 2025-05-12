@@ -63,6 +63,7 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
+            defaultMode: 0750
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
