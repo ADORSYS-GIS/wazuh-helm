@@ -87,8 +87,8 @@ spec:
               apk add --update --no-cache libintl gettext
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
               {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-              chown root:wazuh /var/ossec/integrations/custom-jira
-              chown root:wazuh /var/ossec/integrations/custom-jira.py
+              chown root /var/ossec/integrations/custom-jira
+              chown root /var/ossec/integrations/custom-jira.py
               {{- end }}
           ##
           ##
