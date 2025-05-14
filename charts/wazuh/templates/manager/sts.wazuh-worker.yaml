@@ -87,8 +87,6 @@ spec:
               apk add --update --no-cache libintl gettext
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
               {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-              chmod 750 /var/ossec/integrations/custom-jira
-              chmod 750 /var/ossec/integrations/custom-jira.py
               chown root:wazuh /var/ossec/integrations/custom-jira
               chown root:wazuh /var/ossec/integrations/custom-jira.py
               {{- end }}
@@ -130,6 +128,14 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
+            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
+            - name: jira-conf
+              mountPath: /var/ossec/integrations/custom-jira
+              subPath: custom-jira  
+            - name: jira-conf
+              mountPath: /var/ossec/integrations/custom-jira.py
+              subPath: custom-jira.py  
+            {{- end }}  
         {{ range $k, $v := .initContainers }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}

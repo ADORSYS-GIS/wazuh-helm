@@ -67,7 +67,7 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
-
+            defaultMode: 0750
         {{ if eq (include "integration.azure.exists" $) "true" -}}
         - name: azure-auth
           secret:
@@ -97,10 +97,8 @@ spec:
               set -ex
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
               {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-              chmod 750 /wazuh-config-mount/integrations/custom-jira
-              chmod 750 /wazuh-config-mount/integrations/custom-jira.py
-              chown root:wazuh /wazuh-config-mount/integrations/custom-jira
-              chown root:wazuh /wazuh-config-mount/integrations/custom-jira.py
+              chown root:wazuh /var/ossec/integrations/custom-jira
+              chown root:wazuh /var/ossec/integrations/custom-jira.py
               {{- end }}
           ##
           ##
@@ -146,6 +144,14 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
+            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
+            - name: jira-conf
+              mountPath: /var/ossec/integrations/custom-jira
+              subPath: custom-jira  
+            - name: jira-conf
+              mountPath: /var/ossec/integrations/custom-jira.py
+              subPath: custom-jira.py  
+            {{- end }}
       securityContext:
         fsGroup: 1000
       containers:
