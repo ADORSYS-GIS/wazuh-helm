@@ -68,6 +68,8 @@ spec:
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
             defaultMode: 0750
+        - name: jira-writable
+          emptyDir: {}  
         {{ if eq (include "integration.azure.exists" $) "true" -}}
         - name: azure-auth
           secret:
@@ -97,8 +99,17 @@ spec:
               set -ex
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
               {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-              chown root /var/ossec/integrations/custom-jira
-              chown root /var/ossec/integrations/custom-jira.py
+              # Create wazuh group
+              groupadd -g 1000 wazuh || true
+              # Copy ConfigMap files to writable volume
+              mkdir -p /var/ossec/integrations
+              cp /var/ossec/integrations-ro/custom-jira /var/ossec/integrations/custom-jira
+              cp /var/ossec/integrations-ro/custom-jira.py /var/ossec/integrations/custom-jira.py
+              # Set ownership and permissions
+              chown root:wazuh /var/ossec/integrations/custom-jira
+              chown root:wazuh /var/ossec/integrations/custom-jira.py
+              chmod 750 /var/ossec/integrations/custom-jira
+              chmod 750 /var/ossec/integrations/custom-jira.py
               {{- end }}
           ##
           ##
@@ -146,11 +157,10 @@ spec:
               mountPath: /processed
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - name: jira-conf
-              mountPath: /var/ossec/integrations/custom-jira
-              subPath: custom-jira  
-            - name: jira-conf
-              mountPath: /var/ossec/integrations/custom-jira.py
-              subPath: custom-jira.py  
+              mountPath: /var/ossec/integrations-ro
+              readOnly: true
+            - name: jira-writable
+              mountPath: /var/ossec/integrations
             {{- end }}
       securityContext:
         fsGroup: 1000
