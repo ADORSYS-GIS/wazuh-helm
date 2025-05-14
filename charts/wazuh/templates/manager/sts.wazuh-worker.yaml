@@ -89,15 +89,13 @@ spec:
               apk add --update --no-cache libintl gettext
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
               {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-              # Create wazuh group
-              groupadd -g 1000 wazuh || true
               # Copy ConfigMap files to writable volume
               mkdir -p /var/ossec/integrations
               cp /var/ossec/integrations-ro/custom-jira /var/ossec/integrations/custom-jira
               cp /var/ossec/integrations-ro/custom-jira.py /var/ossec/integrations/custom-jira.py
               # Set ownership and permissions
-              chown root:wazuh /var/ossec/integrations/custom-jira
-              chown root:wazuh /var/ossec/integrations/custom-jira.py
+              chown root /var/ossec/integrations/custom-jira
+              chown root /var/ossec/integrations/custom-jira.py
               chmod 750 /var/ossec/integrations/custom-jira
               chmod 750 /var/ossec/integrations/custom-jira.py
               {{- end }}
