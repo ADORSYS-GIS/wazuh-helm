@@ -63,9 +63,6 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
-            defaultMode: 0750
-        - name: jira-writable
-          emptyDir: {} 
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -86,19 +83,7 @@ spec:
             - -c
             - |
               set -ex
-              apk add --update --no-cache libintl gettext
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
-              {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-              # Copy ConfigMap files to writable volume
-              mkdir -p /var/ossec/integrations
-              cp /var/ossec/integrations-ro/custom-jira /var/ossec/integrations/custom-jira
-              cp /var/ossec/integrations-ro/custom-jira.py /var/ossec/integrations/custom-jira.py
-              # Set ownership and permissions
-              chown root /var/ossec/integrations/custom-jira
-              chown root /var/ossec/integrations/custom-jira.py
-              chmod 750 /var/ossec/integrations/custom-jira
-              chmod 750 /var/ossec/integrations/custom-jira.py
-              {{- end }}
           ##
           ##
           env:
@@ -137,17 +122,10 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
-            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-            - name: jira-conf
-              mountPath: /var/ossec/integrations-ro
-              readOnly: true
-            - name: jira-writable
-              mountPath: /var/ossec/integrations
-            {{- end }}  
         {{ range $k, $v := .initContainers }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
-        {{- end }}
+        {{- end }}   
       securityContext:
         fsGroup: 1000
       containers:
@@ -217,11 +195,9 @@ spec:
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira
               subPath: custom-jira
-              readOnly: true
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira.py
-              subPath: custom-jira.py
-              readOnly: true    
+              subPath: custom-jira.py    
 
             {{ range $k, $v := $.Values.cluster.decoders -}}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
