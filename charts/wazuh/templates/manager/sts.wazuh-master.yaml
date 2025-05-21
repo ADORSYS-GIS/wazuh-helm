@@ -138,7 +138,8 @@ spec:
               subPath: template.config.xml
               readOnly: true
             - name: wazuh-config-temp
-              mountPath: /processed           
+              mountPath: /processed
+      securityContext:           
         fsGroup: 1000
       containers:
         - name: wazuh-manager
