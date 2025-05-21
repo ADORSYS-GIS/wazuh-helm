@@ -19,9 +19,14 @@ worker:
           adduser -S wazuh -G wazuh -u 999
           
           chown -R wazuh:wazuh /var/lib/etc
+
+          chown -R root:wazuh /var/ossec/integrations
+          chmod 0750 /var/ossec/integrations
       volumeMounts:
         - name: '{{ include "common.names.fullname" $ }}-manager-worker'
           mountPath: /var/lib/etc
+        - name: '{{ include "common.names.fullname" $ }}-manager-worker'
+          mountPath: /var/ossec/integrations
 
 master:
   initContainers:
@@ -51,6 +56,9 @@ master:
           
           chown -R wazuh:wazuh /var/lib/snort
           chown -R wazuh:wazuh /var/lib/owasp-zap
+
+          chown -R root:wazuh /var/ossec/integrations
+          chmod 0750 /var/ossec/integrations
       volumeMounts:
         - name: manager-backup
           mountPath: /var/lib/backup
@@ -60,3 +68,5 @@ master:
           mountPath: /var/lib/owasp-zap
         - name: '{{ include "common.names.fullname" $ }}-manager-master'
           mountPath: /var/lib/etc
+        - name: '{{ include "common.names.fullname" $ }}-manager-master'
+          mountPath: /var/ossec/integrations
