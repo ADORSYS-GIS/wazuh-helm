@@ -128,7 +128,7 @@ spec:
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
         {{- end }}   
       securityContext:
-        runAsUser: 0
+        rfsGroup: 1000
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
