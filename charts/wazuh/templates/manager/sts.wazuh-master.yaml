@@ -139,7 +139,8 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
-      securityContext:           
+      securityContext:
+        runAsUser: 0           
         fsGroup: 1000
       containers:
         - name: wazuh-manager

@@ -128,6 +128,7 @@ spec:
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
         {{- end }}   
       securityContext:
+        runAsUser: 0
         fsGroup: 1000
       containers:
         - name: wazuh-manager
