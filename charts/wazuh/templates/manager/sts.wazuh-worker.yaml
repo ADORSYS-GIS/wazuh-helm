@@ -63,11 +63,11 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
-        {{ if eq (include "integration.azure.exists" $) "true" -}}
-        - name: azure-auth
-          secret:
-            secretName: {{ include "secret.common" $ }}-azure
-        {{ end }}
+        # {{ if eq (include "integration.azure.exists" $) "true" -}}
+        # - name: azure-auth
+        #   secret:
+        #     secretName: {{ include "secret.common" $ }}-azure
+        # {{ end }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -98,11 +98,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            {{ if eq (include "integration.azure.exists" $) "true" -}}
-            - name: AZURE_CONFIGS
-              value: |
-                {{ include "integration.azure.conf" $ | nindent 16 }}
-            {{- end }}
+            # {{ if eq (include "integration.azure.exists" $) "true" -}}
+            # - name: AZURE_CONFIGS
+            #   value: |
+            #     {{ include "integration.azure.conf" $ | nindent 16 }}
+            # {{- end }}
                 
             {{ with include "integration.github.conf" $ -}}
             - name: GITHUB_CONFIGS
@@ -241,26 +241,26 @@ spec:
               subPath: server-key.pem
               readOnly: true
 
-            {{ if (eq (include "integration.azure.exists.log" $) "true") -}}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/log_analytics_credentials
-              subPath: log_auth
-              readOnly: true
-            {{- end }}
+            # {{ if (eq (include "integration.azure.exists.log" $) "true") -}}
+            # - name: azure-auth
+            #   mountPath: /var/ossec/wodles/credentials/log_analytics_credentials
+            #   subPath: log_auth
+            #   readOnly: true
+            # {{- end }}
 
-            {{ if (eq (include "integration.azure.exists.graph" $) "true") -}}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/graph_credentials
-              subPath: graph_auth
-              readOnly: true
-            {{- end }}
+            # {{ if (eq (include "integration.azure.exists.graph" $) "true") -}}
+            # - name: azure-auth
+            #   mountPath: /var/ossec/wodles/credentials/graph_credentials
+            #   subPath: graph_auth
+            #   readOnly: true
+            # {{- end }}
 
-            {{ if (eq (include "integration.azure.exists.storage" $) "true") -}}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/storage_credentials
-              subPath: storage_auth
-              readOnly: true
-            {{- end }}
+            # {{ if (eq (include "integration.azure.exists.storage" $) "true") -}}
+            # - name: azure-auth
+            #   mountPath: /var/ossec/wodles/credentials/storage_credentials
+            #   subPath: storage_auth
+            #   readOnly: true
+            # {{- end }}
             
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
