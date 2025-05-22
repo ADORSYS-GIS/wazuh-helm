@@ -416,7 +416,10 @@
         <log_format>json</log_format>
     </localfile>
 
+    {{ if eq (include "integration.azure.exists" $) "true" -}}
     ${AZURE_CONFIGS}
+    {{- end }}
+    
     ${GITHUB_CONFIGS}
     ${SLACK_CONFIG}
     ${JIRA_CONFIG}
