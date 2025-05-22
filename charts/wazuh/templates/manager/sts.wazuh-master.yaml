@@ -141,7 +141,6 @@ spec:
               mountPath: /processed
       securityContext:
         runAsUser: 0           
-        fsGroup: 1000
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
