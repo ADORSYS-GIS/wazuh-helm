@@ -7,8 +7,9 @@ metadata:
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
 data:
+  {{ $template := $.Files.Get "files/configs/template.config.conf.xml" -}}
   "template.config.xml": |
-    {{ $.Files.Get "files/configs/template.config.conf.xml" | nindent 6 }}
+    {{ include "common.tplvalues.render" (dict "value" $template "context" $) | nindent 6 }}
   "0004-custom-decoder.xml":  |
     {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
