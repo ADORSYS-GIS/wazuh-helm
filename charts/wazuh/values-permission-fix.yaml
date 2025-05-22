@@ -20,7 +20,7 @@ worker:
           
           chown -R wazuh:wazuh /var/lib/etc
 
-          chown -R root:wazuh /var/ossec/integrations
+          chown -R wazuh:wazuh /var/ossec/integrations
           chmod -R u=rwx,g=rx,o= /var/ossec/integrations
       volumeMounts:
         - name: '{{ include "common.names.fullname" $ }}-manager-worker'
@@ -57,7 +57,7 @@ master:
           chown -R wazuh:wazuh /var/lib/snort
           chown -R wazuh:wazuh /var/lib/owasp-zap
 
-          chown -R root:wazuh /var/ossec/integrations
+          chown -R wazuh:wazuh /var/ossec/integrations
           chmod -R u=rwx,g=rx,o= /var/ossec/integrations
       volumeMounts:
         - name: manager-backup
