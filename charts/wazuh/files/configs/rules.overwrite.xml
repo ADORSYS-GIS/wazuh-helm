@@ -58,7 +58,7 @@
     <group>pci_dss_10.6.1,pci_dss_10.2.6,gpg13_10.1,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_AU.6,nist_800_53_AU.14,nist_800_53_AU.5,tsc_CC7.2,tsc_CC7.3,tsc_CC6.8,</group>
   </rule>
   
-  <rule id="506" level="3" overwrite="yes">
+  <rule id="506" level="0" overwrite="yes">
     <if_sid>500</if_sid>
     <match>Agent stopped</match>
     <description>Wazuh agent stopped.</description>
@@ -138,7 +138,7 @@
 </group>
 
 <group name="syscheck,restart,">
-  <rule id="100300" level="7">
+  <rule id="100300" level="0" overwrite="yes">
         <if_sid>550</if_sid>
         <field name="file">/</field>
         <description>File modified in / directory.</description>

@@ -1,23 +1,23 @@
 <group name="syscheck,">
-    <rule id="100300" level="7">
+    <rule id="100300" level="0">
         <if_sid>550</if_sid>
         <field name="file">/</field>
         <description>File modified in / directory.</description>
     </rule>
 
-    <rule id="100301" level="7">
+    <rule id="100301" level="0">
         <if_sid>554</if_sid>
         <field name="file">/</field>
         <description>File added to / directory.</description>
     </rule>
 
-    <rule id="100302" level="7">
+    <rule id="100302" level="0">
         <if_sid>550</if_sid>
         <field name="file">C:</field>
         <description>File modified in C:\ directory.</description>
     </rule>
 
-    <rule id="100304" level="7">
+    <rule id="100304" level="0">
         <if_sid>554</if_sid>
         <field name="file">C:</field>
         <description>File added to C:\ directory.</description>
