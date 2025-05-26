@@ -138,6 +138,12 @@
 </group>
 
 <group name="syscheck,restart,">
+  <rule id="100300" level="7">
+        <if_sid>550</if_sid>
+        <field name="file">/</field>
+        <description>File modified in / directory.</description>
+  </rule>
+
   <rule id="100009" level="7">
     <if_sid>100300</if_sid>
     <match>ossec.conf</match>
