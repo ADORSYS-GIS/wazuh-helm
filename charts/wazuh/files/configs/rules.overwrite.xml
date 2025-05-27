@@ -127,7 +127,7 @@
 </group>
 
 <group name="windows,windows_security,">
- <rule id="60106" level="3" overwrite="yes">
+ <rule id="60106" level="0" overwrite="yes">
     <if_sid>60103</if_sid>
     <field name="win.system.eventID">^528$|^540$|^673$|^4624$|^4769$</field>
     <description>Windows Logon Success</description>
