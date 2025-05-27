@@ -15,6 +15,16 @@
     </mitre>
     <group>pci_dss_10.2.5,pci_dss_10.2.2,gpg13_7.6,gpg13_7.8,gpg13_7.13,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,nist_800_53_AC.6,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
   </rule>
+
+  <rule id="5407" level="0" overwrite="yes">
+    <if_sid>5400</if_sid>
+    <regex> ; USER=\S+ ; COMMAND=| ; USER=\S+ ; TSID=\S+ ; COMMAND=</regex>
+    <description>Successful sudo executed.</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <group>pci_dss_10.2.5,pci_dss_10.2.2,gpg13_7.6,gpg13_7.8,gpg13_7.13,gdpr_IV_32.2,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+  </rule>
 </group>
 
 <group name="pam,syslog,">
@@ -113,6 +123,19 @@
     <category>ids</category>
     <check_if_ignored>srcip, id</check_if_ignored>
     <description>IDS event.</description>
+  </rule>
+</group>
+
+<group name="windows,windows_security,">
+ <rule id="60106" level="3" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.eventID">^528$|^540$|^673$|^4624$|^4769$</field>
+    <description>Windows Logon Success</description>
+    <options>no_full_log</options>
+    <group>authentication_success,pci_dss_10.2.5,gpg13_7.1,gpg13_7.2,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.9,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
   </rule>
 </group>
 
