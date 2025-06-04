@@ -20,6 +20,7 @@ jobs:
         chart:
           - wazuh-helm
           - owasp-zap
+          - wazuh-monitoring
         include:
           - chart: wazuh-helm
             path: charts/wazuh
