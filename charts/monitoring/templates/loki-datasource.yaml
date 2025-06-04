@@ -17,7 +17,7 @@ data:
         type: loki
         orgId: 1
         access: proxy
-        url: http://{{ .Release.Name }}-loki:3100
+        url: http://loki:3100
         basicAuth: false
       - name: prometheus
         type: prometheus

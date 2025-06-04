@@ -77,12 +77,12 @@ prom-stack:
         - "prometheus-{{ .Values.global.domain }}"
     prometheusSpec:
       retention: 10d
-      logLevel: error
-      securityContext:
-        runAsGroup: 0
-        runAsNonRoot: false
-        runAsUser: 0
-        fsGroup: 0
+      #logLevel: error
+      #      securityContext:
+      #        runAsGroup: 0
+      #        runAsNonRoot: false
+      #        runAsUser: 0
+      #        fsGroup: 0
       storageSpec:
         volumeClaimTemplate:
           spec:
@@ -107,6 +107,7 @@ prom-stack:
     plugins:
       - grafana-piechart-panel
       - grafana-clock-panel
+      - digrich-bubblechart-panel
     enabled: true
     envFromSecret: '{{ $.Release.Name }}-keycloak-conf'
     grafana.ini:
@@ -115,8 +116,11 @@ prom-stack:
         enable_gzip: true
       auth:
         disable_login_form: true
+      auth.anonymous:
+        enabled: "false"
+        org_role: "Admin"
       auth.basic:
-        enabled: false
+        enabled: "false"
       auth.generic_oauth:
         enabled: "true"
         name: "Keycloak login"
@@ -138,7 +142,11 @@ prom-stack:
         use_pkce: "true"
 
 loki:
+  fullnameOverride: loki
   enabled: true
+  memberlist:
+    service:
+      publishNotReadyAddresses: true
   ingress:
     enabled: false
     ingressClassName: traefik
@@ -146,6 +154,26 @@ loki:
       - "loki-{{ .Values.global.domain }}"
   loki:
     auth_enabled: false
+    storage:
+      type: s3
+      bucketNames:
+        chunks: monitoring
+        ruler: monitoring
+      object_store:
+        storage_prefix: "loki_"
+    structuredConfig:
+      common:
+        storage:
+          s3:
+            endpoint: "<your-s3-endpoint>"
+            access_key_id: "<your-s3-access-key-id>"
+            secret_access_key: "<your-s3-secret-access-key>"
+      compactor:
+        retention_enabled: true
+        delete_request_store: s3
+      limits_config:
+        retention_period: 30d
+    
     commonConfig:
       replication_factor: 1
     schemaConfig:
@@ -162,16 +190,40 @@ loki:
     limits_config:
       allow_structured_metadata: true
       volume_enabled: true
-    ruler:
-      enable_api: true
+  ruler:
+    enable_api: true
+  lokiCanary:
+    enabled: false
+  test:
+    enabled: false
+  monitoring:
+    dashboards:
+      enabled: false
+    rules:
+      enabled: false
+    serviceMonitor:
+      enabled: false
+    selfMonitoring:
+      enabled: false
+      grafanaAgent:
+        installOperator: false
+    lokiCanary:
+      enabled: false
 
   minio:
-    enabled: true
+    enabled: false
 
   deploymentMode: SingleBinary
 
   singleBinary:
     replicas: 1
+    resources:
+      requests:
+        cpu: '100m'
+        memory: '600Mi'
+      limits:
+        cpu: '1000m'
+        memory: '4Gi'
 
   # Zero out replica counts of other deployment modes
   backend:
@@ -377,3 +429,24 @@ alloy:
             }
           }
         }
+    resources:
+      requests:
+        cpu: '100m'
+        memory: '600Mi'
+      limits:
+        cpu: '800m'
+        memory: '4Gi'
+    extraPorts:
+      - name: "otel"
+        port: 4317
+        targetPort: 4317
+        protocol: "TCP"
+      - name: "faro"
+        port: 12347
+        targetPort: 12347
+        protocol: "TCP"
+        appProtocol: "h2c"
+      - name: "thrifthttp"
+        port: 14268
+        targetPort: 14268
+        protocol: "TCP"
