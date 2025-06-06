@@ -165,7 +165,7 @@ loki:
       common:
         storage:
           s3:
-            endpoint: "<your-s3-endpoint>"
+            #endpoint: "<your-s3-endpoint>"
             access_key_id: "<your-s3-access-key-id>"
             secret_access_key: "<your-s3-secret-access-key>"
       compactor:
