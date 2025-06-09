@@ -165,7 +165,7 @@ loki:
       common:
         storage:
           s3:
-            endpoint: "<your-s3-endpoint>"
+            #endpoint: "<your-s3-endpoint>"
             access_key_id: "<your-s3-access-key-id>"
             secret_access_key: "<your-s3-secret-access-key>"
       compactor:
@@ -266,7 +266,7 @@ alloy:
           level  = "info"
           format = "logfmt"
         }
-                  
+        
         discovery.kubernetes "pods" {
           role = "pod"
         }
@@ -293,7 +293,7 @@ alloy:
         
         loki.write "default" {
           endpoint {
-            url = "http://{{ .Release.Name }}-loki:3100/loki/api/v1/push"
+            url = "http://loki:3100/loki/api/v1/push"
           }
         }
         
