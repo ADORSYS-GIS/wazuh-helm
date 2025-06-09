@@ -200,6 +200,11 @@ spec:
               mountPath: /wazuh-config-mount/integrations/custom-jira.py
               subPath: custom-jira.py    
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/0005-audit-mitre_rules.xml
+              subPath: 0005-audit-mitre_rules.xml
+              readOnly: true
+              
             {{ range $k, $v := $.Values.cluster.decoders -}}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
             {{- $n_k := printf "0003-%s" $k -}} 
