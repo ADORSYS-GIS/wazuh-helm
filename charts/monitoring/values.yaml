@@ -235,6 +235,8 @@ loki:
       limits:
         cpu: '1000m'
         memory: '4Gi'
+    persistence:
+      storageClass: 'wazuh-monitoring-sc'
 
   # Zero out replica counts of other deployment modes
   backend:
