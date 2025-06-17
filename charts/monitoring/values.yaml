@@ -151,8 +151,6 @@ pushgateway:
     limits:
       cpu: '200m'
       memory: '50Mi'
-  persistentVolume: 
-    enabled: true
 
 loki:
   fullnameOverride: loki
