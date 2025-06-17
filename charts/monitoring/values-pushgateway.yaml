@@ -1,0 +1,15 @@
+pushgateway:
+  enabled: true
+
+prom-stack:
+  prometheus:
+    prometheusSpec:
+      additionalScrapeConfigs:
+        - job_name: 'pushgateway'
+          static_configs:
+            - targets: [ 'pushgateway:9091' ] # Internal Kubernetes service address
+          # Optional: To ensure metrics are properly grouped by job/instance if your application pushes them with those labels
+          metric_relabel_configs:
+            - source_labels: [ __name__ ]
+              regex: '^(.*)_total$'
+              action: keep # Example to keep only specific metrics

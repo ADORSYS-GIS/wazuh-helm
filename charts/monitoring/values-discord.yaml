@@ -1,0 +1,14 @@
+global: 
+  discord_webhook_url: <your-url-here>
+
+prom-stack: 
+  alertmanager:
+    tplConfig: true
+    config:
+      route:
+        receiver: 'discord'
+        group_by: [ alertname, datacenter, app ]
+      receivers:
+        - name: discord
+          discord_configs:
+            - webhook_url: "{{ .Values.global.discord_webhook_url }}"
