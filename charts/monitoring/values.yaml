@@ -140,6 +140,20 @@ prom-stack:
         allow_assign_grafana_admin: "true"
         use_refresh_token: "true"
         use_pkce: "true"
+  
+pushgateway:
+  enabled: false
+  fullnameOverride: pushgateway
+  resources:
+    requests:
+      cpu: '100m'
+      memory: '30Mi'
+    limits:
+      cpu: '200m'
+      memory: '50Mi'
+  persistentVolume: 
+    enabled: true
+    storageClass: '{{ include "common.storage-className" $ }}'
 
 loki:
   fullnameOverride: loki

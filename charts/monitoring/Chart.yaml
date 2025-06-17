@@ -15,7 +15,7 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.0-rc.18
+version: 0.1.0-rc.19
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
@@ -30,6 +30,13 @@ dependencies:
     tags:
       - common
       - bitnami-common
+  - name: prometheus-pushgateway
+    condition: pushgateway.enabled
+    repository: https://prometheus-community.github.io/helm-charts
+    alias: pushgateway
+    version: "*"
+    tags:
+      - pushgateway
   - name: kube-prometheus-stack
     version: '*'
     repository: https://prometheus-community.github.io/helm-charts
@@ -42,7 +49,11 @@ dependencies:
     condition: loki.enabled
     repository: https://grafana.github.io/helm-charts
     version: "*"
+    tags:
+      - loki
   - name: alloy
     condition: alloy.enabled
     repository: https://grafana.github.io/helm-charts
     version: "*"
+    tags:
+      - alloy
