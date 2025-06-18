@@ -3,7 +3,33 @@ storageClasses:
     provisioner: rancher.io/local-path
     volumeBindingMode: WaitForFirstConsumer
 
+svcs:
+  '{{ include "common.names.fullname" $ }}-dashboard':
+    type: LoadBalancer
+
 dashboard:
-  ingress:
-    enabled: true
-    className: traefik
+  resources: ~
+
+master:
+  resources:
+    limits:
+      cpu: 400m
+      memory: 512Mi
+worker:
+  replicaCount: 0
+  resources:
+    limits:
+      cpu: 400m
+      memory: 512Mi
+indexer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+cluster:
+  rootCaSecretName: "wazuh-root-ca"
