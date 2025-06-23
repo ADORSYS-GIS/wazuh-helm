@@ -16,8 +16,6 @@ data:
     {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
   "0005-audit-mitre_rules.xml":  |
     {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
-  "0006-false-positive_rules.xml":  |
-    {{ $.Files.Get "files/configs/rules.false-positive.xml" | nindent 6 }}
 
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
