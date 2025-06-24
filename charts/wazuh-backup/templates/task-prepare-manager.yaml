@@ -1,0 +1,94 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: prepare-manager
+  namespace: {{ .Values.namespace }}
+spec:
+  workspaces:
+    - name: manager-data
+      description: PVC with manager files
+    - name: backup-output
+      description: shared EmptyDir for archives
+  steps:
+    - name: init-timestamp
+      image: alpine:3.17
+      script: |
+        #!/bin/sh
+        ts=$(date +'%Y%m%d%H%M')
+        out=$(workspaces.backup-output.path)
+        mkdir -p "$out"
+        echo "$ts" > "$out/ts.txt"
+
+    - name: prepare-temp
+      image: alpine:3.17
+      script: |
+        #!/bin/sh
+        ts=$(cat $(workspaces.backup-output.path)/ts.txt)
+        out=$(workspaces.backup-output.path)
+        tmp="$out/tmp-manager-$ts"
+        mkdir -p "$tmp"
+
+    - name: archive-core
+      image: ubuntu:22.04
+      script: |
+        #!/bin/sh
+        set -eux
+        ts=$(cat $(workspaces.backup-output.path)/ts.txt)
+        out=$(workspaces.backup-output.path)
+        tmp="$out/tmp-manager-$ts"
+        apt-get update
+        apt-get install -y rsync
+
+        # Copy core component paths into the shared temp dir
+        rsync -aREz \
+          /workspace/manager-data/filebeat/etc/filebeat \
+          /workspace/manager-data/wazuh/var/ossec/etc/internal_options.conf \
+          /workspace/manager-data/wazuh/var/ossec/etc/local_internal_options.conf \
+          /workspace/manager-data/wazuh/var/ossec/etc/client.keys \
+          /workspace/manager-data/wazuh/var/ossec/etc/sslmanager.key \
+          /workspace/manager-data/wazuh/var/ossec/etc/sslmanager.cert \
+          /workspace/manager-data/wazuh/var/ossec/etc/rules/local_rules.xml \
+          /workspace/manager-data/wazuh/var/ossec/etc/decoders/local_decoder.xml \
+          /workspace/manager-data/wazuh/var/ossec/etc/shared \
+          /workspace/manager-data/wazuh/var/ossec/logs \
+          "$tmp/"
+
+    - name: backup-queue-db
+      image: ubuntu:22.04
+      script: |
+        #!/bin/sh
+        set -eux
+        ts=$(cat $(workspaces.backup-output.path)/ts.txt)
+        out=$(workspaces.backup-output.path)
+        tmp="$out/tmp-manager-$ts"
+        sts={{ .Values.manager.statefulsetName }}
+        ns={{ .Values.namespace }}
+
+        apt-get update
+        apt-get install -y curl rsync
+        # install kubectl
+        curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+        install -m 0755 kubectl /usr/local/bin/
+
+        # scale down & ensure scale-up on exit
+        replicas=$(kubectl get statefulset "$sts" -n "$ns" -o jsonpath='{.spec.replicas}')
+        kubectl scale statefulset "$sts" --replicas=0 -n "$ns"
+        trap 'kubectl scale statefulset "$sts" --replicas=$replicas -n "$ns"' EXIT
+
+        # Copy queue DB into the same temp dir
+        rsync -aREz /workspace/manager-data/wazuh/var/ossec/queue/db/ "$tmp"
+
+
+    - name: create-archive
+      image: alpine:3.17
+      script: |
+        #!/bin/sh
+        set -eux
+        ts=$(cat $(workspaces.backup-output.path)/ts.txt)
+        out=$(workspaces.backup-output.path)
+        tmp="tmp-manager-$ts"
+        mkdir -p "$out/archive"
+        tar czf "$out/archive/manager-backup-$ts.tar.gz" -C "$out" "$tmp"
+        rm -rf "$out/$tmp" "$out/ts.txt"
+
+

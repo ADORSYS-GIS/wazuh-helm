@@ -1,6 +1,34 @@
-# values.yaml
+# Default values for wazuh-backup chart
+
+# Namespace where all resources will be deployed
+namespace: wazuh
 
 aws:
-  accessKeyId: KEYID
-  secretAccessKey: ACCESSKEY
-  sessionToken: SESSIONTOKEN
+  # AWS region for S3 operations
+  region: eu-central-1
+  # S3 bucket (without “s3://” prefix)
+  bucket: test-wazuh-backup-bucket
+  # Name of the Kubernetes Secret that will hold your AWS credentials
+  secretName: aws-creds
+  # AWS credentials (replace with real values or override via --set)
+  accessKeyId: "<YOUR_AWS_ACCESS_KEY_ID>"
+  secretAccessKey: "<YOUR_AWS_SECRET_ACCESS_KEY>"
+
+# PVC names for your Wazuh storage
+pvc:
+  # Manager data PVC
+  manager: wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0
+  # Indexer shard 0 PVC
+  indexerShard0: wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0
+  # Indexer shard 1 PVC
+  indexerShard1: wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-1
+
+# Cron schedule for nightly backups (02:00 UTC)
+schedule: "0 2 * * *"
+
+# Whether the Pipeline should abort on first task failure
+stopOnFailure: true
+
+# Manager StatefulSet name (for scale-down/scale-up)
+manager:
+  statefulsetName: wazuh-wazuh-helm-manager-master
