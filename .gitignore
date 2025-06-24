@@ -5,3 +5,4 @@ test.yaml
 *.key
 *.csr
 *.srl
+*.tgz

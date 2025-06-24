@@ -11,6 +11,7 @@ metadata:
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
 data:
-  "gen_certs.sh": {{ include "wazuh.cert_script" $ | quote }}
+  "gen_certs.sh": |
+    {{ include "wazuh.cert_script" $ | nindent 4 }}
 {{- end }}
 {{- end }}

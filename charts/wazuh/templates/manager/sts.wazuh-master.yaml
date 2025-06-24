@@ -64,6 +64,14 @@ spec:
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
+        - name: jira-conf
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
+        {{ if eq (include "integration.azure.exists" $) "true" -}}
+        - name: azure-auth
+          secret:
+            secretName: {{ include "secret.common" $ }}-azure
+        {{ end }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -75,7 +83,7 @@ spec:
         - name: wazuh-init
           ##
           ##
-          image: ghcr.io/adorsys-gis/envsubt:latest
+          image: ghcr.io/adorsys-gis/envsubt:main-7917c58
           ##
           ##
           imagePullPolicy: IfNotPresent
@@ -86,7 +94,7 @@ spec:
             - -c
             - |
               set -ex
-              envsubst < /workdir/template.config.conf > /processed/ossec.conf
+              envsubst < /workdir/template.config.xml > /processed/ossec.conf
           ##
           ##
           env:
@@ -96,22 +104,43 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            {{ if eq (include "integration.azure.exists" $) "true" -}}
+            - name: AZURE_CONFIGS
+              value: |
+                {{ include "integration.azure.conf" $ | nindent 16 }}
+            {{- end }}
+
+            {{ with include "integration.github.conf" $ -}}
+            - name: GITHUB_CONFIGS
+              value: |
+                {{ . | nindent 16 }}
+            {{- end }}
+
           ##
           ##
           envFrom:
             - secretRef:
                 name: '{{ include "secret.common" $ }}'
+            {{ if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.notification-slack" $ }}'
+            {{- end }}
+          
+            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.integration-jira" $ }}'
+            {{- end }}
           ##
           ##
           volumeMounts:
             - name: config
-              mountPath: /workdir/template.config.conf
-              subPath: template.config.conf
+              mountPath: /workdir/template.config.xml
+              subPath: template.config.xml
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
       securityContext:
-        fsGroup: 1000
+        fsGroup: 1000          
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -172,13 +201,40 @@ spec:
               subPath: local_rules.xml
               readOnly: true
             - name: config
-              mountPath: /wazuh-config-mount/etc/decoders/local_decoder.xml
-              subPath: local_decoder.xml
+              mountPath: /wazuh-config-mount/etc/decoders/0004-custom-decoder.xml
+              subPath: 0004-custom-decoder.xml
               readOnly: true
+
+            - name: jira-conf
+              mountPath: /wazuh-config-mount/integrations/custom-jira
+              subPath: custom-jira
+            - name: jira-conf
+              mountPath: /wazuh-config-mount/integrations/custom-jira.py
+              subPath: custom-jira.py
+
             - name: config
-              mountPath: /wazuh-config-mount/etc/decoders/0004-owasp-zap.xml
-              subPath: 0004-owasp-zap.xml
+              mountPath: /wazuh-config-mount/etc/rules/0005-audit-mitre_rules.xml
+              subPath: 0005-audit-mitre_rules.xml
               readOnly: true
+
+
+            {{ range $k, $v := $.Values.cluster.decoders }}
+            {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+            {{- $n_k := printf "0003-%s" $k -}}
+            - name: config
+              mountPath: /wazuh-config-mount/etc/decoders/{{ $n_k }}
+              readOnly: true
+              subPath: {{ $n_k }}
+            {{- end }}
+
+            {{ range $k, $v := $.Values.cluster.rules }}
+            {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+            {{- $n_k := printf "0003-%s" $k -}}
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/{{ $n_k }}
+              readOnly: true
+              subPath: {{ $n_k }}
+            {{- end }}
 
             - name: root-certs
               mountPath: /etc/ssl/root-ca.pem
@@ -192,12 +248,31 @@ spec:
               mountPath: /etc/ssl/filebeat.key
               subPath: server-key.pem
               readOnly: true
+
+            {{ if (eq (include "integration.azure.exists.log" $) "true") -}}
+            - name: azure-auth
+              mountPath: /var/ossec/wodles/credentials/log_analytics_credentials
+              subPath: log_auth
+              readOnly: true
+            {{- end }}
+
+            {{ if (eq (include "integration.azure.exists.graph" $) "true") -}}
+            - name: azure-auth
+              mountPath: /var/ossec/wodles/credentials/graph_credentials
+              subPath: graph_auth
+              readOnly: true
+            {{- end }}
+
+            {{ if (eq (include "integration.azure.exists.storage" $) "true") -}}
+            - name: azure-auth
+              mountPath: /var/ossec/wodles/credentials/storage_credentials
+              subPath: storage_auth
+              readOnly: true
+            {{- end }}
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
           ports:
-            - containerPort: 1514
-              name: agents-events
             - containerPort: 1515
               name: registration
             - containerPort: 1516
@@ -225,6 +300,7 @@ spec:
                 name: '{{ include "secret.indexer-auth" $ }}'
             - secretRef:
                 name: '{{ include "secret.common" $ }}'
+
           {{ with .envFrom -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}

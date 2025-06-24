@@ -1,0 +1,4 @@
+storageClasses:
+  '{{ include "common.storage-className" $ }}':
+    provisioner: docker.io/hostpath
+    volumeBindingMode: Immediate

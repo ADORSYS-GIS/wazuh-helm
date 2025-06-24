@@ -1,0 +1,8 @@
+<decoder name="trivy-decoder">
+    <prematch>^Trivy:</prematch>
+</decoder>
+<decoder name="trivy-decoder-fields">
+    <parent>trivy-decoder</parent>
+    <regex offset="after_parent">"(\.+)","(\.+)","(\.+)","(\.+)","(\.+)"</regex>
+    <order>image, package, version, vulnerability_id, severity</order>
+</decoder>

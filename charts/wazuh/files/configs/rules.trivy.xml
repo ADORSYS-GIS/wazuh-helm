@@ -1,0 +1,49 @@
+<group name="trivy">
+    <!-- Parent Rule for Trivy alerts -->
+    <rule id="100101" level="0">
+        <decoded_as>trivy-decoder</decoded_as>
+        <description>Trivy alert detected.</description>
+    </rule>
+
+    <!-- This rule detects a critical severity vulnerability in a container image -->
+    <rule id="100102" level="14">
+        <if_sid>100101</if_sid>
+        <field name="severity">Critical</field>
+        <description>Trivy alert [Critical]: Vulnerabilty '$(vulnerability_id)' detected in package '$(package)' version '$(version)' on container image '$(image)'.</description>
+    </rule>
+
+    <!-- This rule detects a high severity vulnerability in a container image -->
+    <rule id="100103" level="12">
+        <if_sid>100101</if_sid>
+        <field name="severity">High</field>
+        <description>Trivy alert [High]: Vulnerabilty '$(vulnerability_id)' detected in package '$(package)' version '$(version)' on container image '$(image)'.</description>
+    </rule>
+
+    <!-- This rule detects a medium severity vulnerability in a container image -->
+    <rule id="100104" level="7">
+        <if_sid>100101</if_sid>
+        <field name="severity">Medium</field>
+        <description>Trivy alert [Medium]: Vulnerabilty '$(vulnerability_id)' detected in package '$(package)' version '$(version)' on container image '$(image)'.</description>
+    </rule>
+
+    <!-- This rule detects a low severity vulnerability in a container image -->
+    <rule id="100105" level="4">
+        <if_sid>100101</if_sid>
+        <field name="severity">Low</field>
+        <description>Trivy alert [Low]: Vulnerabilty '$(vulnerability_id)' detected in package '$(package)' version '$(version)' on container image '$(image)'.</description>
+    </rule>
+
+    <!-- This rule detects a negligible severity vulnerability in a container image -->
+    <rule id="100106" level="1">
+        <if_sid>100101</if_sid>
+        <field name="severity">Negligible</field>
+        <description>Trivy alert [Negligible]: Vulnerabilty '$(vulnerability_id)' detected in package '$(package)' version '$(version)' on container image '$(image)'.</description>
+    </rule>
+
+    <!-- This rule detects an unknown severity vulnerability in a container image -->
+    <rule id="100107" level="7">
+        <if_sid>100101</if_sid>
+        <field name="severity">Unknown</field>
+        <description>Trivy alert [Unknown]: Vulnerabilty '$(vulnerability_id)' detected in package '$(package)' version '$(version)' on container image '$(image)'.</description>
+    </rule>
+</group>

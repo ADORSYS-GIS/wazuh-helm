@@ -7,7 +7,7 @@ on:
     tags:
       - 'v*'
     paths:
-      - 'charts/**/Chart.yaml'
+      - 'charts/**'
       - '.github/workflows/helm-publish.yml'
 
 jobs:
@@ -20,11 +20,14 @@ jobs:
         chart:
           - wazuh-helm
           - owasp-zap
+          - wazuh-monitoring
         include:
           - chart: wazuh-helm
             path: charts/wazuh
           - chart: owasp-zap
             path: charts/owasp-zap
+          - chart: wazuh-monitoring
+            path: charts/monitoring
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

@@ -1,0 +1,7 @@
+<group name="snort_K8s,">
+    <!-- Grouping rule for snort cluster -->
+    <rule id="109000" level="8">
+        <decoded_as>json</decoded_as>
+        <description>snort Cluster Rule</description>
+    </rule>
+</group>
