@@ -200,7 +200,7 @@ indexer:
   keycloak:
     ##
     ##
-    enabled: true
+    enabled: false
     ##
     ##
     roles_key: wazuh_roles
@@ -288,13 +288,7 @@ indexer:
   volumeMounts: [ ]
   ##
   ##
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 1
-      memory: 2Gi
+  resources: ~
 
   ##
   ##
@@ -385,17 +379,7 @@ worker:
     accessModes:
       - ReadWriteOnce
 
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-  ##
-  ##
-  affinity: ~
+  resources: ~
 
   ##
   ##
@@ -492,13 +476,7 @@ master:
     - name: owasp-zap-alerts
       mountPath: /var/log/owasp-zap/
 
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  resources: ~
 
   persistence:
     ##
@@ -591,13 +569,7 @@ dashboard:
   ##
   additionalAnnotations: { }
   additionalLabels: { }
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 400m
-      memory: 1Gi
+  resources: ~
 
   ##
   ##
