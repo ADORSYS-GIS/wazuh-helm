@@ -1,0 +1,85 @@
+# templates/tekton/tasks/s3-upload-directory.yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: s3-upload-directory
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/name: s3-upload-directory
+  annotations:
+    tekton.dev/displayName: "Upload Directory to S3"
+spec:
+  description: |
+    Syncs a subdirectory of a PVC workspace to an S3 bucket using aws-cli.
+  params:
+    - name: sourceDirectoryPath
+      type: string
+      description: "Relative path under /workspace/source to upload."
+    - name: s3BucketName
+      type: string
+      description: "Destination S3 bucket name."
+    - name: s3ObjectKeyPrefix
+      type: string
+      description: "S3 key prefix (folder), ending with '/'."
+      default: ""
+    - name: s3EndpointUrl
+      type: string
+      description: "Optional S3-compatible endpoint URL."
+      default: ""
+  workspaces:
+    - name: source
+      description: PVC workspace with data to upload.
+  steps:
+    - name: sync
+      image: "{{ .Values.tekton.tasks.s3Upload.image | default "amazon/aws-cli:2.13.0" }}"
+      # pull AWS creds directly from your Secret as env vars:
+      script: |
+        set -eux
+
+        SRC_DIR="${WORKSPACE_SOURCE%/}/${SOURCE_DIRECTORY_PATH%/}"
+        if [ ! -d "${SRC_DIR}" ]; then
+          echo "❌ Source directory ${SRC_DIR} does not exist."
+          exit 1
+        fi
+        echo
+        DST="s3://${S3_BUCKET_NAME}/${S3_OBJECT_KEY_PREFIX}"
+        
+        echo "🔑 AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'"
+        echo "🔒 AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'"
+        echo "🌍 AWS_REGION='${AWS_DEFAULT_REGION}'"
+        
+
+        CMD="aws"
+        aws sts get-caller-identity || echo "STS call failed"
+
+        echo "☁️  Uploading ${SRC_DIR%/}/ → ${DST}"
+        ${CMD} s3 sync "${SRC_DIR%/}/" "${DST}" --delete
+        echo "✅ S3 upload complete."
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_SESSION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_SESSION_TOKEN
+        - name: AWS_DEFAULT_REGION
+          value: "{{ .Values.aws.region | default "eu-central-1" }}"
+        - name: WORKSPACE_SOURCE
+          value: "$(workspaces.source.path)"
+        - name: SOURCE_DIRECTORY_PATH
+          value: "$(params.sourceDirectoryPath)"
+        - name: S3_BUCKET_NAME
+          value: "$(params.s3BucketName)"
+        - name: S3_OBJECT_KEY_PREFIX
+          value: "$(params.s3ObjectKeyPrefix)"
+        - name: S3_ENDPOINT_URL
+          value: "$(params.s3EndpointUrl)"

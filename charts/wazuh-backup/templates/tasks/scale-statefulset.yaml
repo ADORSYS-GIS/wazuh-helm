@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: scale-statefulset
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: scale-statefulset
+  annotations:
+    tekton.dev/displayName: "Scale StatefulSet"
+spec:
+  description: |
+    Scale an apps/v1 StatefulSet to N replicas and wait for rollout (if increasing).
+  params:
+    - name: statefulsetName
+      type: string
+      description: "Name of the StatefulSet to scale."
+    - name: namespace
+      type: string
+      description: "Namespace where the StatefulSet lives."
+      default: {{ .Values.namespace | quote }}
+    - name: replicas
+      type: string
+      description: "Target replica count."
+  steps:
+    - name: scale
+      image: {{ .Values.tekton.tasks.scaleStatefulset.image | quote }}
+      script: |
+        set -eux
+        echo "🔄 Scaling StatefulSet ${STATEFULSET_NAME} in ${NAMESPACE} → ${REPLICAS} replicas"
+        kubectl get statefulset "${STATEFULSET_NAME}" -n "${NAMESPACE}"
+        kubectl scale statefulset "${STATEFULSET_NAME}" -n "${NAMESPACE}" --replicas="${REPLICAS}"
+        if [ "${REPLICAS}" != "0" ]; then
+          echo "⏱️ Waiting for StatefulSet rollout…"
+          kubectl rollout status statefulset/"${STATEFULSET_NAME}" -n "${NAMESPACE}" --timeout=300s
+        fi
+        echo "✅ Scale complete."
+      env:
+        - name: STATEFULSET_NAME
+          value: "$(params.statefulsetName)"
+        - name: NAMESPACE
+          value: "$(params.namespace)"
+        - name: REPLICAS
+          value: "$(params.replicas)"
