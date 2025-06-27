@@ -8,20 +8,6 @@ spec:
     name: wazuh-component-backup
   serviceAccountName: wazuh-backup-sa
 
-  # 1) bind the existing component PVC
-  workspaces:
-    - name: component-pvc
-      persistentVolumeClaim:
-        # <-- your existing Wazuh Manager PVC
-        claimName: wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0
-  
-    # 2) bind (or reuse) a staging PVC for the rsync / cleanup
-    - name: staging-pvc
-      persistentVolumeClaim:
-        # <-- either an existing "staging" PVC or create one
-        claimName: backup-staging-pvc
-
-
   params:
     - name: componentName
       value: "wazuh-manager"

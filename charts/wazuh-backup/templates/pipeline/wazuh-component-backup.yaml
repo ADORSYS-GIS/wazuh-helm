@@ -47,21 +47,10 @@ spec:
       type: string
       default: ""
       description: "Optional S3 endpoint URL."
-  workspaces:
-    - name: component-pvc
-      description: "Wazuh component PVC."
-    - name: staging-pvc
-      description: "Shared staging PVC."
-    - name: aws-credentials
-      description: "AWS creds secret (for S3)."
-      optional: true
   tasks:
     - name: clean-staging
       taskRef:
         name: cleanup-pvc-directory
-      workspaces:
-        - name: target
-          workspace: staging-pvc
       params:
         - name: directoryPath
           value: "$(params.backupSubdir)"
@@ -83,9 +72,6 @@ spec:
       runAfter:
         - clean-staging
         - scale-down
-      workspaces:
-        - name: source
-          workspace: component-pvc
       params:
         - name: sourcePath
           value: "$(params.sourcePvcPath)"
@@ -110,9 +96,6 @@ spec:
         name: s3-upload-directory
       runAfter:
         - copy-data
-      workspaces:
-        - name: source
-          workspace: staging-pvc
       params:
         - name: sourceDirectoryPath
           value: "$(params.backupSubdir)"
@@ -128,9 +111,6 @@ spec:
         name: cleanup-pvc-directory
       runAfter:
         - upload-s3
-      workspaces:
-        - name: target
-          workspace: staging-pvc
       params:
         - name: directoryPath
           value: "$(params.backupSubdir)"
