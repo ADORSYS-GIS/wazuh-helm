@@ -1,0 +1,136 @@
+# templates/tekton/pipelines/wazuh-component-backup.yaml
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: "wazuh-component-backup"
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/name: wazuh-component-backup
+  annotations:
+    tekton.dev/displayName: "Wazuh Component Backup Pipeline"
+spec:
+  description: >
+    Back up a Wazuh component by:
+      1) Cleaning staging PVC
+      2) Scaling down the component
+      3) Rsyncing data into staging
+      4) Parallel: scaling up + uploading to S3
+      5) Final cleanup of staging PVC
+  params:
+    - name: componentName
+      type: string
+      description: "Friendly name (e.g. 'wazuh-manager')."
+    - name: statefulsetName
+      type: string
+      description: "K8s Statefulset to scale."
+    - name: statefulsetNamespace
+      type: string
+      default: "wazuh"
+      description: "Namespace of the statefulset."
+    - name: replicas
+      type: string
+      description: "Original replica count."
+    - name: sourcePvcPath
+      type: string
+      description: "Path in component PVC (ends with '/')."
+    - name: backupSubdir
+      type: string
+      description: "Subdirectory in staging PVC."
+    - name: s3BucketName
+      type: string
+      description: "S3 bucket for backups."
+    - name: s3KeyPrefix
+      type: string
+      default: ""
+      description: "S3 object key prefix (ends with '/')."
+    - name: s3EndpointUrl
+      type: string
+      default: ""
+      description: "Optional S3 endpoint URL."
+  workspaces:
+    - name: component-pvc
+      description: "Wazuh component PVC."
+    - name: staging-pvc
+      description: "Shared staging PVC."
+    - name: aws-credentials
+      description: "AWS creds secret (for S3)."
+      optional: true
+  tasks:
+    - name: clean-staging
+      taskRef:
+        name: cleanup-pvc-directory
+      workspaces:
+        - name: target
+          workspace: staging-pvc
+      params:
+        - name: directoryPath
+          value: "$(params.backupSubdir)"
+
+    - name: scale-down
+      taskRef:
+        name: scale-statefulset
+      params:
+        - name: statefulsetName
+          value: "$(params.statefulsetName)"
+        - name: namespace
+          value: "$(params.statefulsetNamespace)"
+        - name: replicas
+          value: "0"
+
+    - name: copy-data
+      taskRef:
+        name: rsync-pvc-to-pvc
+      runAfter:
+        - clean-staging
+        - scale-down
+      workspaces:
+        - name: source
+          workspace: component-pvc
+      params:
+        - name: sourcePath
+          value: "$(params.sourcePvcPath)"
+        - name: destinationPath
+          value: "$(params.backupSubdir)"
+
+    - name: scale-up
+      taskRef:
+        name: scale-statefulset
+      runAfter:
+        - copy-data
+      params:
+        - name: statefulsetName
+          value: "$(params.statefulsetName)"
+        - name: namespace
+          value: "$(params.statefulsetNamespace)"
+        - name: replicas
+          value: "$(params.replicas)"
+
+    - name: upload-s3
+      taskRef:
+        name: s3-upload-directory
+      runAfter:
+        - copy-data
+      workspaces:
+        - name: source
+          workspace: staging-pvc
+      params:
+        - name: sourceDirectoryPath
+          value: "$(params.backupSubdir)"
+        - name: s3BucketName
+          value: "$(params.s3BucketName)"
+        - name: s3ObjectKeyPrefix
+          value: "$(params.s3KeyPrefix)$(params.componentName)/$(context.pipelineRun.name)/"
+        - name: s3EndpointUrl
+          value: "$(params.s3EndpointUrl)"
+
+    - name: final-cleanup
+      taskRef:
+        name: cleanup-pvc-directory
+      runAfter:
+        - upload-s3
+      workspaces:
+        - name: target
+          workspace: staging-pvc
+      params:
+        - name: directoryPath
+          value: "$(params.backupSubdir)"

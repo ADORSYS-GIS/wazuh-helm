@@ -1,0 +1,63 @@
+# templates/tekton/tasks/rsync-pvc-to-pvc.yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rsync-pvc-to-pvc
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/name: rsync-pvc-to-pvc
+  annotations:
+    tekton.dev/displayName: "Rsync PVC to PVC"
+spec:
+  description: |
+    Uses rsync to copy from a source PVC workspace into a destination PVC workspace.
+  params:
+    - name: sourcePath
+      type: string
+      description: "Relative path under /workspace/source to copy from (e.g. 'data/')."
+      default: "./"
+    - name: destinationPath
+      type: string
+      description: "Relative path under /workspace/destination to copy to (e.g. 'manager-backup/')."
+      default: "./backup/"
+  workspaces:
+    - name: source
+      description: Source PVC workspace.
+  steps:
+    - name: rsync
+      image: "{{ .Values.tekton.tasks.rsync.image | default "eeacms/rsync:2.4.0" }}"
+      script: |
+        set -eux
+
+        # full paths
+        SRC="${WORKSPACE_SOURCE%/}/${SOURCE_PATH%/}"
+        DST="${WORKSPACE_SOURCE%/}/${DESTINATION_PATH%/}"
+
+        # make sure the source exists
+        if [ ! -d "${SRC}" ]; then
+        echo "❌ Source path ${SRC} does not exist."
+        exit 1
+        fi
+
+        # ensure the destination directory is in place
+        if [ ! -d "${DST}" ]; then
+        echo "📂 Destination path ${DST} not found. Creating it…"
+        mkdir -p "${DST}"
+        fi
+
+        echo "📦 Rsyncing from ${SRC}/ → ${DST}/"
+        rsync -a --delete "${SRC}/" "${DST}/"
+        echo "✅ Rsync complete."
+      env:
+        - name: WORKSPACE_SOURCE
+          value: "$(workspaces.source.path)"
+        - name: SOURCE_PATH
+          value: "$(params.sourcePath)"
+        - name: DESTINATION_PATH
+          value: "$(params.destinationPath)"
+    - name: debug-shell
+      image: busybox:1.34
+      script: |
+        #!/bin/sh
+        tail -f /dev/null
+

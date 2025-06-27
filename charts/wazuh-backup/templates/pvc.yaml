@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-staging-pvc
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/name: backup-staging
+    app.kubernetes.io/instance: wazuh-backup
+spec:
+  accessModes:
+    - ReadWriteOnce           
+  resources:
+    requests:
+      storage: 20Gi            

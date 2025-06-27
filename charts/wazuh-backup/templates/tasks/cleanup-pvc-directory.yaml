@@ -1,0 +1,36 @@
+# templates/tekton/tasks/cleanup-pvc-directory.yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup-pvc-directory
+  namespace: wazuh
+  labels:
+    app.kubernetes.io/name: cleanup-pvc-directory
+  annotations:
+    tekton.dev/displayName: "Clean Directory in PVC"
+spec:
+  description: |
+    Cleans the contents of a specified subdirectory within a PVC workspace.
+  params:
+    - name: directoryPath
+      type: string
+      description: >
+        Subdirectory under the workspace root to clean (e.g. "manager-backup").
+        Must not be "/" or blank.
+  workspaces:
+    - name: target
+      description: PVC workspace to clean.
+  steps:
+    - name: clean
+      image: "{{ .Values.tekton.tasks.cleanupPvc.image }}"
+      workingDir: "$(workspaces.target.path)/$(params.directoryPath)"
+      script: |
+        set -eux
+        # Prevent accidental deletion of entire PVC
+        if [ "$(pwd)" = "$(workspaces.target.path)" ]; then
+          echo "❌ Refusing to clean workspace root. Please specify a subdirectory."
+          exit 1
+        fi
+        echo "Cleaning contents of $(pwd)..."
+        find . -mindepth 1 -delete
+        echo "✅ Cleanup complete."
