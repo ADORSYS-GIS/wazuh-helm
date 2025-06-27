@@ -20,44 +20,56 @@ spec:
       type: string
       description: "Relative path under /workspace/destination to copy to (e.g. 'manager-backup/')."
       default: "./backup/"
-  workspaces:
-    - name: source
-      description: Source PVC workspace.
   steps:
     - name: rsync
       image: "{{ .Values.tekton.tasks.rsync.image | default "eeacms/rsync:2.4.0" }}"
       script: |
-        set -eux
+        set -euxo pipefail
 
-        # full paths
-        SRC="${WORKSPACE_SOURCE%/}/${SOURCE_PATH%/}"
-        DST="${WORKSPACE_SOURCE%/}/${DESTINATION_PATH%/}"
+        SRC_DIR="${SOURCE_PATH}"
+        DEST_DIR="${DESTINATION_PATH}"
 
-        # make sure the source exists
-        if [ ! -d "${SRC}" ]; then
-        echo "❌ Source path ${SRC} does not exist."
+        # 1  Source must exist.
+        if [[ ! -d "$SRC_DIR" ]]; then
+        echo "❌ Source directory $SRC_DIR does not exist."
         exit 1
         fi
 
-        # ensure the destination directory is in place
-        if [ ! -d "${DST}" ]; then
-        echo "📂 Destination path ${DST} not found. Creating it…"
-        mkdir -p "${DST}"
+        # 2  Refuse to treat / (root) as either source or destination.
+        if [[ "$SRC_DIR" == "/" || "$DEST_DIR" == "/" ]]; then
+        echo "❌ Refusing to use / as source or destination."
+        exit 1
         fi
 
-        echo "📦 Rsyncing from ${SRC}/ → ${DST}/"
-        rsync -a --delete "${SRC}/" "${DST}/"
+        # 3  Create destination if it is missing.
+        if [[ ! -d "$DEST_DIR" ]]; then
+        echo "📂 Destination $DEST_DIR not found. Creating it…"
+        mkdir -p "$DEST_DIR"
+        fi
+
+        echo "📦 Rsyncing from $SRC_DIR/ → $DEST_DIR/"
+        # -a : archive (recursive, preserve permissions/owners/timestamps, etc.)
+        # -v : verbose (helps with Tekton log visibility)
+        # -h : human-readable numbers
+        # --delete : remove files in DEST that were deleted from SRC
+        rsync -avh --delete "$SRC_DIR/" "$DEST_DIR/"
         echo "✅ Rsync complete."
+
       env:
-        - name: WORKSPACE_SOURCE
-          value: "$(workspaces.source.path)"
         - name: SOURCE_PATH
-          value: "$(params.sourcePath)"
+          value: "/wazuh-manager-data"
         - name: DESTINATION_PATH
-          value: "$(params.destinationPath)"
-    - name: debug-shell
-      image: busybox:1.34
-      script: |
-        #!/bin/sh
-        tail -f /dev/null
+          value: "/backup"
+      volumeMounts:
+        - name: source-volume
+          mountPath: /wazuh-manager-data
+        - name: destination-volume
+          mountPath: /backup
+  volumes:
+    - name: source-volume
+      persistentVolumeClaim:
+        claimName: wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0
+    - name: destination-volume
+      persistentVolumeClaim:
+        claimName: backup-staging-pvc
 

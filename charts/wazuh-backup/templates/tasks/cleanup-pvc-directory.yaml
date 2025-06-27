@@ -17,20 +17,37 @@ spec:
       description: >
         Subdirectory under the workspace root to clean (e.g. "manager-backup").
         Must not be "/" or blank.
-  workspaces:
-    - name: target
-      description: PVC workspace to clean.
   steps:
     - name: clean
       image: "{{ .Values.tekton.tasks.cleanupPvc.image }}"
-      workingDir: "$(workspaces.target.path)/$(params.directoryPath)"
       script: |
-        set -eux
-        # Prevent accidental deletion of entire PVC
-        if [ "$(pwd)" = "$(workspaces.target.path)" ]; then
-          echo "❌ Refusing to clean workspace root. Please specify a subdirectory."
-          exit 1
+        set -euxo pipefail
+
+        # Directory that must be wiped
+        BACKUP_DIR="/backup"
+
+        # Safety checks ──────────────────────────────────────────────────────────────
+        # 1. Make sure the directory actually exists.
+        if [[ ! -d "$BACKUP_DIR" ]]; then
+        echo "❌ Backup directory $BACKUP_DIR does not exist."
+        exit 1
         fi
-        echo "Cleaning contents of $(pwd)..."
-        find . -mindepth 1 -delete
+
+        # 2. Never allow / (filesystem root) or the workspace root to be nuked.
+        if [[ "$BACKUP_DIR" == "/" ]] || [[ "$BACKUP_DIR" == "$(workspaces.target.path)" ]]; then
+        echo "❌ Refusing to clean unsafe directory: $BACKUP_DIR"
+        exit 1
+        fi
+
+        # Cleanup ────────────────────────────────────────────────────────────────────
+        echo "Cleaning contents of $BACKUP_DIR ..."
+        # `find` is POSIX-portable and avoids “Argument list too long” issues.
+        find "$BACKUP_DIR" -mindepth 1 -delete
         echo "✅ Cleanup complete."
+      volumeMounts:
+        - name: destination-volume
+          mountPath: /backup
+  volumes:
+    - name: destination-volume
+      persistentVolumeClaim:
+        claimName: backup-staging-pvc
