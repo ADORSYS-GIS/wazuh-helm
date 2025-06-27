@@ -7,47 +7,77 @@ metadata:
   labels:
     app.kubernetes.io/name: s3-upload-directory
   annotations:
-    tekton.dev/displayName: "Upload Directory to S3"
+    tekton.dev/displayName: "Tarball + Upload to S3"
 spec:
   description: |
-    Syncs a subdirectory of a PVC workspace to an S3 bucket using aws-cli.
+    1. Archives a directory from the backup PVC into
+       wazuh-manager-backup-<timestamp>.tar.gz
+    2. Uploads that tarball to the requested S3 location.
   params:
     - name: sourceDirectoryPath
       type: string
-      description: "Relative path under /workspace/source to upload."
+      description: "Relative path under /backup to archive."
+      default: "."          # treat /backup root if nothing given
     - name: s3BucketName
       type: string
       description: "Destination S3 bucket name."
     - name: s3ObjectKeyPrefix
       type: string
-      description: "S3 key prefix (folder), ending with '/'."
+      description: "S3 key prefix (folder); leave blank for bucket root."
       default: ""
     - name: s3EndpointUrl
       type: string
       description: "Optional S3-compatible endpoint URL."
       default: ""
   steps:
-    - name: sync
-      image: "{{ .Values.tekton.tasks.s3Upload.image | default "amazon/aws-cli:2.13.0" }}"
-      # pull AWS creds directly from your Secret as env vars:
+    - name: make-tar
+      image: "alpine:3.18"
+      env:
+        - name: SRC_SUBDIR
+          value: "$(params.sourceDirectoryPath)"
       script: |
         set -euo pipefail
 
-        SRC_DIR=${SOURCE_PATH}
-
-        if [ ! -d "${SRC_DIR}" ]; then
-            echo "❌ Source directory ${SRC_DIR} does not exist."
-            exit 1
+        SRC="/backup"
+        if [ ! -d "${SRC}" ]; then
+          echo "❌ Source directory ${SRC} does not exist."
+          exit 1
         fi
-        echo
 
-        # Trim any leading / trailing slashes so we never get “s3://bucket//path//…”
-        DST="s3://${S3_BUCKET_NAME%/}/${S3_OBJECT_KEY_PREFIX#/}"
+        ts="$(date +'%Y%m%d')"
+        ARCHIVE_NAME="wazuh-manager-backup-${ts}.tar.gz"
+        ARCHIVE_PATH="/backup/${ARCHIVE_NAME}"
 
-        aws sts get-caller-identity || echo "⚠️  STS call failed – proceeding anyway"
+        echo "📦 Creating ${ARCHIVE_NAME} from ${SRC}/ …"
+        tar -czf "${ARCHIVE_PATH}" -C "${SRC}" .
+        echo "✅ Archive created at ${ARCHIVE_PATH}"
+      volumeMounts:
+        - name: backup-volume
+          mountPath: /backup
 
-        echo "☁️  Uploading ${SRC_DIR%/}/ → ${DST}"
-        aws s3 sync "${SRC_DIR%/}/" "${DST}" --delete
+    - name: s3-upload
+      image: "{{ .Values.tekton.tasks.s3Upload.image }}"
+      script: |
+        #!/bin/sh
+        set -euo pipefail
+
+        # Pick the most-recent wazuh tarball left by the previous step
+        ARCHIVE_PATH="$(ls -t /backup/wazuh-manager-backup-*.tar.gz | head -n1)"
+        if [ ! -f "${ARCHIVE_PATH}" ]; then
+          echo "❌ Expected archive not found in /backup/"
+          exit 1
+        fi
+
+        DST_PREFIX="s3://${S3_BUCKET_NAME%/}"
+        DST="${DST_PREFIX%/}/$(basename "${ARCHIVE_PATH}")"
+
+        AWS_ARGS=""
+        if [ -n "${S3_ENDPOINT_URL}" ]; then
+          AWS_ARGS="--endpoint-url ${S3_ENDPOINT_URL}"
+        fi
+
+        echo "☁️  Uploading ${ARCHIVE_PATH} → ${DST}"
+        aws s3 cp ${AWS_ARGS} "${ARCHIVE_PATH}" "${DST}"
         echo "✅ S3 upload complete."
       env:
         - name: AWS_ACCESS_KEY_ID
@@ -66,9 +96,7 @@ spec:
               name: "{{ .Values.aws.secretName }}"
               key: AWS_SESSION_TOKEN
         - name: AWS_DEFAULT_REGION
-          value: "{{ .Values.aws.region | default "eu-central-1" }}"
-        - name: SOURCE_PATH
-          value: "/backup"
+          value: "{{ .Values.aws.region }}"
         - name: S3_BUCKET_NAME
           value: "$(params.s3BucketName)"
         - name: S3_OBJECT_KEY_PREFIX
@@ -76,9 +104,11 @@ spec:
         - name: S3_ENDPOINT_URL
           value: "$(params.s3EndpointUrl)"
       volumeMounts:
-        - name: destination-volume
+        - name: backup-volume
           mountPath: /backup
+
+  # Shared PVC providing /backup for both steps
   volumes:
-    - name: destination-volume
+    - name: backup-volume
       persistentVolumeClaim:
         claimName: backup-staging-pvc
