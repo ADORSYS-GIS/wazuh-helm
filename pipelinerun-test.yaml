@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  namespace: wazuh
+  name: wazuh-manager-backup-run
+spec:
+  pipelineRef:
+    name: wazuh-component-backup
+  serviceAccountName: wazuh-backup-sa
+
+  # 1) bind the existing component PVC
+  workspaces:
+    - name: component-pvc
+      persistentVolumeClaim:
+        # <-- your existing Wazuh Manager PVC
+        claimName: wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0
+  
+    # 2) bind (or reuse) a staging PVC for the rsync / cleanup
+    - name: staging-pvc
+      persistentVolumeClaim:
+        # <-- either an existing "staging" PVC or create one
+        claimName: backup-staging-pvc
+
+
+  params:
+    - name: componentName
+      value: "wazuh-manager"
+    - name: statefulsetName
+      value: "wazuh-wazuh-helm-manager-master"
+    - name: statefulsetNamespace
+      value: "wazuh"
+    - name: replicas
+      value: "1"
+    - name: sourcePvcPath
+      value: "wazuh/var/ossec"
+    - name: backupSubdir
+      value: "manager-backup"
+    - name: s3BucketName
+      value: "test-wazuh-backup-bucket"
+    - name: s3KeyPrefix
+      value: "daily/"
+    - name: s3EndpointUrl
+      value: ""  # leave blank for AWS S3
