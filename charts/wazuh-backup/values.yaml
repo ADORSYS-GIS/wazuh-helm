@@ -1,7 +1,77 @@
-# Default values for wazuh-backup chart
+# values.yaml
 
-# Namespace where all resources will be deployed
-namespace: wazuh
+# ------------------------------------------------------------------------------
+# Chart meta
+# ------------------------------------------------------------------------------
+namespace: wazuh           # namespace where Tekton-RBAC and PVCs live
+chartVersion: "0.1.0"      # your chart version
+
+# ------------------------------------------------------------------------------
+# Tekton Task Images & Settings
+# ------------------------------------------------------------------------------
+tekton:
+  tasks:
+    cleanupPvc:
+      # Alpine with find, delete builtin
+      image: "alpine:3.18"
+      # Optional nodeSelector for cleanup pods
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+
+    scaleStatefulset:
+      # Bitnami kubectl supports up-to-date k8s versions
+      image: "bitnami/kubectl:1.27"
+      # Optional nodeSelector for kubectl pods
+      # nodeSelector:
+      #   node-role.kubernetes.io/control-plane: "true"
+
+    rsync:
+      # rsync client image
+      image: "eeacms/rsync:latest"
+      # Example: pin to Linux nodes with SSD local storage
+      # nodeSelector:
+      #   storage: ssd
+
+    s3Upload:
+      # AWS CLI v2 for S3 sync
+      image: "amazon/aws-cli:2.13.0"
+      # If you have a custom S3-compatible endpoint,
+      # set in PipelineRun params instead of here.
+
+# ------------------------------------------------------------------------------
+# Tekton Pipeline
+# ------------------------------------------------------------------------------
+tektonPipeline:
+  # Name of your pipeline resource
+  name: "wazuh-component-backup"
+
+# ------------------------------------------------------------------------------
+# PVC & Workspace Defaults (optional)
+# ------------------------------------------------------------------------------
+workspaces:
+  componentPvcClaim: "wazuh-manager-pvc"
+  stagingPvcClaim:   "backup-staging-pvc"
+  awsCredentialsSecret: "my-aws-credentials"
+
+# ------------------------------------------------------------------------------
+# Default PipelineRun parameters (can be overridden when installing or via CLI)
+# ------------------------------------------------------------------------------
+pipelineParams:
+  componentName: "wazuh-manager"
+  statefulsetName: "wazuh-manager-statefulset"
+  statefulsetNamespace: "{{ .Release.Namespace }}"
+  replicas: "3"
+  sourcePvcPath: "var/lib/wazuh/data/"
+  backupSubdir: "manager-backup"
+  s3BucketName: "test-wazuh-backup-bucket"
+  s3KeyPrefix: "daily/"
+
+# ------------------------------------------------------------------------------
+# Global defaults
+# ------------------------------------------------------------------------------
+# (If you want to set default nodeSelectors, resourceRequests, etc.)
+global:
+  imagePullPolicy: IfNotPresent
 
 aws:
   # AWS region for S3 operations
@@ -11,23 +81,9 @@ aws:
   # Name of the Kubernetes Secret that will hold your AWS credentials
   secretName: aws-creds
   # AWS credentials (replace with real values or override via --set)
-  accessKeyId: "<YOUR_AWS_ACCESS_KEY_ID>"
-  secretAccessKey: "<YOUR_AWS_SECRET_ACCESS_KEY>"
-
-# PVC names for your Wazuh storage
-pvc:
-  # Manager data PVC
-  manager: wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0
-  # Indexer shard 0 PVC
-  indexerShard0: wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0
-  # Indexer shard 1 PVC
-  indexerShard1: wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-1
-
-# Cron schedule for nightly backups (02:00 UTC)
-schedule: "0 2 * * *"
-
-# Whether the Pipeline should abort on first task failure
-stopOnFailure: true
+  accessKeyId: ""
+  secretAccessKey: ""
+  sessionToken: ""
 
 # Manager StatefulSet name (for scale-down/scale-up)
 manager:
