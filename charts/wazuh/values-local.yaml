@@ -10,11 +10,15 @@ dashboard:
     
 master: 
   replicaCount: 1
+  resources: ~
   
 worker: 
   replicaCount: 1
+  resources: ~
   
 indexer: 
   replicas: 1
+  resources: ~
   keycloak: 
-    enabled: true
+    enabled: false
+    

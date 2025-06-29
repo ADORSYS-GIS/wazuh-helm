@@ -200,7 +200,7 @@ indexer:
   keycloak:
     ##
     ##
-    enabled: false
+    enabled: true
     ##
     ##
     roles_key: wazuh_roles
