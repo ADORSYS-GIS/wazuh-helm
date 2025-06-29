@@ -167,15 +167,15 @@ Install (or upgrade) the chart, specifying the correct values file:
 
 - **k3s:**
   ```sh
-  helm upgrade --install wazuh . -f values-k3s.yaml
+  helm upgrade --install wazuh . -f values-local.yaml -f values-k3s.yaml
   ```
 - **minikube:**
   ```sh
-  helm upgrade --install wazuh . -f values-mkb.yaml
+  helm upgrade --install wazuh . -f values-local.yaml -f values-mkb.yaml
   ```
 - **microk8s:**
   ```sh
-  helm upgrade --install wazuh . -f values-mks.yaml
+  helm upgrade --install wazuh . -f values-local.yaml -f values-mks.yaml
   ```
 
 ---
