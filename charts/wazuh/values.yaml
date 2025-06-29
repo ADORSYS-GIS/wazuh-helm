@@ -962,7 +962,7 @@ integration:
   jira:
     ##
     ##
-    enabled: false
+    enabled: true
     ##
     ##
     webhookUrl: https://<example1>.jira.com/services/hooks/<example2>
