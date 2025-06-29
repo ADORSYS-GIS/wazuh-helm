@@ -1,4 +1,4 @@
-
+<!-- False positive rules -->
 <group name="ossec,">
   <rule id="100500" level="0">
     <if_group>rootcheck</if_group>
