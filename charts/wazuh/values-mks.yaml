@@ -6,15 +6,3 @@ storageClasses:
 svcs:
   '{{ include "common.names.fullname" $ }}-dashboard':
     type: LoadBalancer
-
-dashboard:
-  resources: ~
-
-master:
-  resources: ~
-worker:
-  replicaCount: 1
-  resources: ~
-indexer:
-  replicas: 2
-  resources: ~
