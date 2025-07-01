@@ -163,6 +163,19 @@ Navigate to the mounted chart directory:
 cd /wazuh
 ```
 
+### Note:
+Follow the [documentation](/README.md) to create and configure your Wazuh deployment.
+
+For Helm-specific setup, ensure you:
+
+1. Generate and apply the **Root CA** (as shown in the documentation).
+
+2. Adjust values in `values.yaml` for custom configurations.
+
+3. Install dependencies using `helm dependency update` in your target namespace.
+---
+
+
 Install (or upgrade) the chart, specifying the correct values file:
 
 - **k3s:**
