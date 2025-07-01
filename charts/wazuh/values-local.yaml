@@ -22,3 +22,9 @@ indexer:
   keycloak: 
     enabled: false
     
+cluster:
+  rootCaSecretName: "wazuh-root-ca"
+
+integration:
+  jira:
+    enabled: false
