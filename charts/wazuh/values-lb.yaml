@@ -1,0 +1,3 @@
+svcs:
+  '{{ include "common.names.fullname" $ }}-dashboard':
+    type: LoadBalancer
