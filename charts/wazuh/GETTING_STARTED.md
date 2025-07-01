@@ -53,10 +53,11 @@ flowchart TD
     C --> F[Install Helm & kubectl]
     D --> F
     E --> F
-    F --> G[Mount Helm Chart Directory]
-    G --> H[Helm Install with values-*.yaml]
-    H --> I[Access Services & Troubleshooting]
-    I --> J[Done]
+    F --> G[Create wazuh-root-ca secret]
+    G --> H[Mount Helm Chart Directory]
+    H --> I[Helm Install with values-*.yaml]
+    I --> J[Access Services & Troubleshooting]
+    J --> L[Done]
 ```
 
 ---
@@ -155,7 +156,41 @@ rm kubectl
 
 ---
 
-## 6. Deploy the Wazuh Helm Chart
+## 6. Create wazuh-root-ca secret
+
+To use this chart, you need to have first a root CA.
+To create one you can use the following commands:
+```shell
+OUTPUT_FOLDER="wazuh-certs" # Modify this to your needs
+echo "Generating Root CA"
+openssl genrsa -out "$OUTPUT_FOLDER/root-ca-key.pem" 2048
+openssl req -days 3650 -new -x509 -sha256 \
+    -key "$OUTPUT_FOLDER/root-ca-key.pem" \
+    -out "$OUTPUT_FOLDER/root-ca.pem" \
+    -subj "/C=DE/L=Bayern/O=Adorsys/CN=root-ca"
+```
+
+This will generate a root CA that you can use to sign
+the certificates for the Wazuh components.
+
+Then create a secret with the root CA:
+```shell
+NAMESPACE="wazuh" # Modify this to your needs
+ROOT_SECRET_NAME="wazuh-root-ca" # Modify this to your needs
+kubectl -n $NAMESPACE create secret generic $ROOT_SECRET_NAME \
+    --from-file="root-ca.pem"="$OUTPUT_FOLDER/root-ca.pem" \
+    --from-file="root-ca-key.pem"="$OUTPUT_FOLDER/root-ca-key.pem"
+```
+
+To create the namespace, use the following command:
+```shell
+NAMESPACE="wazuh" # Modify this to your needs
+kubectl create namespace $NAMESPACE
+```
+
+---
+
+## 7. Deploy the Wazuh Helm Chart
 
 Navigate to the mounted chart directory:
 
@@ -163,16 +198,12 @@ Navigate to the mounted chart directory:
 cd /wazuh
 ```
 
-### Note:
-Follow the [documentation](/README.md) to create and configure your Wazuh deployment.
 
 For Helm-specific setup, ensure you:
 
-1. Generate and apply the **Root CA** (as shown in the documentation).
+1. Adjust values in `values.yaml` for custom configurations.
 
-2. Adjust values in `values.yaml` for custom configurations.
-
-3. Install dependencies using `helm dependency update` in your target namespace.
+2. Install dependencies using `helm dependency update` in your target namespace.
 ---
 
 
@@ -193,7 +224,7 @@ Install (or upgrade) the chart, specifying the correct values file:
 
 ---
 
-## 7. Accessing Wazuh Services
+## 8. Accessing Wazuh Services
 
 Services are not directly exposed to your host by default. To access dashboards or APIs:
 
@@ -210,7 +241,7 @@ kubectl get svc
 
 ---
 
-## 8. Tips & Troubleshooting
+## 9. Tips & Troubleshooting
 
 - **Pods not ready?** Check status:
   ```sh
@@ -225,7 +256,7 @@ kubectl get svc
 
 ---
 
-## 9. Cleanup
+## 10. Cleanup
 
 To delete the VM and free resources:
 
