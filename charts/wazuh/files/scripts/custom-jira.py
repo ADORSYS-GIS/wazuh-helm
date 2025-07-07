@@ -46,7 +46,7 @@ def prepare_jira_payload(alert_data):
 
     payload = {
         'data': {
-            "project": {"key": "ECS"},
+            "project": {"key": "WAZUH"},
             "summary": f"Wazuh Alert: {summary}",
             "description": description,
             "issuetype": {"name": "Task"}
