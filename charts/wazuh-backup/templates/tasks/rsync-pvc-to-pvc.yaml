@@ -1,52 +1,56 @@
-# templates/tekton/tasks/rsync-pvc-to-pvc.yaml
+# templates/tasks/rsync-pvc-to-pvc.yaml
+
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: rsync-pvc-to-pvc
-  namespace: wazuh
+  namespace: {{ .Values.namespace }}
   labels:
     app.kubernetes.io/name: rsync-pvc-to-pvc
   annotations:
     tekton.dev/displayName: "Rsync PVC to PVC"
 spec:
   description: |
-    Uses rsync to copy from a source PVC workspace into a destination PVC workspace.
+    Uses rsync to copy from a source PVC to a destination PVC workspace.
+    This task is parameterized to work with any source PVC.
   params:
+    - name: sourcePvcName
+      type: string
+      description: "Name of the source PVC to copy from"
     - name: sourcePath
       type: string
-      description: "Relative path under /workspace/source to copy from (e.g. 'data/')."
-      default: "./"
+      description: "Relative path under the source PVC to copy from (e.g. 'data/')."
+      default: ""
     - name: destinationPath
       type: string
-      description: "Relative path under /workspace/destination to copy to (e.g. 'manager-backup/')."
-      default: "./backup/"
+      description: "Relative path under /backup to copy to (e.g. 'manager-backup/')."
+      default: ""
   steps:
     - name: rsync
-      image: "{{ .Values.tekton.tasks.rsync.image | default "eeacms/rsync:2.4.0" }}"
+      image: "{{ .Values.tekton.tasks.rsync.image }}"
       script: |
         set -euxo pipefail
 
-        SRC_DIR="${SOURCE_PATH}"
-        DEST_DIR="${DESTINATION_PATH}"
+        SRC_DIR="/source/$(params.sourcePath)"
+        DEST_DIR="/backup/$(params.destinationPath)"
 
-        rm -rf SRC_DIR/manager-backup
 
-        # 1  Source must exist.
+        # 1. Source must exist
         if [[ ! -d "$SRC_DIR" ]]; then
-        echo "❌ Source directory $SRC_DIR does not exist."
-        exit 1
+          echo "❌ Source directory $SRC_DIR does not exist."
+          exit 1
         fi
 
-        # 2  Refuse to treat / (root) as either source or destination.
+        # 2. Refuse to treat / (root) as either source or destination
         if [[ "$SRC_DIR" == "/" || "$DEST_DIR" == "/" ]]; then
-        echo "❌ Refusing to use / as source or destination."
-        exit 1
+          echo "❌ Refusing to use / as source or destination."
+          exit 1
         fi
 
-        # 3  Create destination if it is missing.
+        # 3. Create destination if it is missing
         if [[ ! -d "$DEST_DIR" ]]; then
-        echo "📂 Destination $DEST_DIR not found. Creating it…"
-        mkdir -p "$DEST_DIR"
+          echo "📂 Destination $DEST_DIR not found. Creating it…"
+          mkdir -p "$DEST_DIR"
         fi
 
         echo "📦 Rsyncing from $SRC_DIR/ → $DEST_DIR/"
@@ -57,33 +61,16 @@ spec:
         rsync -avh --delete "$SRC_DIR/" "$DEST_DIR/"
         echo "✅ Rsync complete."
 
-      env:
-        - name: SOURCE_PATH
-          value: "/wazuh-manager-data"
-        - name: DESTINATION_PATH
-          value: "/backup"
       volumeMounts:
         - name: source-volume
-          mountPath: /wazuh-manager-data
+          mountPath: /source
         - name: destination-volume
           mountPath: /backup
 
-    # - name: debug-shell
-    #   image: busybox:1.34
-    #   script: |
-    #     #!/bin/sh
-    #     tail -f /dev/null
-    #   volumeMounts:
-    #     - name: source-volume
-    #       mountPath: /wazuh-manager-data
-    #     - name: destination-volume
-    #       mountPath: /backup
   volumes:
     - name: source-volume
       persistentVolumeClaim:
-        claimName: wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0
+        claimName: "$(params.sourcePvcName)"
     - name: destination-volume
       persistentVolumeClaim:
-        claimName: backup-staging-pvc
-
-
+        claimName: {{ .Values.pvc.staging.name }}

@@ -1,53 +1,55 @@
-# templates/tekton/tasks/cleanup-pvc-directory.yaml
+# templates/tasks/cleanup-pvc-directory.yaml
+
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: cleanup-pvc-directory
-  namespace: wazuh
+  namespace: {{ .Values.namespace }}
   labels:
     app.kubernetes.io/name: cleanup-pvc-directory
   annotations:
     tekton.dev/displayName: "Clean Directory in PVC"
 spec:
   description: |
-    Cleans the contents of a specified subdirectory within a PVC workspace.
+    Cleans the contents of a specified subdirectory within the staging PVC.
   params:
     - name: directoryPath
       type: string
       description: >
-        Subdirectory under the workspace root to clean (e.g. "manager-backup").
+        Subdirectory under the staging PVC root to clean (e.g. "master-backup").
         Must not be "/" or blank.
   steps:
+
     - name: clean
       image: "{{ .Values.tekton.tasks.cleanupPvc.image }}"
       script: |
         set -euxo pipefail
 
         # Directory that must be wiped
-        BACKUP_DIR="/backup"
+        BACKUP_DIR="/backup/"
 
         # Safety checks ──────────────────────────────────────────────────────────────
         # 1. Make sure the directory actually exists.
         if [[ ! -d "$BACKUP_DIR" ]]; then
-        echo "❌ Backup directory $BACKUP_DIR does not exist."
-        exit 1
+          echo "❌ Backup directory $BACKUP_DIR does not exist."
+          exit 1
         fi
 
         # 2. Never allow / (filesystem root) or the workspace root to be nuked.
-        if [[ "$BACKUP_DIR" == "/" ]] || [[ "$BACKUP_DIR" == "$(workspaces.target.path)" ]]; then
-        echo "❌ Refusing to clean unsafe directory: $BACKUP_DIR"
-        exit 1
+        if [[ "$BACKUP_DIR" == "/" ]] || [[ "$BACKUP_DIR" == "/backup" ]]; then
+          echo "❌ Refusing to clean unsafe directory: $BACKUP_DIR"
+          exit 1
         fi
 
         # Cleanup ────────────────────────────────────────────────────────────────────
-        echo "Cleaning contents of $BACKUP_DIR ..."
-        # `find` is POSIX-portable and avoids “Argument list too long” issues.
+        echo "🧹 Cleaning contents of $BACKUP_DIR ..."
+        # `find` is POSIX-portable and avoids "Argument list too long" issues.
         find "$BACKUP_DIR" -mindepth 1 -delete
         echo "✅ Cleanup complete."
       volumeMounts:
-        - name: destination-volume
+        - name: staging-volume
           mountPath: /backup
   volumes:
-    - name: destination-volume
+    - name: staging-volume
       persistentVolumeClaim:
-        claimName: backup-staging-pvc
+        claimName: {{ .Values.pvc.staging.name }}
