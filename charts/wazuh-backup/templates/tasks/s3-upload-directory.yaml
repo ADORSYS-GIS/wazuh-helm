@@ -1,30 +1,29 @@
-# templates/tekton/tasks/s3-upload-directory.yaml
+# templates/tasks/s3-upload-directory.yaml
+
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: s3-upload-directory
-  namespace: wazuh
+  namespace: {{ .Values.namespace }}
   labels:
     app.kubernetes.io/name: s3-upload-directory
   annotations:
     tekton.dev/displayName: "Tarball + Upload to S3"
 spec:
   description: |
-    1. Archives a directory from the backup PVC into
-       wazuh-manager-backup-<timestamp>.tar.gz
-    2. Uploads that tarball to the requested S3 location.
+    1. Archives a directory from the backup PVC into a timestamped tarball
+    2. Uploads that tarball to S3 with the path: DD-MM-YY-wazuh-backup/component-name/
   params:
     - name: sourceDirectoryPath
       type: string
       description: "Relative path under /backup to archive."
-      default: "."          # treat /backup root if nothing given
+      default: "."
+    - name: componentName
+      type: string
+      description: "Name of the component being backed up (for S3 path and filename)"
     - name: s3BucketName
       type: string
       description: "Destination S3 bucket name."
-    - name: s3ObjectKeyPrefix
-      type: string
-      description: "S3 key prefix (folder); leave blank for bucket root."
-      default: ""
     - name: s3EndpointUrl
       type: string
       description: "Optional S3-compatible endpoint URL."
@@ -32,25 +31,30 @@ spec:
   steps:
     - name: make-tar
       image: "alpine:3.18"
-      env:
-        - name: SRC_SUBDIR
-          value: "$(params.sourceDirectoryPath)"
       script: |
         set -euo pipefail
 
-        SRC="/backup"
-        if [ ! -d "${SRC}" ]; then
-          echo "❌ Source directory ${SRC} does not exist."
+        COMPONENT_NAME="$(params.componentName)"
+        SRC_DIR="/backup/$(params.sourceDirectoryPath)"
+        
+        if [ ! -d "${SRC_DIR}" ]; then
+          echo "❌ Source directory ${SRC_DIR} does not exist."
           exit 1
         fi
 
-        ts="$(date +'%Y%m%d')"
-        ARCHIVE_NAME="wazuh-manager-backup-${ts}.tar.gz"
+        # Create timestamp in DD-MM-YY format
+        DATE_STAMP="$(date +'%d-%m-%y')"
+        TIME_STAMP="$(date +'%H%M%S')"
+        ARCHIVE_NAME="${COMPONENT_NAME}-backup-${DATE_STAMP}-${TIME_STAMP}.tar.gz"
         ARCHIVE_PATH="/backup/${ARCHIVE_NAME}"
 
-        echo "📦 Creating ${ARCHIVE_NAME} from ${SRC}/ …"
-        tar -czf "${ARCHIVE_PATH}" -C "${SRC}" .
+        echo "📦 Creating ${ARCHIVE_NAME} from ${SRC_DIR}/ …"
+        tar -czf "${ARCHIVE_PATH}" -C "${SRC_DIR}" .
         echo "✅ Archive created at ${ARCHIVE_PATH}"
+        
+        # Store the archive name for the next step
+        echo "${ARCHIVE_NAME}" > /backup/archive-name.txt
+        echo "${DATE_STAMP}" > /backup/date-stamp.txt
       volumeMounts:
         - name: backup-volume
           mountPath: /backup
@@ -61,24 +65,32 @@ spec:
         #!/bin/sh
         set -euo pipefail
 
-        # Pick the most-recent wazuh tarball left by the previous step
-        ARCHIVE_PATH="$(ls -t /backup/wazuh-manager-backup-*.tar.gz | head -n1)"
+        # Read the archive name and date from previous step
+        ARCHIVE_NAME="$(cat /backup/archive-name.txt)"
+        DATE_STAMP="$(cat /backup/date-stamp.txt)"
+        COMPONENT_NAME="$(params.componentName)"
+        
+        ARCHIVE_PATH="/backup/${ARCHIVE_NAME}"
+        
         if [ ! -f "${ARCHIVE_PATH}" ]; then
-          echo "❌ Expected archive not found in /backup/"
+          echo "❌ Expected archive ${ARCHIVE_PATH} not found"
           exit 1
         fi
 
-        DST_PREFIX="s3://${S3_BUCKET_NAME%/}"
-        DST="${DST_PREFIX%/}/$(basename "${ARCHIVE_PATH}")"
+        # S3 path structure: DD-MM-YY-wazuh-backup/component-name/filename
+        S3_PATH="s3://${S3_BUCKET_NAME}/${DATE_STAMP}-wazuh-backup/${COMPONENT_NAME}/${ARCHIVE_NAME}"
 
         AWS_ARGS=""
         if [ -n "${S3_ENDPOINT_URL}" ]; then
           AWS_ARGS="--endpoint-url ${S3_ENDPOINT_URL}"
         fi
 
-        echo "☁️  Uploading ${ARCHIVE_PATH} → ${DST}"
-        aws s3 cp ${AWS_ARGS} "${ARCHIVE_PATH}" "${DST}"
-        echo "✅ S3 upload complete."
+        echo "☁️  Uploading ${ARCHIVE_PATH} → ${S3_PATH}"
+        aws s3 cp ${AWS_ARGS} "${ARCHIVE_PATH}" "${S3_PATH}"
+        echo "✅ S3 upload complete: ${S3_PATH}"
+        
+        # Clean up the archive file after successful upload
+        rm -f "${ARCHIVE_PATH}" /backup/archive-name.txt /backup/date-stamp.txt
       env:
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
@@ -99,16 +111,13 @@ spec:
           value: "{{ .Values.aws.region }}"
         - name: S3_BUCKET_NAME
           value: "$(params.s3BucketName)"
-        - name: S3_OBJECT_KEY_PREFIX
-          value: "$(params.s3ObjectKeyPrefix)"
         - name: S3_ENDPOINT_URL
           value: "$(params.s3EndpointUrl)"
       volumeMounts:
         - name: backup-volume
           mountPath: /backup
 
-  # Shared PVC providing /backup for both steps
   volumes:
     - name: backup-volume
       persistentVolumeClaim:
-        claimName: backup-staging-pvc
+        claimName: {{ .Values.pvc.staging.name }}

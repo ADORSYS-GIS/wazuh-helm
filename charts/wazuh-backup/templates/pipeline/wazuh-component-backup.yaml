@@ -1,35 +1,41 @@
-# templates/tekton/pipelines/wazuh-component-backup.yaml
+# templates/pipeline/wazuh-component-backup.yaml
+# Enhanced pipeline using unified scale task
+
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: "wazuh-component-backup"
-  namespace: wazuh
+  namespace: {{ .Values.namespace }}
   labels:
     app.kubernetes.io/name: wazuh-component-backup
   annotations:
     tekton.dev/displayName: "Wazuh Component Backup Pipeline"
 spec:
   description: >
-    Back up a Wazuh component by:
+    Back up a Wazuh component with comprehensive error handling using unified scale task:
       1) Cleaning staging PVC
-      2) Scaling down the component
+      2) Scaling down the component (normal mode)
       3) Rsyncing data into staging
-      4) Parallel: scaling up + uploading to S3
+      4) Parallel: scaling up (normal mode) + uploading to S3
       5) Final cleanup of staging PVC
+      6) Emergency scale-up if any step fails (emergency mode)
   params:
     - name: componentName
       type: string
-      description: "Friendly name (e.g. 'wazuh-manager')."
+      description: "Friendly name (e.g. 'master', 'indexer', 'worker')."
     - name: statefulsetName
       type: string
       description: "K8s Statefulset to scale."
     - name: statefulsetNamespace
       type: string
-      default: "wazuh"
+      default: "{{ .Values.namespace }}"
       description: "Namespace of the statefulset."
     - name: replicas
       type: string
       description: "Original replica count."
+    - name: sourcePvcName
+      type: string
+      description: "Name of the source PVC to backup."
     - name: sourcePvcPath
       type: string
       description: "Path in component PVC (ends with '/')."
@@ -39,14 +45,28 @@ spec:
     - name: s3BucketName
       type: string
       description: "S3 bucket for backups."
-    - name: s3KeyPrefix
-      type: string
-      default: ""
-      description: "S3 object key prefix (ends with '/')."
     - name: s3EndpointUrl
       type: string
       default: ""
       description: "Optional S3 endpoint URL."
+  finally:
+    # CRITICAL: Emergency scale-up using unified task in emergency mode
+    - name: emergency-scale-up
+      taskRef:
+        name: scale-statefulset
+      params:
+        - name: statefulsetName
+          value: "$(params.statefulsetName)"
+        - name: namespace
+          value: "$(params.statefulsetNamespace)"
+        - name: replicas
+          value: "$(params.replicas)"
+        - name: mode
+          value: "emergency"
+        - name: componentName
+          value: "$(params.componentName)"
+        - name: pipelineStatus
+          value: "$(tasks.status)"
   tasks:
     - name: clean-staging
       taskRef:
@@ -65,6 +85,10 @@ spec:
           value: "$(params.statefulsetNamespace)"
         - name: replicas
           value: "0"
+        - name: mode
+          value: "normal"
+        - name: componentName
+          value: "$(params.componentName)"
 
     - name: copy-data
       taskRef:
@@ -73,6 +97,8 @@ spec:
         - clean-staging
         - scale-down
       params:
+        - name: sourcePvcName
+          value: "$(params.sourcePvcName)"
         - name: sourcePath
           value: "$(params.sourcePvcPath)"
         - name: destinationPath
@@ -90,6 +116,10 @@ spec:
           value: "$(params.statefulsetNamespace)"
         - name: replicas
           value: "$(params.replicas)"
+        - name: mode
+          value: "normal"
+        - name: componentName
+          value: "$(params.componentName)"
 
     - name: upload-s3
       taskRef:
@@ -99,10 +129,10 @@ spec:
       params:
         - name: sourceDirectoryPath
           value: "$(params.backupSubdir)"
+        - name: componentName
+          value: "$(params.componentName)"
         - name: s3BucketName
           value: "$(params.s3BucketName)"
-        - name: s3ObjectKeyPrefix
-          value: "$(params.s3KeyPrefix)$(params.componentName)/$(context.pipelineRun.name)/"
         - name: s3EndpointUrl
           value: "$(params.s3EndpointUrl)"
 
@@ -111,6 +141,7 @@ spec:
         name: cleanup-pvc-directory
       runAfter:
         - upload-s3
+        - scale-up  # Wait for both S3 upload and scale-up to complete
       params:
         - name: directoryPath
           value: "$(params.backupSubdir)"
