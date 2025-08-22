@@ -1,0 +1,123 @@
+# templates/tasks/s3-upload-directory.yaml
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: s3-upload-directory
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: s3-upload-directory
+  annotations:
+    tekton.dev/displayName: "Tarball + Upload to S3"
+spec:
+  description: |
+    1. Archives a directory from the backup PVC into a timestamped tarball
+    2. Uploads that tarball to S3 with the path: DD-MM-YY-wazuh-backup/component-name/
+  params:
+    - name: sourceDirectoryPath
+      type: string
+      description: "Relative path under /backup to archive."
+      default: "."
+    - name: componentName
+      type: string
+      description: "Name of the component being backed up (for S3 path and filename)"
+    - name: s3BucketName
+      type: string
+      description: "Destination S3 bucket name."
+    - name: s3EndpointUrl
+      type: string
+      description: "Optional S3-compatible endpoint URL."
+      default: ""
+  steps:
+    - name: make-tar
+      image: "alpine:3.18"
+      script: |
+        set -euo pipefail
+
+        COMPONENT_NAME="$(params.componentName)"
+        SRC_DIR="/backup/$(params.sourceDirectoryPath)"
+        
+        if [ ! -d "${SRC_DIR}" ]; then
+          echo "❌ Source directory ${SRC_DIR} does not exist."
+          exit 1
+        fi
+
+        # Create timestamp in DD-MM-YY format
+        DATE_STAMP="$(date +'%d-%m-%y')"
+        TIME_STAMP="$(date +'%H%M%S')"
+        ARCHIVE_NAME="${COMPONENT_NAME}-backup-${DATE_STAMP}-${TIME_STAMP}.tar.gz"
+        ARCHIVE_PATH="/backup/${ARCHIVE_NAME}"
+
+        echo "📦 Creating ${ARCHIVE_NAME} from ${SRC_DIR}/ …"
+        tar -czf "${ARCHIVE_PATH}" -C "${SRC_DIR}" .
+        echo "✅ Archive created at ${ARCHIVE_PATH}"
+        
+        # Store the archive name for the next step
+        echo "${ARCHIVE_NAME}" > /backup/archive-name.txt
+        echo "${DATE_STAMP}" > /backup/date-stamp.txt
+      volumeMounts:
+        - name: backup-volume
+          mountPath: /backup
+
+    - name: s3-upload
+      image: "{{ .Values.tekton.tasks.s3Upload.image }}"
+      script: |
+        #!/bin/sh
+        set -euo pipefail
+
+        # Read the archive name and date from previous step
+        ARCHIVE_NAME="$(cat /backup/archive-name.txt)"
+        DATE_STAMP="$(cat /backup/date-stamp.txt)"
+        COMPONENT_NAME="$(params.componentName)"
+        
+        ARCHIVE_PATH="/backup/${ARCHIVE_NAME}"
+        
+        if [ ! -f "${ARCHIVE_PATH}" ]; then
+          echo "❌ Expected archive ${ARCHIVE_PATH} not found"
+          exit 1
+        fi
+
+        # S3 path structure: DD-MM-YY-wazuh-backup/component-name/filename
+        S3_PATH="s3://${S3_BUCKET_NAME}/${DATE_STAMP}-wazuh-backup/${COMPONENT_NAME}/${ARCHIVE_NAME}"
+
+        AWS_ARGS=""
+        if [ -n "${S3_ENDPOINT_URL}" ]; then
+          AWS_ARGS="--endpoint-url ${S3_ENDPOINT_URL}"
+        fi
+
+        echo "☁️  Uploading ${ARCHIVE_PATH} → ${S3_PATH}"
+        aws s3 cp ${AWS_ARGS} "${ARCHIVE_PATH}" "${S3_PATH}"
+        echo "✅ S3 upload complete: ${S3_PATH}"
+        
+        # Clean up the archive file after successful upload
+        rm -f "${ARCHIVE_PATH}" /backup/archive-name.txt /backup/date-stamp.txt
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_SESSION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_SESSION_TOKEN
+        - name: AWS_DEFAULT_REGION
+          value: "{{ .Values.aws.region }}"
+        - name: S3_BUCKET_NAME
+          value: "$(params.s3BucketName)"
+        - name: S3_ENDPOINT_URL
+          value: "$(params.s3EndpointUrl)"
+      volumeMounts:
+        - name: backup-volume
+          mountPath: /backup
+
+  volumes:
+    - name: backup-volume
+      persistentVolumeClaim:
+        claimName: {{ .Values.pvc.staging.name }}
