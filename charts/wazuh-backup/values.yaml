@@ -1,9 +1,27 @@
 # values.yaml - Hybrid Mode Configuration
 
 # ------------------------------------------------------------------------------
+# Standard Helm chart metadata
+# ------------------------------------------------------------------------------
+kubeVersion: ""
+nameOverride: ""
+fullnameOverride: ""
+
+# Common labels and annotations for all resources
+commonLabels: {}
+commonAnnotations: {}
+
+# ------------------------------------------------------------------------------
+# Global settings
+# ------------------------------------------------------------------------------
+global:
+  namespace: wazuh
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+# ------------------------------------------------------------------------------
 # Chart meta
 # ------------------------------------------------------------------------------
-namespace: wazuh
 chartVersion: "0.1.0"
 
 # ------------------------------------------------------------------------------
@@ -59,16 +77,40 @@ backup:
 tekton:
   tasks:
     cleanupPvc:
-      image: "alpine:3.18"
+      image:
+        registry: docker.io
+        repository: alpine
+        tag: "3.18"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
     
     scaleStatefulset:
-      image: "bitnami/kubectl:1.27"
+      image:
+        registry: docker.io
+        repository: bitnami/kubectl
+        tag: "1.27"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
     
     rsync:
-      image: "eeacms/rsync:latest"
+      image:
+        registry: docker.io
+        repository: eeacms/rsync
+        tag: "latest"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
     
     s3Upload:
-      image: "amazon/aws-cli:2.13.0"
+      image:
+        registry: docker.io
+        repository: amazon/aws-cli
+        tag: "2.13.0"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
 
 # ------------------------------------------------------------------------------
 # AWS Configuration
@@ -99,8 +141,3 @@ pvc:
     accessMode: "ReadWriteOnce"
     storageClass: "wazuh-wazuh-helm"
 
-# ------------------------------------------------------------------------------
-# Global defaults
-# ------------------------------------------------------------------------------
-global:
-  imagePullPolicy: IfNotPresent

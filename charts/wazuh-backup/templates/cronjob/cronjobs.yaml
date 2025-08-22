@@ -8,12 +8,13 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: wazuh-backup-{{ $componentName }}-cron
-  namespace: {{ $.Values.namespace }}
+  name: {{ include "common.names.fullname" $ }}-{{ $componentName }}-cron
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
-    app.kubernetes.io/name: wazuh-backup-{{ $componentName }}-cron
-    app.kubernetes.io/instance: {{ $.Release.Name }}
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
     component: {{ $componentName }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
 spec:
   schedule: "{{ $config.schedule | default $.Values.backup.schedule }}"
   concurrencyPolicy: Forbid
@@ -23,7 +24,7 @@ spec:
     spec:
       template:
         spec:
-          serviceAccountName: wazuh-backup-sa
+          serviceAccountName: {{ include "common.names.fullname" $ }}-sa
           restartPolicy: OnFailure
           containers:
             - name: trigger-backup
@@ -45,7 +46,7 @@ spec:
                       "s3EndpointUrl": "{{ $.Values.backup.s3.endpointUrl }}",
                       "triggeredBy": "cronjob"
                     }' \
-                    "http://wazuh-backup-listener-svc.{{ $.Values.namespace }}.svc.cluster.local:8080/"
+                    "http://{{ include "common.names.fullname" $ }}-listener-svc.{{ include "common.names.namespace" $ }}.svc.cluster.local:8080/"
                   
                   if [ $? -eq 0 ]; then
                     echo "✅ Backup request sent successfully for {{ $componentName }}"

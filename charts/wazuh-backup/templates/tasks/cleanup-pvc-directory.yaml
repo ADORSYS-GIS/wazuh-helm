@@ -4,10 +4,11 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: cleanup-pvc-directory
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
-    app.kubernetes.io/name: cleanup-pvc-directory
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
   annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
     tekton.dev/displayName: "Clean Directory in PVC"
 spec:
   description: |
@@ -21,7 +22,7 @@ spec:
   steps:
 
     - name: clean
-      image: "{{ .Values.tekton.tasks.cleanupPvc.image }}"
+      image: {{ include "common.images.image" ( dict "imageRoot" .Values.tekton.tasks.cleanupPvc.image "global" .Values.global ) | quote }}
       script: |
         set -euxo pipefail
 
