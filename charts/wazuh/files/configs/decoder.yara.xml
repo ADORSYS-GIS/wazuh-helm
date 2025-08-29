@@ -4,7 +4,7 @@
 
 <decoder name="yara_decoder">
     <parent>yara_decoder</parent>
-    <regex>wazuh-yara: (\S+) - Scan result: (\S+) (\S+)</regex>
+    <regex>wazuh-yara: (\S+) - Scan result: (\S+) (\.+)</regex>
     <order>log_type, yara_rule, yara_scanned_file</order>
 </decoder>
 
