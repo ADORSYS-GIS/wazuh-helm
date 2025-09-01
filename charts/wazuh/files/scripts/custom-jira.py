@@ -29,15 +29,6 @@ def load_alert_data(file_path):
         logger.error(f"Failed to parse the last line '{file_path}' as JSON.")
         return None
 
-def is_alert_excluded(alert_data, excluded_groups):
-    """Check if the alert belongs to an excluded group."""
-    alert_groups = alert_data.get('rule', {}).get('groups', [])
-    for group in alert_groups:
-        if group in excluded_groups:
-            logger.info(f"Alert skipped: belongs to excluded group '{group}'")
-            return True
-    return False
-
 def prepare_jira_payload(alert_data, project_key):
     """Prepare the payload for Jira based on Wazuh alert data."""
     summary = alert_data.get("rule", {}).get("description", "Wazuh Alert")
@@ -55,7 +46,7 @@ def prepare_jira_payload(alert_data, project_key):
 
     payload = {
         'data': {
-            "project": {"key": project_key},
+            "project": {"key": "WAZUH"},
             "summary": f"Wazuh Alert: {summary}",
             "description": description,
             "issuetype": {"name": "Task"}
@@ -82,29 +73,23 @@ def send_webhook(url, api_key, payload):
 
 def main():
     # Check if enough arguments are provided
-    if len(sys.argv) != 6:
-        logger.error(f"Expected 5 arguments (alert_file, api_key, hook_url, project_key, excluded_groups), got {len(sys.argv) - 1}")
-        logger.error(f"Usage: {sys.argv[0]} <alert_file> <api_key> <hook_url> <project_key> <excluded_groups>")
+    if len(sys.argv) != 4:
+        logger.error(f"Expected 3 arguments (alert_file, api_key, hook_url), got {len(sys.argv) - 1}")
+        logger.error(f"Usage: {sys.argv[0]} <alert_file> <api_key> <hook_url>")
         sys.exit(1)
 
     # Map sys.argv to variables per ossec.conf
-    alert_file = sys.argv[1]      # First argument: alert file path
-    api_key = sys.argv[2]         # Second argument: api_key from ossec.conf
-    hook_url = sys.argv[3]        # Third argument: hook_url from ossec.conf
-    project_key = sys.argv[4]     # Fourth argument: project_key from <options> in ossec.conf
-    excluded_groups = sys.argv[5].split(',')  # Fifth argument: comma-separated excluded groups from <group>
+    alert_file = sys.argv[1]  # First argument: alert file path
+    api_key = sys.argv[2]     # Second argument: api_key from ossec.conf
+    hook_url = sys.argv[3]    # Third argument: hook_url from ossec.conf
 
     # Load alert data using the provided file path
     alert_data = load_alert_data(alert_file)
     if not alert_data:
         sys.exit(1)
 
-    # Check if the alert should be excluded based on groups
-    if is_alert_excluded(alert_data, excluded_groups):
-        sys.exit(0)  # Exit without error, as skipping is intentional
-
     # Prepare the Jira payload
-    payload = prepare_jira_payload(alert_data, project_key)
+    payload = prepare_jira_payload(alert_data)
     logger.info("Prepared payload: %s", json.dumps(payload, indent=2))
 
     # Send the webhook using the provided URL and token
