@@ -29,7 +29,7 @@ def load_alert_data(file_path):
         logger.error(f"Failed to parse the last line '{file_path}' as JSON.")
         return None
 
-def prepare_jira_payload(alert_data, project_key):
+def prepare_jira_payload(alert_data):
     """Prepare the payload for Jira based on Wazuh alert data."""
     summary = alert_data.get("rule", {}).get("description", "Wazuh Alert")
     description = (
