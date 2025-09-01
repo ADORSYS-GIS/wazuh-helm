@@ -999,7 +999,4 @@ integration:
     apikey: 101010
     ##
     ##
-    projectKey: ECS
-    ##
-    ##
     externalSecret: ~
