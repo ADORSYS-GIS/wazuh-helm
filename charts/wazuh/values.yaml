@@ -999,7 +999,7 @@ integration:
     apikey: 101010
     ##
     ##
-    projectKey-group: WAZUH
+    projectKey: WAZUH
     ##
     ##
     externalSecret: ~
