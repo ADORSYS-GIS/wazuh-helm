@@ -28,18 +28,18 @@ if [ ! -f "${PYTHON_SCRIPT}" ]; then
     exit 1
 fi
 
-# Check if at least 3 arguments are provided
-if [ $# -lt 3 ]; then
-    echo "$(date '+%Y/%m/%d %H:%M:%S') - ERROR: Expected at least 3 arguments, got $#" >> "${LOG_FILE}"
+# Check if at least 4 arguments are provided
+if [ $# -lt 4 ]; then
+    echo "$(date '+%Y/%m/%d %H:%M:%S') - ERROR: Expected at least 4 arguments, got $#" >> "${LOG_FILE}"
     exit 1
 fi
 
-# Execute the Python script with only the first 3 arguments
-"${WAZUH_PATH}/${WPYTHON_BIN}" "${PYTHON_SCRIPT}" "$1" "$2" "$3"
+# Execute the Python script with the first 4 arguments
+"${WAZUH_PATH}/${WPYTHON_BIN}" "${PYTHON_SCRIPT}" "$1" "$2" "$3" "$4"
 
 # Check the exit status of the Python script
 if [ $? -ne 0 ]; then
-    echo "$(date '+%Y/%m/%d %H:%M:%S') - ERROR: Python script ${PYTHON_SCRIPT} failed with arguments $1 $2 $3" >> "${LOG_FILE}"
+    echo "$(date '+%Y/%m/%d %H:%M:%S') - ERROR: Python script ${PYTHON_SCRIPT} failed with arguments $1 $2 $3 $4" >> "${LOG_FILE}"
     exit 1
 fi
 
