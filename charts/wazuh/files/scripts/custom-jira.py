@@ -43,7 +43,7 @@ def is_alert_excluded(alert_data, excluded_groups):
     logger.info("Alert not excluded: proceeding to create Jira ticket")
     return False
 
-def prepare_jira_payload(alert_data, project_key):
+def prepare_jira_payload(alert_data):
     """Prepare the payload for Jira based on Wazuh alert data."""
     summary = alert_data.get("rule", {}).get("description", "Wazuh Alert")
     description = (
@@ -60,7 +60,6 @@ def prepare_jira_payload(alert_data, project_key):
 
     payload = {
         'data': {
-            "project": {"key": project_key},
             "summary": f"Wazuh Alert: {summary}",
             "description": description,
             "issuetype": {"name": "Task"}
@@ -86,9 +85,12 @@ def send_webhook(url, api_key, payload):
             logger.error(f"Response: {response.text}")
 
 def main():
+    # Log all arguments for debugging
+    logger.info(f"All arguments received: {sys.argv}")
+
     # Check if enough arguments are provided
-    if len(sys.argv) != 5:
-        logger.error(f"Expected 4 arguments (alert_file, api_key, hook_url, options), got {len(sys.argv) - 1}")
+    if len(sys.argv) < 5:
+        logger.error(f"Expected at least 4 arguments (alert_file, api_key, hook_url, options), got {len(sys.argv) - 1}")
         logger.error(f"Usage: {sys.argv[0]} <alert_file> <api_key> <hook_url> <options>")
         sys.exit(1)
 
@@ -96,15 +98,16 @@ def main():
     alert_file = sys.argv[1]      # First argument: alert file path
     api_key = sys.argv[2]         # Second argument: api_key from ossec.conf
     hook_url = sys.argv[3]        # Third argument: hook_url from ossec.conf
-    options = sys.argv[4].split(',')  # Fourth argument: options (project_key,excluded_groups)
+    options_raw = sys.argv[4] if len(sys.argv) > 4 else ""  # Fourth argument: options (excluded_groups)
 
-    # Parse options: first element is project_key, rest are excluded_groups
-    if not options:
-        logger.error("Options argument is empty")
-        sys.exit(1)
-    project_key = options[0].strip()
-    excluded_groups = options[1:] if len(options) > 1 else []
-    logger.info(f"Received arguments: alert_file={alert_file}, project_key={project_key}, excluded_groups={excluded_groups}")
+    # Log raw options for debugging
+    logger.info(f"Raw options argument: '{options_raw}'")
+
+    # Parse options: all elements are excluded_groups
+    excluded_groups = options_raw.split(',') if options_raw else []
+    if not excluded_groups:
+        logger.warning("No excluded groups provided; all alerts will be processed")
+    logger.info(f"Parsed arguments: alert_file={alert_file}, excluded_groups={excluded_groups}")
 
     # Load alert data using the provided file path
     alert_data = load_alert_data(alert_file)
@@ -120,7 +123,7 @@ def main():
         sys.exit(0)  # Exit without error, as skipping is intentional
 
     # Prepare the Jira payload
-    payload = prepare_jira_payload(alert_data, project_key)
+    payload = prepare_jira_payload(alert_data)
     logger.info("Prepared payload: %s", json.dumps(payload, indent=2))
 
     # Send the webhook using the provided URL and token
