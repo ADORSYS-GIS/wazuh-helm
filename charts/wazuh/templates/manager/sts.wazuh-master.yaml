@@ -217,6 +217,11 @@ spec:
               subPath: 0005-audit-mitre_rules.xml
               readOnly: true
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/0006-FIM-MacOS.xml
+              subPath: 0006-FIM-MacOS.xml
+              readOnly: true
+
 
             {{ range $k, $v := $.Values.cluster.decoders }}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
