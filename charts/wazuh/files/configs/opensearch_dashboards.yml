@@ -11,6 +11,11 @@ server.ssl.key: "/usr/share/wazuh-dashboard/certs/dashboard-key.pem"
 server.ssl.certificate: "/usr/share/wazuh-dashboard/certs/dashboard.pem"
 opensearch.ssl.certificateAuthorities: ["/usr/share/wazuh-dashboard/certs/root-ca.pem"]
 uiSettings.overrides.defaultRoute: /app/wz-home?security_tenant=global
+
+# Session expiration settings
+opensearch_security.cookie.ttl: 900000
+opensearch_security.session.ttl: 900000
+opensearch_security.session.keepalive: true
   
 {{ with $.Values.indexer.keycloak -}}
 {{- if .enabled -}}
