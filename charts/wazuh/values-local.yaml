@@ -1,13 +1,3 @@
-storageClasses:
-  '{{ include "wazuh.storageClassName" $ }}':
-    provisioner: rancher.io/local-path
-    volumeBindingMode: WaitForFirstConsumer
-
-dashboard:
-  ingress:
-    enabled: true
-    className: traefik
-    
 master: 
   replicaCount: 1
   resources: ~
