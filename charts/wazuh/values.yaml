@@ -971,4 +971,7 @@ integration:
     apikey: 101010
     ##
     ##
+    projectKey: WAZUH
+    ##
+    ##
     externalSecret: ~
