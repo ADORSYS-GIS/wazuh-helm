@@ -29,43 +29,22 @@ spec:
     - name: rsync
       image: "{{ .Values.tekton.tasks.rsync.image }}"
       script: |
-        set -euxo pipefail
-
-        SRC_DIR="/source/$(params.sourcePath)"
-        DEST_DIR="/backup/$(params.destinationPath)"
-
-
-        # 1. Source must exist
-        if [[ ! -d "$SRC_DIR" ]]; then
-          echo "❌ Source directory $SRC_DIR does not exist."
-          exit 1
-        fi
-
-        # 2. Refuse to treat / (root) as either source or destination
-        if [[ "$SRC_DIR" == "/" || "$DEST_DIR" == "/" ]]; then
-          echo "❌ Refusing to use / as source or destination."
-          exit 1
-        fi
-
-        # 3. Create destination if it is missing
-        if [[ ! -d "$DEST_DIR" ]]; then
-          echo "📂 Destination $DEST_DIR not found. Creating it…"
-          mkdir -p "$DEST_DIR"
-        fi
-
-        echo "📦 Rsyncing from $SRC_DIR/ → $DEST_DIR/"
-        # -a : archive (recursive, preserve permissions/owners/timestamps, etc.)
-        # -v : verbose (helps with Tekton log visibility)
-        # -h : human-readable numbers
-        # --delete : remove files in DEST that were deleted from SRC
-        rsync -avh --delete "$SRC_DIR/" "$DEST_DIR/"
-        echo "✅ Rsync complete."
-
+        # Copy script to writable location and execute
+        cp /scripts/rsync-pvc-to-pvc.sh /tmp/rsync-pvc-to-pvc.sh
+        chmod +x /tmp/rsync-pvc-to-pvc.sh
+        /tmp/rsync-pvc-to-pvc.sh
+      env:
+        - name: SOURCE_PATH
+          value: "$(params.sourcePath)"
+        - name: DESTINATION_PATH
+          value: "$(params.destinationPath)"
       volumeMounts:
         - name: source-volume
           mountPath: /source
         - name: destination-volume
           mountPath: /backup
+        - name: scripts-volume
+          mountPath: /scripts
 
   volumes:
     - name: source-volume
@@ -74,3 +53,7 @@ spec:
     - name: destination-volume
       persistentVolumeClaim:
         claimName: {{ .Values.pvc.staging.name }}
+    - name: scripts-volume
+      configMap:
+        name: wazuh-backup-scripts
+        defaultMode: 0755

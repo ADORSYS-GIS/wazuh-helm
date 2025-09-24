@@ -79,8 +79,8 @@ tekton:
     cleanupPvc:
       image:
         registry: docker.io
-        repository: alpine
-        tag: "3.18"
+        repository: bash
+        tag: "5.2"
         digest: ""
         pullPolicy: IfNotPresent
         pullSecrets: []

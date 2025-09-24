@@ -20,37 +20,26 @@ spec:
         Subdirectory under the staging PVC root to clean (e.g. "master-backup").
         Must not be "/" or blank.
   steps:
-
     - name: clean
       image: {{ include "common.images.image" ( dict "imageRoot" .Values.tekton.tasks.cleanupPvc.image "global" .Values.global ) | quote }}
       script: |
-        set -euxo pipefail
-
-        # Directory that must be wiped
-        BACKUP_DIR="/backup/"
-
-        # Safety checks ──────────────────────────────────────────────────────────────
-        # 1. Make sure the directory actually exists.
-        if [[ ! -d "$BACKUP_DIR" ]]; then
-          echo "❌ Backup directory $BACKUP_DIR does not exist."
-          exit 1
-        fi
-
-        # 2. Never allow / (filesystem root) or the workspace root to be nuked.
-        if [[ "$BACKUP_DIR" == "/" ]] || [[ "$BACKUP_DIR" == "/backup" ]]; then
-          echo "❌ Refusing to clean unsafe directory: $BACKUP_DIR"
-          exit 1
-        fi
-
-        # Cleanup ────────────────────────────────────────────────────────────────────
-        echo "🧹 Cleaning contents of $BACKUP_DIR ..."
-        # `find` is POSIX-portable and avoids "Argument list too long" issues.
-        find "$BACKUP_DIR" -mindepth 1 -delete
-        echo "✅ Cleanup complete."
+        # Copy script to writable location and execute
+        cp /scripts/cleanup-pvc-directory.sh /tmp/cleanup-pvc-directory.sh
+        chmod +x /tmp/cleanup-pvc-directory.sh
+        /tmp/cleanup-pvc-directory.sh
+      env:
+        - name: DIRECTORY_PATH
+          value: "$(params.directoryPath)"
       volumeMounts:
         - name: staging-volume
           mountPath: /backup
+        - name: scripts-volume
+          mountPath: /scripts
   volumes:
     - name: staging-volume
       persistentVolumeClaim:
         claimName: {{ .Values.pvc.staging.name }}
+    - name: scripts-volume
+      configMap:
+        name: wazuh-backup-scripts
+        defaultMode: 0755
