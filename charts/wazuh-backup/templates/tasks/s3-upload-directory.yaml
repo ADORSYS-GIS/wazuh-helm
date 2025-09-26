@@ -1,0 +1,107 @@
+# templates/tasks/s3-upload-directory.yaml
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: s3-upload-directory
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    app.kubernetes.io/name: s3-upload-directory
+  annotations:
+    tekton.dev/displayName: "Tarball + Upload to S3"
+spec:
+  description: |
+    1. Archives a directory from the backup PVC into a timestamped tarball
+    2. Uploads that tarball to S3 with the path: DD-MM-YY-wazuh-backup/component-name/
+  params:
+    - name: sourceDirectoryPath
+      type: string
+      description: "Relative path under /backup to archive."
+      default: "."
+    - name: componentName
+      type: string
+      description: "Name of the component being backed up (for S3 path and filename)"
+    - name: s3BucketName
+      type: string
+      description: "Destination S3 bucket name."
+    - name: s3EndpointUrl
+      type: string
+      description: "Optional S3-compatible endpoint URL."
+      default: ""
+  steps:
+    - name: make-tar
+      image: bash:5.2
+      script: |
+        # Copy script to writable location and execute
+        cp /scripts/make-tar.sh /tmp/make-tar.sh
+        chmod +x /tmp/make-tar.sh
+        sh /tmp/make-tar.sh
+      env:
+        - name: COMPONENT_NAME
+          value: "$(params.componentName)"
+        - name: SOURCE_DIRECTORY_PATH
+          value: "$(params.sourceDirectoryPath)"
+      volumeMounts:
+        - name: backup-volume
+          mountPath: /backup
+        - name: scripts-volume
+          mountPath: /scripts
+    # - name: hold
+    #   image: ubuntu:20.04
+    #   script: |
+    #     #!/bin/bash
+    #     echo "Pod is running. Touch /stop file to exit."
+    #     while [ ! -f /stop ]; do
+    #       sleep 5
+    #     done
+    #   volumeMounts:
+    #     - name: backup-volume
+    #       mountPath: /backup
+    #     - name: scripts-volume
+    #       mountPath: /scripts
+    - name: s3-upload
+      image: "{{ include "image.ref" .Values.tekton.tasks.s3Upload.image }}"
+      imagePullPolicy: {{ .Values.tekton.tasks.s3Upload.image.pullPolicy | default "IfNotPresent" }}
+      script: |
+        # Copy script to writable location and execute
+        cp /scripts/s3-upload.sh /tmp/s3-upload.sh
+        chmod +x /tmp/s3-upload.sh
+        sh /tmp/s3-upload.sh
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_SESSION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.aws.secretName }}"
+              key: AWS_SESSION_TOKEN
+        - name: AWS_DEFAULT_REGION
+          value: "{{ .Values.aws.region }}"
+        - name: S3_BUCKET_NAME
+          value: "$(params.s3BucketName)"
+        - name: S3_ENDPOINT_URL
+          value: "$(params.s3EndpointUrl)"
+        - name: COMPONENT_NAME
+          value: "$(params.componentName)"
+      volumeMounts:
+        - name: backup-volume
+          mountPath: /backup
+        - name: scripts-volume
+          mountPath: /scripts
+
+  volumes:
+    - name: backup-volume
+      persistentVolumeClaim:
+        claimName: {{ .Values.pvc.staging.name }}
+    - name: scripts-volume
+      configMap:
+        name: wazuh-backup-scripts
+        defaultMode: 0755

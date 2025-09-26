@@ -1,0 +1,34 @@
+# templates/triggers/event-listener.yaml
+
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: wazuh-backup-listener
+  namespace: {{ .Values.namespace }}
+spec:
+  serviceAccountName: wazuh-backup-sa
+  triggers:
+    - triggerRef: wazuh-backup-master-trigger
+    - triggerRef: wazuh-backup-indexer-trigger
+    - triggerRef: wazuh-backup-worker-trigger
+
+---
+# Service - exposes the EventListener
+apiVersion: v1
+kind: Service
+metadata:
+  name: wazuh-backup-listener-svc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: wazuh-backup-eventlistener
+spec:
+  selector:
+    app.kubernetes.io/managed-by: EventListener
+    app.kubernetes.io/part-of: Triggers
+    eventlistener: wazuh-backup-listener
+  ports:
+    - name: http-listener
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-backup-scripts
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+data:
+  cleanup-pvc-directory.sh: |
+{{ .Files.Get "scripts/cleanup-pvc-directory.sh" | indent 4 }}
+  scale-statefulset.sh: |
+{{ .Files.Get "scripts/scale-statefulset.sh" | indent 4 }}
+  make-tar.sh: |
+{{ .Files.Get "scripts/make-tar.sh" | indent 4 }}
+  s3-upload.sh: |
+{{ .Files.Get "scripts/s3-upload.sh" | indent 4 }}
+  rsync-pvc-to-pvc.sh: |
+{{ .Files.Get "scripts/rsync-pvc-to-pvc.sh" | indent 4 }}

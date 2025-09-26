@@ -1,0 +1,73 @@
+# templates/tasks/scale-statefulset.yaml
+# Unified scale task with both normal and emergency modes
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: scale-statefulset
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    app.kubernetes.io/name: scale-statefulset
+  annotations:
+    tekton.dev/displayName: "Scale StatefulSet (Unified)"
+spec:
+  description: |
+    Unified StatefulSet scaling task that handles both normal operations and emergency recovery.
+    
+    Modes:
+    - normal: Strict error handling, fails on errors (default)
+    - emergency: Lenient error handling, always tries to recover, never fails
+  params:
+    - name: statefulsetName
+      type: string
+      description: "Name of the StatefulSet to scale."
+    - name: namespace
+      type: string
+      description: "Namespace where the StatefulSet lives."
+      default: {{ include "common.names.namespace" $ }}
+    - name: replicas
+      type: string
+      description: "Target replica count."
+    - name: mode
+      type: string
+      description: "Operation mode: 'normal' or 'emergency'"
+      default: "normal"
+    - name: componentName
+      type: string
+      description: "Component name for logging (used in emergency mode)"
+      default: "unknown"
+    - name: pipelineStatus
+      type: string
+      description: "Pipeline status for emergency mode logging"
+      default: "Unknown"
+  steps:
+    - name: scale
+      image: "{{ include "image.ref" .Values.tekton.tasks.scaleStatefulset.image }}"
+      imagePullPolicy: {{ .Values.tekton.tasks.scaleStatefulset.image.pullPolicy | default "IfNotPresent" }}
+      script: |
+        # Copy script to writable location and execute
+        cp /scripts/scale-statefulset.sh /tmp/scale-statefulset.sh
+        chmod +x /tmp/scale-statefulset.sh
+        bash /tmp/scale-statefulset.sh
+      volumeMounts:
+        - name: scripts-volume
+          mountPath: /scripts
+        
+      env:
+        - name: STATEFULSET_NAME
+          value: "$(params.statefulsetName)"
+        - name: NAMESPACE
+          value: "$(params.namespace)"
+        - name: REPLICAS
+          value: "$(params.replicas)"
+        - name: MODE
+          value: "$(params.mode)"
+        - name: COMPONENT_NAME
+          value: "$(params.componentName)"
+        - name: PIPELINE_STATUS
+          value: "$(params.pipelineStatus)"
+  volumes:
+    - name: scripts-volume
+      configMap:
+        name: wazuh-backup-scripts
+        defaultMode: 0755

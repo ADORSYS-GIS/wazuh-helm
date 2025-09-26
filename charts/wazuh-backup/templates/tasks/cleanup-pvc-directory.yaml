@@ -1,0 +1,46 @@
+# templates/tasks/cleanup-pvc-directory.yaml
+
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup-pvc-directory
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    tekton.dev/displayName: "Clean Directory in PVC"
+spec:
+  description: |
+    Cleans the contents of a specified subdirectory within the staging PVC.
+  params:
+    - name: directoryPath
+      type: string
+      description: >
+        Subdirectory under the staging PVC root to clean (e.g. "master-backup").
+        Must not be "/" or blank.
+  steps:
+    - name: clean
+      image: {{ include "common.images.image" ( dict "imageRoot" .Values.tekton.tasks.cleanupPvc.image "global" .Values.global ) | quote }}
+      script: |
+        # Copy script to writable location and execute
+        cp /scripts/cleanup-pvc-directory.sh /tmp/cleanup-pvc-directory.sh
+        chmod +x /tmp/cleanup-pvc-directory.sh
+        bash /tmp/cleanup-pvc-directory.sh
+      env:
+        - name: DIRECTORY_PATH
+          value: "$(params.directoryPath)"
+      volumeMounts:
+        - name: staging-volume
+          mountPath: /backup
+        - name: scripts-volume
+          mountPath: /scripts
+  volumes:
+    - name: staging-volume
+      persistentVolumeClaim:
+        claimName: {{ .Values.pvc.staging.name }}
+    - name: scripts-volume
+      configMap:
+        name: wazuh-backup-scripts
+        defaultMode: 0755

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: wazuh-backup
+description: A Helm chart to deploy a Tekton pipeline for backing up Wazuh core components to S3
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
+dependencies:
+  - name: common
+    version: '*'
+    repository: https://charts.bitnami.com/bitnami
+    tags:
+      - common
+      - bitnami-common
