@@ -1,5 +1,6 @@
 # templates/tasks/cleanup-pvc-directory.yaml
 
+
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
@@ -26,7 +27,7 @@ spec:
         # Copy script to writable location and execute
         cp /scripts/cleanup-pvc-directory.sh /tmp/cleanup-pvc-directory.sh
         chmod +x /tmp/cleanup-pvc-directory.sh
-        /tmp/cleanup-pvc-directory.sh
+        bash /tmp/cleanup-pvc-directory.sh
       env:
         - name: DIRECTORY_PATH
           value: "$(params.directoryPath)"

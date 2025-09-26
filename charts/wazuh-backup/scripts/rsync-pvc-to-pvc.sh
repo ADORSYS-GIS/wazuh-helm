@@ -1,16 +1,16 @@
-#!/bin/bash
-set -euxo pipefail
+#!/bin/sh
+set -eu
 
 # Parameters passed via environment variables
 SOURCE_PATH="${SOURCE_PATH:-}"
 DESTINATION_PATH="${DESTINATION_PATH:-}"
 
-if [[ -z "$SOURCE_PATH" ]]; then
+if [ -z "$SOURCE_PATH" ]; then
   echo "❌ SOURCE_PATH environment variable must be set"
   exit 1
 fi
 
-if [[ -z "$DESTINATION_PATH" ]]; then
+if [ -z "$DESTINATION_PATH" ]; then
   echo "❌ DESTINATION_PATH environment variable must be set"
   exit 1
 fi
@@ -19,19 +19,19 @@ SRC_DIR="/source/${SOURCE_PATH}"
 DEST_DIR="/backup/${DESTINATION_PATH}"
 
 # 1. Source must exist
-if [[ ! -d "$SRC_DIR" ]]; then
+if [ ! -d "$SRC_DIR" ]; then
   echo "❌ Source directory $SRC_DIR does not exist."
   exit 1
 fi
 
 # 2. Refuse to treat / (root) as either source or destination
-if [[ "$SRC_DIR" == "/" || "$DEST_DIR" == "/" ]]; then
+if [ "$SRC_DIR" = "/" ] || [ "$DEST_DIR" = "/" ]; then
   echo "❌ Refusing to use / as source or destination."
   exit 1
 fi
 
 # 3. Create destination if it is missing
-if [[ ! -d "$DEST_DIR" ]]; then
+if [ ! -d "$DEST_DIR" ]; then
   echo "📂 Destination $DEST_DIR not found. Creating it…"
   mkdir -p "$DEST_DIR"
 fi

@@ -4,7 +4,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: s3-upload-directory
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
     app.kubernetes.io/name: s3-upload-directory
   annotations:
@@ -30,12 +30,12 @@ spec:
       default: ""
   steps:
     - name: make-tar
-      image: "alpine:3.18"
+      image: bash:5.2
       script: |
         # Copy script to writable location and execute
         cp /scripts/make-tar.sh /tmp/make-tar.sh
         chmod +x /tmp/make-tar.sh
-        /tmp/make-tar.sh
+        sh /tmp/make-tar.sh
       env:
         - name: COMPONENT_NAME
           value: "$(params.componentName)"
@@ -46,14 +46,27 @@ spec:
           mountPath: /backup
         - name: scripts-volume
           mountPath: /scripts
-
+    # - name: hold
+    #   image: ubuntu:20.04
+    #   script: |
+    #     #!/bin/bash
+    #     echo "Pod is running. Touch /stop file to exit."
+    #     while [ ! -f /stop ]; do
+    #       sleep 5
+    #     done
+    #   volumeMounts:
+    #     - name: backup-volume
+    #       mountPath: /backup
+    #     - name: scripts-volume
+    #       mountPath: /scripts
     - name: s3-upload
-      image: "{{ .Values.tekton.tasks.s3Upload.image }}"
+      image: "{{ include "image.ref" .Values.tekton.tasks.s3Upload.image }}"
+      imagePullPolicy: {{ .Values.tekton.tasks.s3Upload.image.pullPolicy | default "IfNotPresent" }}
       script: |
         # Copy script to writable location and execute
         cp /scripts/s3-upload.sh /tmp/s3-upload.sh
         chmod +x /tmp/s3-upload.sh
-        /tmp/s3-upload.sh
+        sh /tmp/s3-upload.sh
       env:
         - name: AWS_ACCESS_KEY_ID
           valueFrom:

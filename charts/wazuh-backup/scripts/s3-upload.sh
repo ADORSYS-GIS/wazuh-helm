@@ -1,10 +1,10 @@
 #!/bin/sh
-set -euo pipefail
+set -eu
 
 # Parameters passed via environment variables
 COMPONENT_NAME="${COMPONENT_NAME:-}"
 
-if [[ -z "$COMPONENT_NAME" ]]; then
+if [ -z "$COMPONENT_NAME" ]; then
   echo "❌ COMPONENT_NAME environment variable must be set"
   exit 1
 fi

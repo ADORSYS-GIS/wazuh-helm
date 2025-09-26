@@ -5,7 +5,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: scale-statefulset
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
     app.kubernetes.io/name: scale-statefulset
   annotations:
@@ -24,7 +24,7 @@ spec:
     - name: namespace
       type: string
       description: "Namespace where the StatefulSet lives."
-      default: {{ .Values.namespace | quote }}
+      default: {{ include "common.names.namespace" $ }}
     - name: replicas
       type: string
       description: "Target replica count."
@@ -42,12 +42,13 @@ spec:
       default: "Unknown"
   steps:
     - name: scale
-      image: {{ .Values.tekton.tasks.scaleStatefulset.image | quote }}
+      image: "{{ include "image.ref" .Values.tekton.tasks.scaleStatefulset.image }}"
+      imagePullPolicy: {{ .Values.tekton.tasks.scaleStatefulset.image.pullPolicy | default "IfNotPresent" }}
       script: |
         # Copy script to writable location and execute
         cp /scripts/scale-statefulset.sh /tmp/scale-statefulset.sh
         chmod +x /tmp/scale-statefulset.sh
-        /tmp/scale-statefulset.sh
+        bash /tmp/scale-statefulset.sh
       volumeMounts:
         - name: scripts-volume
           mountPath: /scripts

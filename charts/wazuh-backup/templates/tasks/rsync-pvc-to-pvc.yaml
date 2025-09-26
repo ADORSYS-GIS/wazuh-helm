@@ -4,7 +4,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: rsync-pvc-to-pvc
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
     app.kubernetes.io/name: rsync-pvc-to-pvc
   annotations:
@@ -27,12 +27,13 @@ spec:
       default: ""
   steps:
     - name: rsync
-      image: "{{ .Values.tekton.tasks.rsync.image }}"
+      image: "{{ include "image.ref" .Values.tekton.tasks.rsync.image }}"
+      imagePullPolicy: {{ .Values.tekton.tasks.rsync.image.pullPolicy | default "IfNotPresent" }}
       script: |
         # Copy script to writable location and execute
         cp /scripts/rsync-pvc-to-pvc.sh /tmp/rsync-pvc-to-pvc.sh
         chmod +x /tmp/rsync-pvc-to-pvc.sh
-        /tmp/rsync-pvc-to-pvc.sh
+        sh /tmp/rsync-pvc-to-pvc.sh
       env:
         - name: SOURCE_PATH
           value: "$(params.sourcePath)"

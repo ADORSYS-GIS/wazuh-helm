@@ -49,7 +49,7 @@ backup:
       statefulsetName: "wazuh-wazuh-helm-manager-master"
       pvcName: "wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0"
       replicas: 1
-      sourcePvcPath: ""
+      sourcePvcPath: "./"
       backupSubdir: "master-backup"
       schedule: "0 2 * * *"  # Daily at 2 AM
     

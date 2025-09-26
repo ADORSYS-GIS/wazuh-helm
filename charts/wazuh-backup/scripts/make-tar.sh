@@ -1,16 +1,16 @@
 #!/bin/sh
-set -euo pipefail
+set -eu
 
 # Parameters passed via environment variables
 COMPONENT_NAME="${COMPONENT_NAME:-}"
 SOURCE_DIRECTORY_PATH="${SOURCE_DIRECTORY_PATH:-}"
 
-if [[ -z "$COMPONENT_NAME" ]]; then
+if [ -z "$COMPONENT_NAME" ]; then
   echo "❌ COMPONENT_NAME environment variable must be set"
   exit 1
 fi
 
-if [[ -z "$SOURCE_DIRECTORY_PATH" ]]; then
+if [ -z "$SOURCE_DIRECTORY_PATH" ]; then
   echo "❌ SOURCE_DIRECTORY_PATH environment variable must be set"
   exit 1
 fi

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euxo pipefail
 
 # Directory that must be wiped - use parameter passed via environment variable
@@ -14,7 +14,7 @@ BACKUP_DIR="/backup/${DIRECTORY_PATH}"
 # 1. Make sure the directory actually exists.
 if [[ ! -d "$BACKUP_DIR" ]]; then
   echo "❌ Backup directory $BACKUP_DIR does not exist."
-  exit 1
+  exit 0
 fi
 
 # 2. Never allow / (filesystem root) or the workspace root to be nuked.
