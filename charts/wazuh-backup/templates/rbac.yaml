@@ -1,0 +1,71 @@
+# templates/rbac.yaml
+
+# Additional RBAC for EventListener
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wazuh-backup-eventlistener-role
+  namespace: {{ .Values.global.namespace }}
+rules:
+  # EventListener needs to create PipelineRuns
+  - apiGroups: ["tekton.dev"]
+    resources: ["pipelineruns"]
+    verbs: ["create", "get", "list", "watch"]
+  # EventListener needs to read and watch all trigger resources
+  - apiGroups: ["triggers.tekton.dev"]
+    resources: ["triggerbindings", "triggertemplates", "triggers", "eventlisteners", "interceptors"]
+    verbs: ["get", "list", "watch"]
+  # EventListener needs to manage its own deployment
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # EventListener needs to manage services
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # EventListener needs to manage pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRole for cluster-scoped resources that EventListener needs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wazuh-backup-eventlistener-cluster-role
+rules:
+  # EventListener needs to read cluster-scoped trigger resources
+  - apiGroups: ["triggers.tekton.dev"]
+    resources: ["clusterinterceptors", "clustertriggerbindings"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRoleBinding for cluster-scoped permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wazuh-backup-eventlistener-cluster-binding
+subjects:
+  - kind: ServiceAccount
+    name: wazuh-backup-sa
+    namespace: {{ .Values.global.namespace }}
+roleRef:
+  kind: ClusterRole
+  name: wazuh-backup-eventlistener-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wazuh-backup-eventlistener-binding
+  namespace: {{ .Values.global.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: wazuh-backup-sa
+    namespace: {{ .Values.global.namespace }}
+roleRef:
+  kind: Role
+  name: wazuh-backup-eventlistener-role
+  apiGroup: rbac.authorization.k8s.io

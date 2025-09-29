@@ -1,0 +1,60 @@
+# templates/triggers/triggers.yaml
+
+# Trigger for Master backups
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: wazuh-backup-master-trigger
+  namespace: {{ .Values.namespace }}
+spec:
+  bindings:
+    - ref: wazuh-backup-master-binding
+  template:
+    ref: wazuh-backup-master-template
+  interceptors:
+    - name: "validate-component"
+      ref:
+        name: "cel"
+      params:
+        - name: "filter"
+          value: "body.component == 'master'"
+
+---
+# Trigger for Indexer backups
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: wazuh-backup-indexer-trigger
+  namespace: {{ .Values.namespace }}
+spec:
+  bindings:
+    - ref: wazuh-backup-indexer-binding
+  template:
+    ref: wazuh-backup-indexer-template
+  interceptors:
+    - name: "validate-component"
+      ref:
+        name: "cel"
+      params:
+        - name: "filter"
+          value: "body.component == 'indexer'"
+
+---
+# Trigger for Worker backups
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: wazuh-backup-worker-trigger
+  namespace: {{ .Values.namespace }}
+spec:
+  bindings:
+    - ref: wazuh-backup-worker-binding
+  template:
+    ref: wazuh-backup-worker-template
+  interceptors:
+    - name: "validate-component"
+      ref:
+        name: "cel"
+      params:
+        - name: "filter"
+          value: "body.component == 'worker'"
