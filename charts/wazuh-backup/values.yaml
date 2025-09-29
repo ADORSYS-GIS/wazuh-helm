@@ -1,0 +1,143 @@
+# values.yaml - Hybrid Mode Configuration
+
+# ------------------------------------------------------------------------------
+# Standard Helm chart metadata
+# ------------------------------------------------------------------------------
+kubeVersion: ""
+nameOverride: ""
+fullnameOverride: ""
+
+# Common labels and annotations for all resources
+commonLabels: {}
+commonAnnotations: {}
+
+# ------------------------------------------------------------------------------
+# Global settings
+# ------------------------------------------------------------------------------
+global:
+  namespace: wazuh
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+# ------------------------------------------------------------------------------
+# Chart meta
+# ------------------------------------------------------------------------------
+chartVersion: "0.1.0"
+
+# ------------------------------------------------------------------------------
+# Backup Configuration
+# ------------------------------------------------------------------------------
+backup:
+  # Global backup settings
+  schedule: "0 2 * * *"  # Default schedule for all components
+  
+  # Deployment mode
+  mode:
+    cronjobs: true    # Enable automatic scheduled backups
+    triggers: true    # Enable HTTP-triggered backups
+  
+  s3:
+    bucketName: "test-wazuh-backup-bucket"
+    endpointUrl: ""  # Leave empty for AWS S3
+    # S3 path will be: s3://bucket/DD-MM-YY-wazuh-backup/component-name/
+    pathPrefix: "wazuh-backup"
+  
+  # Component-specific configurations
+  components:
+    master:
+      enabled: true
+      statefulsetName: "wazuh-wazuh-helm-manager-master"
+      pvcName: "wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0"
+      replicas: 1
+      sourcePvcPath: "./"
+      backupSubdir: "master-backup"
+      schedule: "0 2 * * *"  # Daily at 2 AM
+    
+    indexer:
+      enabled: true
+      statefulsetName: "wazuh-wazuh-helm-indexer"
+      pvcName: "wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0"
+      replicas: 2
+      sourcePvcPath: ""
+      backupSubdir: "indexer-backup"
+      schedule: "0 3 * * *"  # Daily at 3 AM
+    
+    worker:
+      enabled: true
+      statefulsetName: "wazuh-wazuh-helm-manager-worker"
+      pvcName: "wazuh-wazuh-helm-manager-worker-wazuh-wazuh-helm-manager-worker-0"
+      replicas: 2
+      sourcePvcPath: ""
+      backupSubdir: "worker-backup"
+      schedule: "0 4 * * *"  # Daily at 4 AM
+
+# ------------------------------------------------------------------------------
+# Tekton Task Images & Settings
+# ------------------------------------------------------------------------------
+tekton:
+  tasks:
+    cleanupPvc:
+      image:
+        registry: docker.io
+        repository: bash
+        tag: "5.2"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
+    
+    scaleStatefulset:
+      image:
+        registry: docker.io
+        repository: bitnami/kubectl
+        tag: "1.27"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
+    
+    rsync:
+      image:
+        registry: docker.io
+        repository: eeacms/rsync
+        tag: "latest"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
+    
+    s3Upload:
+      image:
+        registry: docker.io
+        repository: amazon/aws-cli
+        tag: "2.13.0"
+        digest: ""
+        pullPolicy: IfNotPresent
+        pullSecrets: []
+
+# ------------------------------------------------------------------------------
+# AWS Configuration
+# ------------------------------------------------------------------------------
+aws:
+  region: eu-central-1
+  secretName: aws-creds
+  accessKeyId: ""
+  secretAccessKey: ""
+  sessionToken: ""
+
+# ------------------------------------------------------------------------------
+# RBAC Configuration
+# ------------------------------------------------------------------------------
+rbac:
+  # Additional StatefulSets that the service account needs access to
+  additionalStatefulSets:
+    - "wazuh-wazuh-helm-indexer"
+    - "wazuh-wazuh-helm-manager-worker"
+
+# ------------------------------------------------------------------------------
+# PVC Configuration
+# ------------------------------------------------------------------------------
+pvc:
+  staging:
+    name: "backup-staging-pvc"
+    size: "20Gi"
+    accessMode: "ReadWriteOnce"
+    storageClass: "wazuh-wazuh-helm"
+
