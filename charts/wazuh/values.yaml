@@ -4,7 +4,7 @@ global:
   domain: wazuh.example.com
   ##
   ##
-  version: "4.9.2"
+  version: "4.12.0"
   ##
   ##
   imageRegistry: ""
@@ -194,6 +194,43 @@ indexer:
     ##
     ##
     password: "rU40Fm%0GnK£iqQN"
+  
+  ##
+  ##
+  keycloak:
+    ##
+    ##
+    enabled: true
+    ##
+    ##
+    roles_key: wazuh_roles
+    ##
+    ##
+    subject_key: preferred_username
+    ##
+    ##
+    openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
+    ##
+    ##
+    client_id: ~
+    ##
+    ##
+    client_secret: ~
+    ##
+    ##
+    scope: ~
+    ##
+    ##
+    base_redirect_url: ~
+    ##
+    ##
+    roles_mapping: ~
+    ##
+    ##
+    roles: ~
+    ##
+    ##
+    tenants: ~
 
   ##
   ##
@@ -333,24 +370,6 @@ worker:
   ##
   ##
   podManagementPolicy: Parallel
-  ##
-  ##
-  service:
-    ##
-    ##
-    type: ClusterIP
-    ##
-    ##
-    additionalLabels: { }
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
-    loadBalancerClass: ""
-    ##
-    ##
-    port: 1514
 
   ##
   ##
@@ -368,11 +387,15 @@ worker:
 
   resources:
     requests:
-       cpu: 100m
-       memory: 256Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-       cpu: 500m
-       memory: 512Mi
+      cpu: 500m
+      memory: 512Mi
+
+  ##
+  ##
+  affinity: ~
 
   ##
   ##
@@ -403,24 +426,6 @@ master:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: [ ]
-  ##
-  ##
-  service:
-    ##
-    ##
-    type: ClusterIP
-    ##
-    ##
-    additionalLabels: { }
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
-    loadBalancerClass: ""
-    ##
-    ##
-    port: 1515
   ##
   ##
   additionalAnnotations: { }
@@ -489,11 +494,11 @@ master:
 
   resources:
     requests:
-       cpu: 100m
-       memory: 256Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
-       cpu: 500m
-       memory: 512Mi
+      cpu: 500m
+      memory: 512Mi
 
   persistence:
     ##
@@ -510,13 +515,6 @@ master:
   ##
   ##
   affinity: ~
-  
-  ##
-  ##
-  backup: 
-    ## This schedule is for the cronjob to run every day at 12AM (example).
-    ##
-    schedule: 0 2 * * *
 
 ##
 ##
@@ -598,31 +596,9 @@ dashboard:
       cpu: 200m
       memory: 512Mi
     limits:
-     cpu: 400m
-     memory: 1Gi
-  service:
-    additionalLabels: { }
-    ##
-    ##
-    type: ClusterIP # LoadBalancer
-    ##
-    ##
-    port: 5601
-    ##
-    ##
-    targetPort: 5601
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
-    loadBalancerIP: null
-    ##
-    ##
-    allocateLoadBalancerNodePorts: null
-    ##
-    ##
-    clusterIP: null
+      cpu: 400m
+      memory: 1Gi
+
   ##
   ##
   authSecret: ~
@@ -656,45 +632,277 @@ dashboard:
     ##
     ##
     host: "{{ .Values.global.domain }}"
+    ##
+    ##
+    port: 5601
   ports:
     - containerPort: 5601
       name: dashboard
   volumes: [ ]
   volumeMounts: [ ]
-  env: [ ]
+  env:
+    - name: OPENSEARCH_JAVA_OPTS
+      value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   envFrom: [ ]
+  ## @branding more at https://opensearch.org/docs/latest/dashboards/branding/
+  ## 
+  branding:
+    logo:
+      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
+    mark:
+      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    #   darkModeUrl: ""
+    loadingLogo:
+      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    #   darkModeUrl: ""
+    faviconUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    applicationTitle: "Wazuh | Adorsys"
+    useExpandedHeader: false
 
-##
-##
-service:
+
+svcs:
   ##
   ##
-  type: ClusterIP
+  '{{ include "common.names.fullname" $ }}':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: LoadBalancer
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    clusterIP: ~
+
+    ##
+    ##
+    loadBalancerIP: ~
+
+    ##
+    ##
+    allocateLoadBalancerNodePorts: ~
+
+    ##
+    ##
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: master
+
+    ports:
+      - name: api
+        port: 55000
+        targetPort: api
+        protocol: TCP
+      - name: registration
+        port: 1515
+        targetPort: registration
+        protocol: TCP
+
   ##
   ##
-  additionalLabels: { }
+  '{{ include "common.names.fullname" $ }}-worker':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: LoadBalancer
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    ports:
+      - name: agents-events
+        port: 1514
+        targetPort: agents-events
+        protocol: TCP
+
+    ##
+    ##
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: worker
+
   ##
   ##
-  annotations: { }
+  '{{ include "common.names.fullname" $ }}-cluster':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: ClusterIP
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+
+    ##
+    ##
+    clusterIP: None
+
+    ##
+    ##
+    ports:
+      - name: cluster
+        port: 1516
+        protocol: TCP
+        targetPort: cluster
+
   ##
   ##
-  loadBalancerClass: ""
+  '{{ include "common.names.fullname" $ }}-dashboard':
+    ##
+    ##
+    enabled: true
+
+    ##
+    ##
+    type: ClusterIP
+
+    ##
+    ##
+    additionalLabels: { }
+
+    ##
+    ##
+    annotations: { }
+
+    ##
+    ##
+    loadBalancerClass: ""
+
+    ##
+    ##
+    selector:
+      ##
+      ##
+      app: '{{ include "common.names.fullname" $ }}-dashboard'
+
+    ##
+    ##
+    clusterIP: ~
+
+    ##
+    ##
+    ports:
+      - name: dashboard
+        port: 5601
+        protocol: TCP
+        targetPort: 5601
 
 ##
 ##
 cluster:
+  ##
+  ##
   secret:
+    ##
+    ##
     enabled: true
+  
+  ##
+  ##
   secretName: ~
+  ##
+  ##
   rootCaSecretName: "example-secret-name"
+  ##
+  ##
   auth:
+    ##
+    ##
     key: "dfbb2c1b9d679c39af94d5c1c821c952"
+  
+  ##
+  ##
   config:
+    ##
+    ##
     smtp:
+      ##
+      ##
       server: smtp.example.wazuh.com
+      ##
+      ##
       from: ossecm@example.wazuh.com
+      ##
+      ##
       to: recipient@example.wazuh.com
+      ##
+      ##
       max_per_hour: 12
+  
+  ##
+  ##
+  ## rules:
+  ##    "rules.miaou.xml": |
+  ##      <group name="miaou,">
+  ##        <rule id="100000" level="3">
+  ##          <decoded_as>miaou</decoded_as>
+  ##          <description>miaou</description>
+  ##          <field name="program">miaou</field>
+  ##        </rule>
+  ##      </group>
+  rules: { }
+  
+  ##
+  ##
+  ## decoders:
+  ##    "decoder.miaou.xml": |
+  ##      <decoder name="miaou">
+  ##          <prematch>^{\s*"@programName"\s*:\s*"ZAP"</prematch>
+  ##          <plugin_decoder>JSON_Decoder</plugin_decoder>
+  ##      </decoder>
+  ##      
+  ##      <decoder name="miaou">
+  ##          <parent>miaou</parent>
+  ##          <regex type="pcre2">\"riskcode\".*?:.*?\"(.*?)\"</regex>
+  ##          <order>riskcode</order>
+  ##      </decoder>
+  decoders: { }
+
 
 ##
 ##
@@ -703,3 +911,95 @@ configmaps: { }
 ##
 ##
 secrets: { }
+
+
+##
+##
+notification:
+  ##
+  ##
+  slack:
+    ##
+    ##
+    enabled: false
+    ##
+    ##
+    webhookUrl: https://<example1>.slack.com/services/hooks/<example2>
+    ##
+    ##
+    externalSecret: ~
+
+
+##
+##
+integration:
+  ##
+  ## https://documentation.wazuh.com/current/cloud-security/azure/platform-and-services.html#getting-access-credentials-for-microsoft-azure-storage
+  azure:
+    ##
+    ##
+    workspace: ~
+    ##
+    ##
+    domain: gisudm.onmicrosoft.com
+    ##
+    ##
+    auth:
+      ##
+      ##
+      log:
+        ##
+        ##
+        application_id: ~
+        ##
+        ##
+        application_key: ~
+      ##
+      ##
+      graph:
+        ##
+        ##
+        application_id: ~
+        ##
+        ##
+        application_key: ~
+      ##
+      ##
+      storage:
+        ##
+        ##
+        account_name: ~
+        ##
+        ##
+        account_key: ~
+
+
+  ##
+  ## https://documentation.wazuh.com/current/cloud-security/azure/storage.html
+  github: [ ]
+#    - ##
+#      ##
+#      secret: <PAT>
+#      ##
+#      ##
+#      orgs:
+#        - <ORG1>
+#        - <ORG2>
+  ##
+  ## https://documentation.wazuh.com/current/user-manual/manager/integration-with-external-apis.html
+  jira:
+    ##
+    ##
+    enabled: true
+    ##
+    ##
+    webhookUrl: https://<example1>.jira.com/services/hooks/<example2>
+    ##
+    ##
+    apikey: 101010
+    ##
+    ##
+    projectKey: WAZUH
+    ##
+    ##
+    externalSecret: ~
