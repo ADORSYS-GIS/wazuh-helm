@@ -17,6 +17,9 @@ data:
   "0005-audit-mitre_rules.xml":  |
     {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
 
+  "0006-fim-macos.xml":  |
+    {{ $.Files.Get "files/configs/rules.FIM-MacOS.xml" | nindent 6 }}
+
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
   {{ printf "0003-%s" $k | quote | nindent 2 }}: |
