@@ -1,0 +1,19 @@
+{{- if .Values.backup.mode.triggers }}
+{{ range .Values.clusterrolebindings }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+{{ with .subjects -}}
+subjects: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+{{- end }}
+{{ with .roleRef -}}
+roleRef: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+{{- end }}
+---
+{{ end }}
+{{- end }}

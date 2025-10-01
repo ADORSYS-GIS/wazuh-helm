@@ -1,0 +1,22 @@
+{{ range .Values.configmaps }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+{{ with .data }}
+data:
+{{- range $k, $v := . }}
+  {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+  {{ $k | quote | nindent 2 }} : {{ include "common.tplvalues.render" (dict "value" $f "context" $) | quote }}
+{{- end }}
+{{- end }}
+{{ with .binaryData }}
+binaryData: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2}}
+{{- end }}
+---
+{{ end }}
