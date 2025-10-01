@@ -20,11 +20,6 @@ global:
   imagePullSecrets: []
 
 # ------------------------------------------------------------------------------
-# Chart meta
-# ------------------------------------------------------------------------------
-chartVersion: "0.1.0"
-
-# ------------------------------------------------------------------------------
 # Backup Configuration
 # ------------------------------------------------------------------------------
 backup:
@@ -141,3 +136,932 @@ pvc:
     accessMode: "ReadWriteOnce"
     storageClass: "wazuh-wazuh-helm"
 
+
+# ------------------------------------------------------------------------------
+# Tekton Pipelines Configuration
+# ------------------------------------------------------------------------------
+pipelines:
+  - name: '{{ include "common.names.fullname" $ }}-pipeline'
+    additionalLabels: {}
+    additionalAnnotations:
+      tekton.dev/displayName: "Wazuh Component Backup Pipeline"
+    spec:
+      description: >
+        Back up a Wazuh component with comprehensive error handling using unified scale task:
+          1) Cleaning staging PVC
+          2) Scaling down the component (normal mode)
+          3) Rsyncing data into staging
+          4) Parallel: scaling up (normal mode) + uploading to S3
+          5) Final cleanup of staging PVC
+          6) Emergency scale-up if any step fails (emergency mode)
+      params:
+        - name: componentName
+          type: string
+          description: "Friendly name (e.g. 'master', 'indexer', 'worker')."
+        - name: statefulsetName
+          type: string
+          description: "K8s Statefulset to scale."
+        - name: statefulsetNamespace
+          type: string
+          default: '{{ include "common.names.namespace" $ }}'
+          description: "Namespace of the statefulset."
+        - name: replicas
+          type: string
+          description: "Original replica count."
+        - name: sourcePvcName
+          type: string
+          description: "Name of the source PVC to backup."
+        - name: sourcePvcPath
+          type: string
+          description: "Path in component PVC (ends with '/')."
+        - name: backupSubdir
+          type: string
+          description: "Subdirectory in staging PVC."
+        - name: s3BucketName
+          type: string
+          description: "S3 bucket for backups."
+        - name: s3EndpointUrl
+          type: string
+          default: ""
+          description: "Optional S3 endpoint URL."
+      finally:
+        - name: emergency-scale-up
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+          params:
+            - name: statefulsetName
+              value: "$(params.statefulsetName)"
+            - name: namespace
+              value: "$(params.statefulsetNamespace)"
+            - name: replicas
+              value: "$(params.replicas)"
+            - name: mode
+              value: "emergency"
+            - name: componentName
+              value: "$(params.componentName)"
+            - name: pipelineStatus
+              value: "$(tasks.status)"
+      tasks:
+        - name: clean-staging
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-cleanup-pvc-directory'
+          params:
+            - name: directoryPath
+              value: "$(params.backupSubdir)"
+        - name: scale-down
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+          params:
+            - name: statefulsetName
+              value: "$(params.statefulsetName)"
+            - name: namespace
+              value: "$(params.statefulsetNamespace)"
+            - name: replicas
+              value: "0"
+            - name: mode
+              value: "normal"
+            - name: componentName
+              value: "$(params.componentName)"
+        - name: copy-data
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-rsync-pvc-to-pvc'
+          runAfter:
+            - clean-staging
+            - scale-down
+          params:
+            - name: sourcePvcName
+              value: "$(params.sourcePvcName)"
+            - name: sourcePath
+              value: "$(params.sourcePvcPath)"
+            - name: destinationPath
+              value: "$(params.backupSubdir)"
+        - name: scale-up
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+          runAfter:
+            - copy-data
+          params:
+            - name: statefulsetName
+              value: "$(params.statefulsetName)"
+            - name: namespace
+              value: "$(params.statefulsetNamespace)"
+            - name: replicas
+              value: "$(params.replicas)"
+            - name: mode
+              value: "normal"
+            - name: componentName
+              value: "$(params.componentName)"
+        - name: upload-s3
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-s3-upload-directory'
+          runAfter:
+            - copy-data
+          params:
+            - name: sourceDirectoryPath
+              value: "$(params.backupSubdir)"
+            - name: componentName
+              value: "$(params.componentName)"
+            - name: s3BucketName
+              value: "$(params.s3BucketName)"
+            - name: s3EndpointUrl
+              value: "$(params.s3EndpointUrl)"
+        - name: final-cleanup
+          taskRef:
+            name: '{{ include "common.names.fullname" $ }}-cleanup-pvc-directory'
+          runAfter:
+            - upload-s3
+            - scale-up
+          params:
+            - name: directoryPath
+              value: "$(params.backupSubdir)"
+
+# ------------------------------------------------------------------------------
+# Tekton Tasks Configuration
+# ------------------------------------------------------------------------------
+tasks:
+  # Cleanup PVC Directory Task
+  - name: '{{ include "common.names.fullname" $ }}-cleanup-pvc-directory'
+    additionalLabels: {}
+    additionalAnnotations:
+      tekton.dev/displayName: "Clean Directory in PVC"
+    spec:
+      description: |
+        Cleans the contents of a specified subdirectory within the staging PVC.
+      params:
+        - name: directoryPath
+          type: string
+          description: >
+            Subdirectory under the staging PVC root to clean (e.g. "master-backup").
+            Must not be "/" or blank.
+      steps:
+        - name: clean
+          image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.tasks.cleanupPvc.image "global" .Values.global ) }}'
+          script: |
+            # Copy script to writable location and execute
+            cp /scripts/cleanup-pvc-directory.sh /tmp/cleanup-pvc-directory.sh
+            chmod +x /tmp/cleanup-pvc-directory.sh
+            bash /tmp/cleanup-pvc-directory.sh
+          env:
+            - name: DIRECTORY_PATH
+              value: "$(params.directoryPath)"
+          volumeMounts:
+            - name: staging-volume
+              mountPath: /backup
+            - name: scripts-volume
+              mountPath: /scripts
+      volumes:
+        - name: staging-volume
+          persistentVolumeClaim:
+            claimName: '{{ .Values.pvc.staging.name }}'
+        - name: scripts-volume
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-scripts'
+            defaultMode: 0755
+
+  # Scale StatefulSet Task
+  - name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+    additionalLabels: {}
+    additionalAnnotations:
+      tekton.dev/displayName: "Scale StatefulSet (Unified)"
+    spec:
+      description: |
+        Unified StatefulSet scaling task that handles both normal operations and emergency recovery.
+        
+        Modes:
+        - normal: Strict error handling, fails on errors (default)
+        - emergency: Lenient error handling, always tries to recover, never fails
+      params:
+        - name: statefulsetName
+          type: string
+          description: "Name of the StatefulSet to scale."
+        - name: namespace
+          type: string
+          description: "Namespace where the StatefulSet lives."
+          default: '{{ include "common.names.namespace" $ }}'
+        - name: replicas
+          type: string
+          description: "Target replica count."
+        - name: mode
+          type: string
+          description: "Operation mode: 'normal' or 'emergency'"
+          default: "normal"
+        - name: componentName
+          type: string
+          description: "Component name for logging (used in emergency mode)"
+          default: "unknown"
+        - name: pipelineStatus
+          type: string
+          description: "Pipeline status for emergency mode logging"
+          default: "Unknown"
+      steps:
+        - name: scale
+          image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.tasks.scaleStatefulset.image "global" .Values.global ) }}'
+          script: |
+            # Copy script to writable location and execute
+            cp /scripts/scale-statefulset.sh /tmp/scale-statefulset.sh
+            chmod +x /tmp/scale-statefulset.sh
+            bash /tmp/scale-statefulset.sh
+          volumeMounts:
+            - name: scripts-volume
+              mountPath: /scripts
+          env:
+            - name: STATEFULSET_NAME
+              value: "$(params.statefulsetName)"
+            - name: NAMESPACE
+              value: "$(params.namespace)"
+            - name: REPLICAS
+              value: "$(params.replicas)"
+            - name: MODE
+              value: "$(params.mode)"
+            - name: COMPONENT_NAME
+              value: "$(params.componentName)"
+            - name: PIPELINE_STATUS
+              value: "$(params.pipelineStatus)"
+      volumes:
+        - name: scripts-volume
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-scripts'
+            defaultMode: 0755
+
+  # Rsync PVC to PVC Task
+  - name: '{{ include "common.names.fullname" $ }}-rsync-pvc-to-pvc'
+    additionalLabels: {}
+    additionalAnnotations:
+      tekton.dev/displayName: "Rsync PVC to PVC"
+    spec:
+      description: |
+        Uses rsync to copy from a source PVC to a destination PVC workspace.
+        This task is parameterized to work with any source PVC.
+      params:
+        - name: sourcePvcName
+          type: string
+          description: "Name of the source PVC to copy from"
+        - name: sourcePath
+          type: string
+          description: "Relative path under the source PVC to copy from (e.g. 'data/')."
+          default: ""
+        - name: destinationPath
+          type: string
+          description: "Relative path under /backup to copy to (e.g. 'manager-backup/')."
+          default: ""
+      steps:
+        - name: rsync
+          image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.tasks.rsync.image "global" .Values.global ) }}'
+          script: |
+            # Copy script to writable location and execute
+            cp /scripts/rsync-pvc-to-pvc.sh /tmp/rsync-pvc-to-pvc.sh
+            chmod +x /tmp/rsync-pvc-to-pvc.sh
+            sh /tmp/rsync-pvc-to-pvc.sh
+          env:
+            - name: SOURCE_PATH
+              value: "$(params.sourcePath)"
+            - name: DESTINATION_PATH
+              value: "$(params.destinationPath)"
+          volumeMounts:
+            - name: source-volume
+              mountPath: /source
+            - name: destination-volume
+              mountPath: /backup
+            - name: scripts-volume
+              mountPath: /scripts
+      volumes:
+        - name: source-volume
+          persistentVolumeClaim:
+            claimName: "$(params.sourcePvcName)"
+        - name: destination-volume
+          persistentVolumeClaim:
+            claimName: '{{ .Values.pvc.staging.name }}'
+        - name: scripts-volume
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-scripts'
+            defaultMode: 0755
+
+  # S3 Upload Directory Task
+  - name: '{{ include "common.names.fullname" $ }}-s3-upload-directory'
+    additionalLabels: {}
+    additionalAnnotations:
+      tekton.dev/displayName: "Tarball + Upload to S3"
+    spec:
+      description: |
+        1. Archives a directory from the backup PVC into a timestamped tarball
+        2. Uploads that tarball to S3 with the path: DD-MM-YY-wazuh-backup/component-name/
+      params:
+        - name: sourceDirectoryPath
+          type: string
+          description: "Relative path under /backup to archive."
+          default: "."
+        - name: componentName
+          type: string
+          description: "Name of the component being backed up (for S3 path and filename)"
+        - name: s3BucketName
+          type: string
+          description: "Destination S3 bucket name."
+        - name: s3EndpointUrl
+          type: string
+          description: "Optional S3-compatible endpoint URL."
+          default: ""
+      steps:
+        - name: make-tar
+          image: bash:5.2
+          script: |
+            # Copy script to writable location and execute
+            cp /scripts/make-tar.sh /tmp/make-tar.sh
+            chmod +x /tmp/make-tar.sh
+            sh /tmp/make-tar.sh
+          env:
+            - name: COMPONENT_NAME
+              value: "$(params.componentName)"
+            - name: SOURCE_DIRECTORY_PATH
+              value: "$(params.sourceDirectoryPath)"
+          volumeMounts:
+            - name: backup-volume
+              mountPath: /backup
+            - name: scripts-volume
+              mountPath: /scripts
+        - name: s3-upload
+          image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.tasks.s3Upload.image "global" .Values.global ) }}'
+          script: |
+            # Copy script to writable location and execute
+            cp /scripts/s3-upload.sh /tmp/s3-upload.sh
+            chmod +x /tmp/s3-upload.sh
+            sh /tmp/s3-upload.sh
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ .Values.aws.secretName }}'
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ .Values.aws.secretName }}'
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ .Values.aws.secretName }}'
+                  key: AWS_SESSION_TOKEN
+            - name: AWS_DEFAULT_REGION
+              value: '{{ .Values.aws.region }}'
+            - name: S3_BUCKET_NAME
+              value: "$(params.s3BucketName)"
+            - name: S3_ENDPOINT_URL
+              value: "$(params.s3EndpointUrl)"
+            - name: COMPONENT_NAME
+              value: "$(params.componentName)"
+          volumeMounts:
+            - name: backup-volume
+              mountPath: /backup
+            - name: scripts-volume
+              mountPath: /scripts
+      volumes:
+        - name: backup-volume
+          persistentVolumeClaim:
+            claimName: '{{ .Values.pvc.staging.name }}'
+        - name: scripts-volume
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-scripts'
+            defaultMode: 0755
+
+# ------------------------------------------------------------------------------
+# Tekton Triggers Configuration
+# ------------------------------------------------------------------------------
+triggers:
+  - name: '{{ include "common.names.fullname" $ }}-master-trigger'
+    additionalLabels:
+      app.kubernetes.io/component: master
+    additionalAnnotations: {}
+    spec:
+      bindings:
+        - ref: '{{ include "common.names.fullname" $ }}-master-binding'
+      template:
+        ref: '{{ include "common.names.fullname" $ }}-master-template'
+      interceptors:
+        - name: "validate-component"
+          ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.component == 'master'"
+
+  - name: '{{ include "common.names.fullname" $ }}-indexer-trigger'
+    additionalLabels:
+      app.kubernetes.io/component: indexer
+    additionalAnnotations: {}
+    spec:
+      bindings:
+        - ref: '{{ include "common.names.fullname" $ }}-indexer-binding'
+      template:
+        ref: '{{ include "common.names.fullname" $ }}-indexer-template'
+      interceptors:
+        - name: "validate-component"
+          ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.component == 'indexer'"
+
+  - name: '{{ include "common.names.fullname" $ }}-worker-trigger'
+    additionalLabels:
+      app.kubernetes.io/component: worker
+    additionalAnnotations: {}
+    spec:
+      bindings:
+        - ref: '{{ include "common.names.fullname" $ }}-worker-binding'
+      template:
+        ref: '{{ include "common.names.fullname" $ }}-worker-template'
+      interceptors:
+        - name: "validate-component"
+          ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.component == 'worker'"
+
+# ------------------------------------------------------------------------------
+# Tekton Trigger Bindings Configuration
+# ------------------------------------------------------------------------------
+triggerbindings:
+  - name: '{{ include "common.names.fullname" $ }}-master-binding'
+    additionalLabels:
+      app.kubernetes.io/component: master
+    additionalAnnotations: {}
+    spec:
+      params:
+        - name: s3BucketName
+          value: $(body.s3BucketName)
+        - name: s3EndpointUrl
+          value: $(body.s3EndpointUrl)
+        - name: triggeredBy
+          value: $(body.triggeredBy)
+
+  - name: '{{ include "common.names.fullname" $ }}-indexer-binding'
+    additionalLabels:
+      app.kubernetes.io/component: indexer
+    additionalAnnotations: {}
+    spec:
+      params:
+        - name: s3BucketName
+          value: $(body.s3BucketName)
+        - name: s3EndpointUrl
+          value: $(body.s3EndpointUrl)
+        - name: triggeredBy
+          value: $(body.triggeredBy)
+
+  - name: '{{ include "common.names.fullname" $ }}-worker-binding'
+    additionalLabels:
+      app.kubernetes.io/component: worker
+    additionalAnnotations: {}
+    spec:
+      params:
+        - name: s3BucketName
+          value: $(body.s3BucketName)
+        - name: s3EndpointUrl
+          value: $(body.s3EndpointUrl)
+        - name: triggeredBy
+          value: $(body.triggeredBy)
+
+# ------------------------------------------------------------------------------
+# Tekton Trigger Templates Configuration
+# ------------------------------------------------------------------------------
+triggertemplates:
+  - name: '{{ include "common.names.fullname" $ }}-master-template'
+    additionalLabels:
+      app.kubernetes.io/component: master
+    additionalAnnotations: {}
+    spec:
+      params:
+        - name: s3BucketName
+          description: "S3 bucket for backups"
+          default: '{{ .Values.backup.s3.bucketName }}'
+        - name: s3EndpointUrl
+          description: "Optional S3 endpoint URL"
+          default: '{{ .Values.backup.s3.endpointUrl }}'
+        - name: triggeredBy
+          description: "How the backup was triggered"
+          default: "manual"
+      resourcetemplates:
+        - apiVersion: tekton.dev/v1beta1
+          kind: PipelineRun
+          metadata:
+            generateName: '{{ include "common.names.fullname" $ }}-master-'
+            namespace: '{{ include "common.names.namespace" $ }}'
+            labels:
+              app.kubernetes.io/component: master
+              triggered-by: "$(tt.params.triggeredBy)"
+            annotations:
+              backup.wazuh.io/component: "master"
+              backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
+          spec:
+            serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
+            pipelineRef:
+              name: '{{ include "common.names.fullname" $ }}-pipeline'
+            params:
+              - name: componentName
+                value: "master"
+              - name: statefulsetName
+                value: '{{ .Values.backup.components.master.statefulsetName }}'
+              - name: statefulsetNamespace
+                value: '{{ include "common.names.namespace" $ }}'
+              - name: replicas
+                value: '{{ .Values.backup.components.master.replicas }}'
+              - name: sourcePvcName
+                value: '{{ .Values.backup.components.master.pvcName }}'
+              - name: sourcePvcPath
+                value: '{{ .Values.backup.components.master.sourcePvcPath }}'
+              - name: backupSubdir
+                value: '{{ .Values.backup.components.master.backupSubdir }}'
+              - name: s3BucketName
+                value: "$(tt.params.s3BucketName)"
+              - name: s3EndpointUrl
+                value: "$(tt.params.s3EndpointUrl)"
+
+  - name: '{{ include "common.names.fullname" $ }}-indexer-template'
+    additionalLabels:
+      app.kubernetes.io/component: indexer
+    additionalAnnotations: {}
+    spec:
+      params:
+        - name: s3BucketName
+          description: "S3 bucket for backups"
+          default: '{{ .Values.backup.s3.bucketName }}'
+        - name: s3EndpointUrl
+          description: "Optional S3 endpoint URL"
+          default: '{{ .Values.backup.s3.endpointUrl }}'
+        - name: triggeredBy
+          description: "How the backup was triggered"
+          default: "manual"
+      resourcetemplates:
+        - apiVersion: tekton.dev/v1beta1
+          kind: PipelineRun
+          metadata:
+            generateName: '{{ include "common.names.fullname" $ }}-indexer-'
+            namespace: '{{ include "common.names.namespace" $ }}'
+            labels:
+              app.kubernetes.io/component: indexer
+              triggered-by: "$(tt.params.triggeredBy)"
+            annotations:
+              backup.wazuh.io/component: "indexer"
+              backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
+          spec:
+            serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
+            pipelineRef:
+              name: '{{ include "common.names.fullname" $ }}-pipeline'
+            params:
+              - name: componentName
+                value: "indexer"
+              - name: statefulsetName
+                value: '{{ .Values.backup.components.indexer.statefulsetName }}'
+              - name: statefulsetNamespace
+                value: '{{ include "common.names.namespace" $ }}'
+              - name: replicas
+                value: '{{ .Values.backup.components.indexer.replicas }}'
+              - name: sourcePvcName
+                value: '{{ .Values.backup.components.indexer.pvcName }}'
+              - name: sourcePvcPath
+                value: '{{ .Values.backup.components.indexer.sourcePvcPath }}'
+              - name: backupSubdir
+                value: '{{ .Values.backup.components.indexer.backupSubdir }}'
+              - name: s3BucketName
+                value: "$(tt.params.s3BucketName)"
+              - name: s3EndpointUrl
+                value: "$(tt.params.s3EndpointUrl)"
+
+  - name: '{{ include "common.names.fullname" $ }}-worker-template'
+    additionalLabels:
+      app.kubernetes.io/component: worker
+    additionalAnnotations: {}
+    spec:
+      params:
+        - name: s3BucketName
+          description: "S3 bucket for backups"
+          default: '{{ .Values.backup.s3.bucketName }}'
+        - name: s3EndpointUrl
+          description: "Optional S3 endpoint URL"
+          default: '{{ .Values.backup.s3.endpointUrl }}'
+        - name: triggeredBy
+          description: "How the backup was triggered"
+          default: "manual"
+      resourcetemplates:
+        - apiVersion: tekton.dev/v1beta1
+          kind: PipelineRun
+          metadata:
+            generateName: '{{ include "common.names.fullname" $ }}-worker-'
+            namespace: '{{ include "common.names.namespace" $ }}'
+            labels:
+              app.kubernetes.io/component: worker
+              triggered-by: "$(tt.params.triggeredBy)"
+            annotations:
+              backup.wazuh.io/component: "worker"
+              backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
+          spec:
+            serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
+            pipelineRef:
+              name: '{{ include "common.names.fullname" $ }}-pipeline'
+            params:
+              - name: componentName
+                value: "worker"
+              - name: statefulsetName
+                value: '{{ .Values.backup.components.worker.statefulsetName }}'
+              - name: statefulsetNamespace
+                value: '{{ include "common.names.namespace" $ }}'
+              - name: replicas
+                value: '{{ .Values.backup.components.worker.replicas }}'
+              - name: sourcePvcName
+                value: '{{ .Values.backup.components.worker.pvcName }}'
+              - name: sourcePvcPath
+                value: '{{ .Values.backup.components.worker.sourcePvcPath }}'
+              - name: backupSubdir
+                value: '{{ .Values.backup.components.worker.backupSubdir }}'
+              - name: s3BucketName
+                value: "$(tt.params.s3BucketName)"
+              - name: s3EndpointUrl
+                value: "$(tt.params.s3EndpointUrl)"
+
+# ------------------------------------------------------------------------------
+# ConfigMaps Configuration
+# ------------------------------------------------------------------------------
+configmaps:
+  - name: '{{ include "common.names.fullname" $ }}-scripts'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    data:
+      "cleanup-pvc-directory.sh": '{{- $.Files.Get "scripts/cleanup-pvc-directory.sh" }}'
+      "scale-statefulset.sh": '{{- $.Files.Get "scripts/scale-statefulset.sh" }}'
+      "make-tar.sh": '{{- $.Files.Get "scripts/make-tar.sh" }}'
+      "s3-upload.sh": '{{- $.Files.Get "scripts/s3-upload.sh" }}'
+      "rsync-pvc-to-pvc.sh": '{{- $.Files.Get "scripts/rsync-pvc-to-pvc.sh" }}'
+      "trigger-backup-cronjob.sh": '{{- $.Files.Get "scripts/trigger-backup-cronjob.sh" }}'
+
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# CronJobs Configuration
+# ------------------------------------------------------------------------------
+cronjobs:
+  - name: '{{ include "common.names.fullname" $ }}-master-cron'
+    additionalLabels:
+      component: master
+    additionalAnnotations: {}
+    spec:
+      schedule: '{{ .Values.backup.components.master.schedule | default .Values.backup.schedule }}'
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 5
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
+              restartPolicy: OnFailure
+              containers:
+                - name: trigger-backup
+                  image: curlimages/curl:8.1.0
+                  command:
+                    - sh
+                    - /scripts/trigger-backup-cronjob.sh
+                  env:
+                    - name: COMPONENT_NAME
+                      value: master
+                    - name: S3_BUCKET_NAME
+                      value: '{{ .Values.backup.s3.bucketName }}'
+                    - name: S3_ENDPOINT_URL
+                      value: '{{ .Values.backup.s3.endpointUrl }}'
+                    - name: EVENT_LISTENER_URL
+                      value: 'http://{{ include "common.names.fullname" $ }}-listener-svc.{{ include "common.names.namespace" $ }}.svc.cluster.local:8080/'
+                  volumeMounts:
+                    - name: scripts
+                      mountPath: /scripts
+                      readOnly: true
+              volumes:
+                - name: scripts
+                  configMap:
+                    name: '{{ include "common.names.fullname" $ }}-scripts'
+                    defaultMode: 0755
+
+  - name: '{{ include "common.names.fullname" $ }}-indexer-cron'
+    additionalLabels:
+      component: indexer
+    additionalAnnotations: {}
+    spec:
+      schedule: '{{ .Values.backup.components.indexer.schedule | default .Values.backup.schedule }}'
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 5
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
+              restartPolicy: OnFailure
+              containers:
+                - name: trigger-backup
+                  image: curlimages/curl:8.1.0
+                  command:
+                    - sh
+                    - /scripts/trigger-backup-cronjob.sh
+                  env:
+                    - name: COMPONENT_NAME
+                      value: indexer
+                    - name: S3_BUCKET_NAME
+                      value: '{{ .Values.backup.s3.bucketName }}'
+                    - name: S3_ENDPOINT_URL
+                      value: '{{ .Values.backup.s3.endpointUrl }}'
+                    - name: EVENT_LISTENER_URL
+                      value: 'http://{{ include "common.names.fullname" $ }}-listener-svc.{{ include "common.names.namespace" $ }}.svc.cluster.local:8080/'
+                  volumeMounts:
+                    - name: scripts
+                      mountPath: /scripts
+                      readOnly: true
+              volumes:
+                - name: scripts
+                  configMap:
+                    name: '{{ include "common.names.fullname" $ }}-scripts'
+                    defaultMode: 0755
+
+  - name: '{{ include "common.names.fullname" $ }}-worker-cron'
+    additionalLabels:
+      component: worker
+    additionalAnnotations: {}
+    spec:
+      schedule: '{{ .Values.backup.components.worker.schedule | default .Values.backup.schedule }}'
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 5
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
+              restartPolicy: OnFailure
+              containers:
+                - name: trigger-backup
+                  image: curlimages/curl:8.1.0
+                  command:
+                    - sh
+                    - /scripts/trigger-backup-cronjob.sh
+                  env:
+                    - name: COMPONENT_NAME
+                      value: worker
+                    - name: S3_BUCKET_NAME
+                      value: '{{ .Values.backup.s3.bucketName }}'
+                    - name: S3_ENDPOINT_URL
+                      value: '{{ .Values.backup.s3.endpointUrl }}'
+                    - name: EVENT_LISTENER_URL
+                      value: 'http://{{ include "common.names.fullname" $ }}-listener-svc.{{ include "common.names.namespace" $ }}.svc.cluster.local:8080/'
+                  volumeMounts:
+                    - name: scripts
+                      mountPath: /scripts
+                      readOnly: true
+              volumes:
+                - name: scripts
+                  configMap:
+                    name: '{{ include "common.names.fullname" $ }}-scripts'
+                    defaultMode: 0755
+
+# ------------------------------------------------------------------------------
+# ServiceAccounts Configuration
+# ------------------------------------------------------------------------------
+serviceaccounts:
+  - name: '{{ include "common.names.fullname" $ }}-sa'
+    additionalLabels: {}
+    additionalAnnotations: {}
+
+# ------------------------------------------------------------------------------
+# PVCs Configuration
+# ------------------------------------------------------------------------------
+pvcs:
+  - name: '{{ .Values.pvc.staging.name }}'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    spec:
+      accessModes:
+        - '{{ .Values.pvc.staging.accessMode }}'
+      storageClassName: '{{ .Values.pvc.staging.storageClass }}'
+      resources:
+        requests:
+          storage: '{{ .Values.pvc.staging.size }}'
+
+# ------------------------------------------------------------------------------
+# Secrets Configuration
+# ------------------------------------------------------------------------------
+secrets:
+  - name: '{{ .Values.aws.secretName }}'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    type: Opaque
+    stringData:
+      AWS_ACCESS_KEY_ID: '{{ .Values.aws.accessKeyId }}'
+      AWS_SECRET_ACCESS_KEY: '{{ .Values.aws.secretAccessKey }}'
+      AWS_SESSION_TOKEN: '{{ .Values.aws.sessionToken }}'
+
+# ------------------------------------------------------------------------------
+# Roles Configuration
+# ------------------------------------------------------------------------------
+roles:
+  - name: '{{ include "common.names.fullname" $ }}-role'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    rules:
+      - apiGroups: [""]
+        resources: ["persistentvolumeclaims"]
+        verbs: ["get", "list"]
+      - apiGroups: [""]
+        resources: ["secrets"]
+        resourceNames: ['{{ .Values.aws.secretName }}']
+        verbs: ["get"]
+      - apiGroups: ["apps"]
+        resources: ["statefulsets"]
+        resourceNames:
+          - '{{ .Values.backup.components.master.statefulsetName }}'
+          - '{{ .Values.backup.components.indexer.statefulsetName }}'
+          - '{{ .Values.backup.components.worker.statefulsetName }}'
+        verbs: ["get", "list", "patch", "update"]
+      - apiGroups: ["apps"]
+        resources: ["statefulsets/scale"]
+        resourceNames:
+          - '{{ .Values.backup.components.master.statefulsetName }}'
+          - '{{ .Values.backup.components.indexer.statefulsetName }}'
+          - '{{ .Values.backup.components.worker.statefulsetName }}'
+        verbs: ["get", "patch", "update"]
+      - apiGroups: ["batch"]
+        resources: ["cronjobs"]
+        verbs: ["get", "list", "create", "update", "patch", "delete"]
+      - apiGroups: ["batch"]
+        resources: ["jobs"]
+        verbs: ["get", "list", "watch"]
+
+  - name: '{{ include "common.names.fullname" $ }}-eventlistener-role'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    rules:
+      - apiGroups: ["tekton.dev"]
+        resources: ["pipelineruns"]
+        verbs: ["create", "get", "list", "watch"]
+      - apiGroups: ["triggers.tekton.dev"]
+        resources: ["triggerbindings", "triggertemplates", "triggers", "eventlisteners", "interceptors"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["apps"]
+        resources: ["deployments"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: [""]
+        resources: ["services"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["get", "list", "watch"]
+
+# ------------------------------------------------------------------------------
+# RoleBindings Configuration
+# ------------------------------------------------------------------------------
+rolebindings:
+  - name: '{{ include "common.names.fullname" $ }}-rolebinding'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    subjects:
+      - kind: ServiceAccount
+        name: '{{ include "common.names.fullname" $ }}-sa'
+        namespace: '{{ include "common.names.namespace" $ }}'
+    roleRef:
+      kind: Role
+      name: '{{ include "common.names.fullname" $ }}-role'
+      apiGroup: rbac.authorization.k8s.io
+
+  - name: '{{ include "common.names.fullname" $ }}-eventlistener-binding'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    subjects:
+      - kind: ServiceAccount
+        name: '{{ include "common.names.fullname" $ }}-sa'
+        namespace: '{{ include "common.names.namespace" $ }}'
+    roleRef:
+      kind: Role
+      name: '{{ include "common.names.fullname" $ }}-eventlistener-role'
+      apiGroup: rbac.authorization.k8s.io
+
+# ------------------------------------------------------------------------------
+# ClusterRoles Configuration
+# ------------------------------------------------------------------------------
+clusterroles:
+  - name: '{{ include "common.names.fullname" $ }}-eventlistener-cluster-role'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    rules:
+      - apiGroups: ["triggers.tekton.dev"]
+        resources: ["clusterinterceptors", "clustertriggerbindings"]
+        verbs: ["get", "list", "watch"]
+
+# ------------------------------------------------------------------------------
+# ClusterRoleBindings Configuration
+# ------------------------------------------------------------------------------
+clusterrolebindings:
+  - name: '{{ include "common.names.fullname" $ }}-eventlistener-cluster-binding'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    subjects:
+      - kind: ServiceAccount
+        name: '{{ include "common.names.fullname" $ }}-sa'
+        namespace: '{{ include "common.names.namespace" $ }}'
+    roleRef:
+      kind: ClusterRole
+      name: '{{ include "common.names.fullname" $ }}-eventlistener-cluster-role'
+      apiGroup: rbac.authorization.k8s.io
