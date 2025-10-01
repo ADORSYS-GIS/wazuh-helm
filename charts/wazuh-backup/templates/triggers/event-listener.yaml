@@ -4,7 +4,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
   name: wazuh-backup-listener
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 spec:
   serviceAccountName: wazuh-backup-sa
   triggers:
@@ -18,7 +18,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: wazuh-backup-listener-svc
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
     app.kubernetes.io/name: wazuh-backup-eventlistener
 spec:

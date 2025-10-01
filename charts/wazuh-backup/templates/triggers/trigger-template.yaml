@@ -2,11 +2,11 @@
 # Fixed trigger templates for hybrid mode with renamed components
 
 # Template for Master backups
-apiVersion: triggers.tekton.dev/v1beta1
+apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
   name: wazuh-backup-master-template
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 spec:
   params:
     - name: s3BucketName
@@ -23,7 +23,7 @@ spec:
       kind: PipelineRun
       metadata:
         generateName: wazuh-backup-master-
-        namespace: {{ .Values.namespace }}
+        namespace: {{ include "common.names.namespace" $ }}
         labels:
           app.kubernetes.io/name: wazuh-component-backup
           component: master
@@ -41,7 +41,7 @@ spec:
           - name: statefulsetName
             value: "{{ .Values.backup.components.master.statefulsetName }}"
           - name: statefulsetNamespace
-            value: "{{ .Values.namespace }}"
+            value: "{{ include "common.names.namespace" $ }}"
           - name: replicas
             value: "{{ .Values.backup.components.master.replicas }}"
           - name: sourcePvcName
@@ -57,11 +57,11 @@ spec:
 
 ---
 # Template for Indexer backups
-apiVersion: triggers.tekton.dev/v1beta1
+apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
   name: wazuh-backup-indexer-template
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 spec:
   params:
     - name: s3BucketName
@@ -78,7 +78,7 @@ spec:
       kind: PipelineRun
       metadata:
         generateName: wazuh-backup-indexer-
-        namespace: {{ .Values.namespace }}
+        namespace: {{ include "common.names.namespace" $ }}
         labels:
           app.kubernetes.io/name: wazuh-component-backup
           component: indexer
@@ -96,7 +96,7 @@ spec:
           - name: statefulsetName
             value: "{{ .Values.backup.components.indexer.statefulsetName }}"
           - name: statefulsetNamespace
-            value: "{{ .Values.namespace }}"
+            value: "{{ include "common.names.namespace" $ }}"
           - name: replicas
             value: "{{ .Values.backup.components.indexer.replicas }}"
           - name: sourcePvcName
@@ -112,11 +112,11 @@ spec:
 
 ---
 # Template for Worker backups
-apiVersion: triggers.tekton.dev/v1beta1
+apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
   name: wazuh-backup-worker-template
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 spec:
   params:
     - name: s3BucketName
@@ -133,7 +133,7 @@ spec:
       kind: PipelineRun
       metadata:
         generateName: wazuh-backup-worker-
-        namespace: {{ .Values.namespace }}
+        namespace: {{ include "common.names.namespace" $ }}
         labels:
           app.kubernetes.io/name: wazuh-component-backup
           component: worker
@@ -151,7 +151,7 @@ spec:
           - name: statefulsetName
             value: "{{ .Values.backup.components.worker.statefulsetName }}"
           - name: statefulsetNamespace
-            value: "{{ .Values.namespace }}"
+            value: "{{ include "common.names.namespace" $ }}"
           - name: replicas
             value: "{{ .Values.backup.components.worker.replicas }}"
           - name: sourcePvcName

@@ -5,7 +5,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: Trigger
 metadata:
   name: wazuh-backup-master-trigger
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 spec:
   bindings:
     - ref: wazuh-backup-master-binding
@@ -25,7 +25,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: Trigger
 metadata:
   name: wazuh-backup-indexer-trigger
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 spec:
   bindings:
     - ref: wazuh-backup-indexer-binding
@@ -45,7 +45,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: Trigger
 metadata:
   name: wazuh-backup-worker-trigger
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 spec:
   bindings:
     - ref: wazuh-backup-worker-binding

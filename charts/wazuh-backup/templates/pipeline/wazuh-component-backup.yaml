@@ -5,7 +5,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: "wazuh-component-backup"
-  namespace: {{ .Values.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
     app.kubernetes.io/name: wazuh-component-backup
   annotations:
@@ -28,7 +28,7 @@ spec:
       description: "K8s Statefulset to scale."
     - name: statefulsetNamespace
       type: string
-      default: "{{ .Values.namespace }}"
+      default: "{{ include "common.names.namespace" $ }}"
       description: "Namespace of the statefulset."
     - name: replicas
       type: string

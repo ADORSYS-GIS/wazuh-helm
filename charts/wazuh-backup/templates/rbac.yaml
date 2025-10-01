@@ -5,7 +5,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: wazuh-backup-eventlistener-role
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 rules:
   # EventListener needs to create PipelineRuns
   - apiGroups: ["tekton.dev"]
@@ -49,7 +49,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: wazuh-backup-sa
-    namespace: {{ .Values.global.namespace }}
+    namespace: {{ include "common.names.namespace" $ }}
 roleRef:
   kind: ClusterRole
   name: wazuh-backup-eventlistener-cluster-role
@@ -60,11 +60,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: wazuh-backup-eventlistener-binding
-  namespace: {{ .Values.global.namespace }}
+  namespace: {{ include "common.names.namespace" $ }}
 subjects:
   - kind: ServiceAccount
     name: wazuh-backup-sa
-    namespace: {{ .Values.global.namespace }}
+    namespace: {{ include "common.names.namespace" $ }}
 roleRef:
   kind: Role
   name: wazuh-backup-eventlistener-role
