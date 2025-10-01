@@ -1,10 +1,12 @@
 # Wazuh Backup Helm Chart
 
-A comprehensive Kubernetes backup solution for Wazuh components using Tekton Pipelines and S3 storage.
+A comprehensive, fully dynamic Kubernetes backup solution for Wazuh components using Tekton Pipelines and S3 storage.
 
 ## 🎯 Overview
 
 This Helm chart provides automated backup capabilities for Wazuh security platform components running on Kubernetes. It supports both **automatic scheduled backups** (via CronJobs) and **manual on-demand backups** (via HTTP triggers).
+
+All resources are dynamically generated from `values.yaml`, making the chart highly flexible and customizable for different deployment scenarios.
 
 ### Key Features
 
@@ -12,7 +14,8 @@ This Helm chart provides automated backup capabilities for Wazuh security platfo
 - ✅ **Multi-Component Support**: Manager Master, Indexer, Worker nodes
 - ✅ **S3 Integration**: Organized, date-based backup storage
 - ✅ **Safety First**: Automatic service recovery on failures
-- ✅ **Parameterized**: Fully configurable via values.yaml
+- ✅ **Fully Dynamic**: All resources generated from values.yaml
+- ✅ **External Scripts**: Maintainable scripts mounted via ConfigMaps
 - ✅ **Debug Support**: Built-in troubleshooting capabilities
 
 ---
@@ -56,33 +59,99 @@ This Helm chart provides automated backup capabilities for Wazuh security platfo
 ```
 📦wazuh-backup/
  ┣ 📜Chart.yaml                     # Helm chart metadata
- ┣ 📜values.yaml                    # Configuration values
- ┣ 📂templates/
- ┃ ┣ 📂cronjob/
- ┃ ┃ ┗ 📜cronjobs.yaml             # Automatic backup schedules
- ┃ ┣ 📂pipeline/
- ┃ ┃ ┗ 📜wazuh-component-backup.yaml # Main backup pipeline
- ┃ ┣ 📂tasks/
- ┃ ┃ ┣ 📜cleanup-pvc-directory.yaml # PVC cleanup task
- ┃ ┃ ┣ 📜rsync-pvc-to-pvc.yaml     # Data copy task
- ┃ ┃ ┣ 📜s3-upload-directory.yaml  # S3 upload task
- ┃ ┃ ┗ 📜scale-statefulset.yaml    # StatefulSet scaling task
- ┃ ┣ 📂triggers/
- ┃ ┃ ┣ 📜event-listener.yaml       # HTTP endpoint
- ┃ ┃ ┣ 📜trigger-binding.yaml      # Parameter binding
- ┃ ┃ ┣ 📜trigger-template.yaml     # Pipeline templates
- ┃ ┃ ┗ 📜triggers.yaml             # Trigger definitions
- ┃ ┣ 📜pvc.yaml                    # Staging storage
- ┃ ┣ 📜rbac.yaml                   # EventListener permissions
- ┃ ┣ 📜secret-aws-creds.yaml       # AWS credentials
- ┃ ┗ 📜serviceaccount.yaml         # Service account & RBAC
+ ┣ 📜values.yaml                    # All configuration (dynamic resources)
+ ┣ 📂templates/                     # Dynamic Helm templates
+ ┃ ┣ 📜pipeline.yaml               # Dynamic pipeline generation
+ ┃ ┣ 📜task.yaml                   # Dynamic task generation
+ ┃ ┣ 📜cronjobs.yaml               # Dynamic CronJob generation
+ ┃ ┣ 📜triggers.yaml               # Dynamic Trigger generation
+ ┃ ┣ 📜triggerbindings.yaml        # Dynamic TriggerBinding generation
+ ┃ ┣ 📜triggertemplates.yaml       # Dynamic TriggerTemplate generation
+ ┃ ┣ 📜event-listener.yaml         # EventListener & Service
+ ┃ ┣ 📜configmaps.yaml             # Dynamic ConfigMap generation (includes scripts)
+ ┃ ┣ 📜pvcs.yaml                   # Dynamic PVC generation
+ ┃ ┣ 📜secrets.yaml                # Dynamic Secret generation
+ ┃ ┣ 📜serviceaccounts.yaml        # Dynamic ServiceAccount generation
+ ┃ ┣ 📜roles.yaml                  # Dynamic Role generation
+ ┃ ┣ 📜rolebindings.yaml           # Dynamic RoleBinding generation
+ ┃ ┣ 📜clusterroles.yaml           # Dynamic ClusterRole generation
+ ┃ ┗ 📜clusterrolebindings.yaml    # Dynamic ClusterRoleBinding generation
+ ┗ 📂scripts/                       # External scripts
+   ┣ 📜cleanup-pvc-directory.sh    # PVC cleanup logic
+   ┣ 📜make-tar.sh                 # Tarball creation logic
+   ┣ 📜rsync-pvc-to-pvc.sh         # Rsync data copy logic
+   ┣ 📜s3-upload.sh                # S3 upload logic
+   ┣ 📜scale-statefulset.sh        # StatefulSet scaling logic
+   ┗ 📜trigger-backup-cronjob.sh   # CronJob trigger logic (NEW)
 ```
+
+### Template Architecture
+
+All templates follow a consistent dynamic pattern:
+
+```yaml
+{{ range .Values.<resourceType> }}
+apiVersion: <api-version>
+kind: <Kind>
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+{{ with .spec -}}
+spec: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+{{- end }}
+---
+{{ end }}
+```
+
+This makes it easy to add, remove, or modify resources by simply updating `values.yaml`.
+
+---
+
+## 🔄 What's New in v0.1.1-rc2
+
+This version introduces a complete architectural overhaul to make the chart fully dynamic and values-driven:
+
+### Major Changes
+
+1. **Full Template Dynamization**
+   - All static YAML templates converted to dynamic, values-driven templates
+   - Resources now generated from arrays in `values.yaml`
+   - Follows same pattern as other charts using `{{ range .Values.<resourceType> }}` loops
+
+2. **External Script Architecture**
+   - Created [trigger-backup-cronjob.sh](scripts/trigger-backup-cronjob.sh) for CronJob logic
+   - Moved inline scripts to external files for better maintainability
+   - Scripts mounted via ConfigMap volumes
+   - Configuration passed through environment variables
+
+3. **Separated RBAC Resources**
+   - Split monolithic `rbac.yaml` into separate templates
+   - Individual templates for Roles, RoleBindings, ClusterRoles, ClusterRoleBindings
+   - Easier to customize permissions per component
+
+4. **Template Reorganization**
+   - Consolidated all ConfigMaps into single dynamic template
+   - Moved triggers from subdirectory to root templates
+   - Consistent naming and structure across all templates
+
+5. **Enhanced Flexibility**
+   - Easy to add/remove backup components via values.yaml
+   - Customize any resource without modifying templates
+   - Better support for multi-environment deployments
+
+### Migration from v0.1.0
+
+If upgrading from v0.1.0, your existing `values.yaml` structure is compatible. The chart now generates the same resources but with improved flexibility.
 
 ---
 
 ## ⚙️ Configuration
 
 ### Core Configuration (values.yaml)
+
+The chart uses a fully dynamic configuration model. All Kubernetes resources are defined as arrays in `values.yaml`:
 
 ```yaml
 # Namespace for all resources
@@ -94,13 +163,13 @@ backup:
   mode:
     cronjobs: true    # Automatic scheduled backups
     triggers: true    # Manual HTTP-triggered backups
-  
+
   # S3 storage configuration
   s3:
     bucketName: "your-backup-bucket"
     endpointUrl: ""   # Leave empty for AWS S3
     pathPrefix: "wazuh-backup"
-  
+
   # Component-specific settings
   components:
     master:           # Wazuh Manager Master
@@ -111,7 +180,7 @@ backup:
       sourcePvcPath: "var/lib/wazuh/data/"
       backupSubdir: "master-backup"
       schedule: "0 2 * * *"  # Daily at 2 AM
-    
+
     indexer:          # Wazuh Indexer
       enabled: true
       statefulsetName: "wazuh-wazuh-helm-indexer"
@@ -120,7 +189,7 @@ backup:
       sourcePvcPath: "usr/share/wazuh-indexer/data/"
       backupSubdir: "indexer-backup"
       schedule: "0 3 * * *"  # Daily at 3 AM
-    
+
     worker:           # Wazuh Manager Worker
       enabled: true
       statefulsetName: "wazuh-wazuh-helm-manager-worker"
@@ -130,22 +199,24 @@ backup:
       backupSubdir: "worker-backup"
       schedule: "0 4 * * *"  # Daily at 4 AM
 
-# AWS credentials
-aws:
-  region: eu-central-1
-  secretName: aws-creds
-  accessKeyId: "YOUR_ACCESS_KEY"
-  secretAccessKey: "YOUR_SECRET_KEY"
-  sessionToken: "YOUR_SESSION_TOKEN"  # Optional
-
-# Storage configuration
-pvc:
-  staging:
-    name: "backup-staging-pvc"
-    size: "20Gi"
-    accessMode: "ReadWriteOnce"
-    storageClass: "standard"  # Adjust for your cluster
+# Dynamic resource arrays (all resources defined here)
+pipelines: [...]           # Tekton Pipeline definitions
+tasks: [...]               # Tekton Task definitions
+triggers: [...]            # Tekton Trigger definitions
+triggerbindings: [...]     # Tekton TriggerBinding definitions
+triggertemplates: [...]    # Tekton TriggerTemplate definitions
+cronjobs: [...]            # CronJob definitions
+pvcs: [...]                # PVC definitions
+secrets: [...]             # Secret definitions (including AWS creds)
+serviceaccounts: [...]     # ServiceAccount definitions
+roles: [...]               # Role definitions
+rolebindings: [...]        # RoleBinding definitions
+clusterroles: [...]        # ClusterRole definitions
+clusterrolebindings: [...] # ClusterRoleBinding definitions
+configmaps: [...]          # ConfigMap definitions (including scripts)
 ```
+
+> **Note**: The full `values.yaml` includes complete definitions for all resources. Each array contains the complete spec for each resource, making it easy to customize or add new resources.
 
 ### Component Data Breakdown
 
@@ -208,8 +279,8 @@ cd wazuh-backup
 # 3. Validate the template
 helm template wazuh-backup . --namespace wazuh --debug
 
-# 4. Deploy the chart
-helm install wazuh-backup . --namespace wazuh --create-namespace
+# 4. Install/upgrade the chart
+helm upgrade --install wazuh-backup . --namespace wazuh --create-namespace
 
 # 5. Verify deployment
 kubectl get all -n wazuh -l app.kubernetes.io/instance=wazuh-backup
@@ -238,25 +309,27 @@ kubectl get pvc backup-staging-pvc -n wazuh
 ### Test 2: Manual Backup Triggers
 
 ```bash
-# 1. Port forward the EventListener
-kubectl port-forward svc/wazuh-backup-listener-svc 8080:8080 -n wazuh
+# 1. Port forward the EventListener (note: actual service name is el-wazuh-backup-listener)
+kubectl port-forward svc/el-wazuh-backup-listener 8080:8080 -n wazuh
 
 # 2. In another terminal, test each component
 # Test master backup
 curl -X POST http://localhost:8080 \
   -H "Content-Type: application/json" \
-  -d '{"component": "master", "triggeredBy": "test"}'
+  -d '{"component": "master", "s3BucketName": "wazuh-backups", "s3EndpointUrl": "https://s3.amazonaws.com", "triggeredBy": "test"}'
 
 # Test indexer backup
 curl -X POST http://localhost:8080 \
   -H "Content-Type: application/json" \
-  -d '{"component": "indexer", "triggeredBy": "test"}'
+  -d '{"component": "indexer", "s3BucketName": "wazuh-backups", "s3EndpointUrl": "https://s3.amazonaws.com", "triggeredBy": "test"}'
 
 # Test worker backup
 curl -X POST http://localhost:8080 \
   -H "Content-Type: application/json" \
-  -d '{"component": "worker", "triggeredBy": "test"}'
+  -d '{"component": "worker", "s3BucketName": "wazuh-backups", "s3EndpointUrl": "https://s3.amazonaws.com", "triggeredBy": "test"}'
 ```
+
+> **Note**: The EventListener service name is `el-wazuh-backup-listener` (prefixed with `el-` by Tekton Triggers).
 
 ### Test 3: Monitor Backup Execution
 
@@ -321,13 +394,18 @@ kubectl create job --from=cronjob/wazuh-backup-master-cron manual-backup-$(date 
 
 **Basic manual backup:**
 ```bash
-# Set up port forward
-kubectl port-forward svc/wazuh-backup-listener-svc 8080:8080 -n wazuh
+# Set up port forward (note: service name is el-wazuh-backup-listener)
+kubectl port-forward svc/el-wazuh-backup-listener 8080:8080 -n wazuh
 
 # Trigger backup
 curl -X POST http://localhost:8080 \
   -H "Content-Type: application/json" \
-  -d '{"component": "master"}'
+  -d '{
+    "component": "master",
+    "s3BucketName": "wazuh-backups",
+    "s3EndpointUrl": "https://s3.amazonaws.com",
+    "triggeredBy": "manual"
+  }'
 ```
 
 **Advanced manual backup with custom settings:**
@@ -350,7 +428,12 @@ for component in "${components[@]}"; do
   echo "Backing up $component..."
   curl -X POST http://localhost:8080 \
     -H "Content-Type: application/json" \
-    -d "{\"component\": \"$component\", \"triggeredBy\": \"emergency\"}"
+    -d "{
+      \"component\": \"$component\",
+      \"s3BucketName\": \"wazuh-backups\",
+      \"s3EndpointUrl\": \"https://s3.amazonaws.com\",
+      \"triggeredBy\": \"emergency\"
+    }"
   sleep 30  # Wait between backups
 done
 ```
@@ -705,11 +788,59 @@ curl -X POST http://localhost:8080 \
 curl -X POST http://localhost:8080 \
   -H "Content-Type: application/json" \
   -d '{
-    "component": "master", 
+    "component": "master",
     "s3BucketName": "dr-backup-bucket",
     "triggeredBy": "dr-backup"
   }'
 ```
+
+### Adding New Backup Components
+
+Thanks to the dynamic template architecture, adding a new component is straightforward:
+
+1. **Add component configuration to values.yaml**:
+```yaml
+backup:
+  components:
+    dashboard:  # New component
+      enabled: true
+      statefulsetName: "wazuh-dashboard"
+      pvcName: "wazuh-dashboard-data-0"
+      replicas: 1
+      sourcePvcPath: "usr/share/wazuh-dashboard/data/"
+      backupSubdir: "dashboard-backup"
+      schedule: "0 5 * * *"  # Daily at 5 AM
+```
+
+2. **Add corresponding trigger, binding, and template entries to values.yaml arrays**:
+```yaml
+triggers:
+  - name: wazuh-backup-dashboard-trigger
+    # ... similar to existing triggers
+
+triggerbindings:
+  - name: wazuh-backup-dashboard-binding
+    # ... similar to existing bindings
+
+triggertemplates:
+  - name: wazuh-backup-dashboard-template
+    # ... similar to existing templates
+```
+
+3. **Add CronJob entry**:
+```yaml
+cronjobs:
+  - name: wazuh-backup-dashboard-cron
+    # ... similar to existing cronjobs
+```
+
+4. **Deploy the update**:
+```bash
+helm upgrade wazuh-backup . --namespace wazuh
+```
+
+The new component will automatically be included in backups with its own schedule and trigger endpoint.
+
 ---
 
 ## 🔧 Maintenance
