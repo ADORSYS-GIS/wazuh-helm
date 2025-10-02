@@ -118,7 +118,7 @@ secretjob:
     registry: docker.io
     ##
     ##
-    repository: bitnami/kubectl
+    repository: bitnamilegacy/kubectl
     ##
     ##
     tag: latest
