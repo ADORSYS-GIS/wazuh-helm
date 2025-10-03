@@ -1,5 +1,5 @@
 {{ range .Values.tasks }}
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}

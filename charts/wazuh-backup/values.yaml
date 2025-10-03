@@ -641,7 +641,7 @@ triggertemplates:
           description: "How the backup was triggered"
           default: "manual"
       resourcetemplates:
-        - apiVersion: tekton.dev/v1beta1
+        - apiVersion: tekton.dev/v1
           kind: PipelineRun
           metadata:
             generateName: '{{ include "common.names.fullname" $ }}-master-'
@@ -692,7 +692,7 @@ triggertemplates:
           description: "How the backup was triggered"
           default: "manual"
       resourcetemplates:
-        - apiVersion: tekton.dev/v1beta1
+        - apiVersion: tekton.dev/v1
           kind: PipelineRun
           metadata:
             generateName: '{{ include "common.names.fullname" $ }}-indexer-'
@@ -743,7 +743,7 @@ triggertemplates:
           description: "How the backup was triggered"
           default: "manual"
       resourcetemplates:
-        - apiVersion: tekton.dev/v1beta1
+        - apiVersion: tekton.dev/v1
           kind: PipelineRun
           metadata:
             generateName: '{{ include "common.names.fullname" $ }}-worker-'
