@@ -653,9 +653,10 @@ triggertemplates:
               backup.wazuh.io/component: "master"
               backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
           spec:
-            serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
             pipelineRef:
               name: '{{ include "common.names.fullname" $ }}-pipeline'
+            taskRunTemplate:
+              serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
             params:
               - name: componentName
                 value: "master"
@@ -704,9 +705,10 @@ triggertemplates:
               backup.wazuh.io/component: "indexer"
               backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
           spec:
-            serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
             pipelineRef:
               name: '{{ include "common.names.fullname" $ }}-pipeline'
+            taskRunTemplate:
+              serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
             params:
               - name: componentName
                 value: "indexer"
@@ -755,9 +757,10 @@ triggertemplates:
               backup.wazuh.io/component: "worker"
               backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
           spec:
-            serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
             pipelineRef:
               name: '{{ include "common.names.fullname" $ }}-pipeline'
+            taskRunTemplate:
+              serviceAccountName: '{{ include "common.names.fullname" $ }}-sa'
             params:
               - name: componentName
                 value: "worker"
