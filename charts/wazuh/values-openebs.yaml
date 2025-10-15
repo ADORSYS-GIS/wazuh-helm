@@ -1,0 +1,4 @@
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    provisioner: openebs.io/local
+    volumeBindingMode: WaitForFirstConsumer
