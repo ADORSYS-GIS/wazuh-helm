@@ -1,0 +1,4 @@
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    provisioner: driver.longhorn.io
+    volumeBindingMode: WaitForFirstConsumer
