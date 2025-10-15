@@ -424,6 +424,8 @@
     ${AZURE_CONFIGS}
     {{- end }}
     
+    ${AWS_CONFIGS}
+
     ${GITHUB_CONFIGS}
     ${SLACK_CONFIG}
     ${JIRA_CONFIG}
