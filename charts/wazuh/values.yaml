@@ -975,3 +975,39 @@ integration:
     ##
     ##
     externalSecret: ~
+
+  ##
+  ## AWS integrations for CloudTrail and Security Hub
+  aws:
+    ## top-level defaults reused by both blocks
+    profile: ~
+    roleArn: ~
+    ## Optional k8s Secret to mount to /root/.aws containing credentials and/or config
+    secrets:
+      create: true
+      name: wazuh-aws
+      existingSecret: ~
+      additionalAnnotations: {}
+      additionalLabels: {}
+      ## Inline contents if creating the secret:
+      ## credentials: |
+      ##   [default]
+      ##   aws_access_key_id=...
+      ##   aws_secret_access_key=...
+      credentials: ~
+      ## config: |
+      ##   [profile main]
+      ##   region=eu-central-1
+      ##   role_arn=arn:aws:iam::123456789012:role/Wazuh-IAM-Role
+      ##   source_profile=default
+      config: ~
+    ## CloudTrail from S3 bucket
+    cloudtrail:
+      enabled: false
+      bucketName: ~
+      interval: 1m
+    ## Security Hub via SQS
+    securityHub:
+      enabled: false
+      sqsName: ~
+      interval: 1h

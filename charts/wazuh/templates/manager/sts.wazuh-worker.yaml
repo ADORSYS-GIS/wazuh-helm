@@ -51,6 +51,13 @@ spec:
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
+        {{- with $.Values.integration.aws }}
+        {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+        - name: aws-credentials
+          secret:
+            secretName: {{ default (printf "%s-aws" (include "secret.common" $)) .secrets.name | default .secrets.existingSecret }}
+        {{- end }}
+        {{- end }}
         - name: config
           configMap:
             name: '{{ include "common.names.fullname" $ }}-wazuh-conf'
@@ -99,6 +106,11 @@ spec:
               value: |
                 {{ . | nindent 16 }}
             {{- end }}
+            {{ with include "integration.aws.conf" $ -}}
+            - name: AWS_CONFIGS
+              value: |
+                {{ . | nindent 16 }}
+            {{- end }}
           ##
           ##
           envFrom:
@@ -123,6 +135,13 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
+            {{- with $.Values.integration.aws }}
+            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+            - name: aws-credentials
+              mountPath: /root/.aws
+              readOnly: true
+            {{- end }}
+            {{- end }}
         {{ range $k, $v := .initContainers }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
