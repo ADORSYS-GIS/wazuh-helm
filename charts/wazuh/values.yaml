@@ -984,9 +984,9 @@ integration:
     roleArn: ~
     ## Optional k8s Secret to mount to /root/.aws containing credentials and/or config
     secrets:
-      create: true
-      name: wazuh-aws
-      existingSecret: ~
+      create: false
+      # name: "wazuh-aws"
+      existingSecret: "ext-wazuh-aws-secrets"
       additionalAnnotations: {}
       additionalLabels: {}
       ## Inline contents if creating the secret:

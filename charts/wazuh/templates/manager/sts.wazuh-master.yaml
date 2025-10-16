@@ -59,7 +59,7 @@ spec:
         {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
         - name: aws-credentials
           secret:
-            secretName: {{ default (printf "%s-aws" (include "secret.common" $)) .secrets.name | default .secrets.existingSecret }}
+            secretName: {{ coalesce .secrets.existingSecret .secrets.name (printf "%s-aws" (include "secret.common" $)) }}
         {{- end }}
         {{- end }}
         - name: config
