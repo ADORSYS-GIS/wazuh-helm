@@ -55,7 +55,7 @@ spec:
         {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
         - name: aws-credentials
           secret:
-            secretName: {{ default (printf "%s-aws" (include "secret.common" $)) .secrets.name | default .secrets.existingSecret }}
+            secretName: {{ coalesce .secrets.existingSecret .secrets.name (printf "%s-aws" (include "secret.common" $)) }}
         {{- end }}
         {{- end }}
         - name: config
@@ -260,6 +260,14 @@ spec:
               mountPath: /etc/ssl/filebeat.key
               subPath: server-key.pem
               readOnly: true
+
+            {{- with $.Values.integration.aws }}
+            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+            - name: aws-credentials
+              mountPath: /root/.aws
+              readOnly: true
+            {{- end }}
+            {{- end }}
 
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
