@@ -979,6 +979,7 @@ integration:
   ##
   ## AWS integrations for CloudTrail and Security Hub
   aws:
+    enable: false
     ## top-level defaults reused by both blocks
     profile: ~
     roleArn: ~

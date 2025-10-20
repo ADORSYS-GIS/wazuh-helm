@@ -55,11 +55,14 @@ spec:
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
+          
         {{- with $.Values.integration.aws }}
+        {{ if .enable }}
         {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
         - name: aws-credentials
           secret:
             secretName: {{ coalesce .secrets.existingSecret .secrets.name (printf "%s-aws" (include "secret.common" $)) }}
+        {{- end }}
         {{- end }}
         {{- end }}
         - name: config
@@ -231,10 +234,12 @@ spec:
               readOnly: true
 
             {{- with $.Values.integration.aws }}
+            {{ if .enable -}}
             {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
             - name: aws-credentials
               mountPath: /root/.aws
               readOnly: true
+            {{- end }}
             {{- end }}
             {{- end }}
 

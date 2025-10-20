@@ -1,6 +1,7 @@
 {{- define "integration.aws.conf" -}}
 {{- $aws := .Values.integration.aws -}}
 {{- if $aws -}}
+{{- if $aws.enable -}}
 {{- if and $aws.cloudtrail $aws.cloudtrail.enabled -}}
 <wodle name="aws-s3">
     <disabled>no</disabled>
@@ -39,5 +40,4 @@
 {{- end -}}
 {{- end -}}
 {{- end -}}
-
-
+{{- end -}}

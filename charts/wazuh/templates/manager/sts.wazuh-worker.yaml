@@ -52,10 +52,12 @@ spec:
         - name: wazuh-config-temp
           emptyDir: { }
         {{- with $.Values.integration.aws }}
+        {{ if .enable }}
         {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
         - name: aws-credentials
           secret:
             secretName: {{ coalesce .secrets.existingSecret .secrets.name (printf "%s-aws" (include "secret.common" $)) }}
+        {{- end }}
         {{- end }}
         {{- end }}
         - name: config
@@ -136,10 +138,12 @@ spec:
             - name: wazuh-config-temp
               mountPath: /processed
             {{- with $.Values.integration.aws }}
+            {{ if .enable }}
             {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
             - name: aws-credentials
               mountPath: /root/.aws
               readOnly: true
+            {{- end }}
             {{- end }}
             {{- end }}
         {{ range $k, $v := .initContainers }}
@@ -147,7 +151,7 @@ spec:
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
         {{- end }}   
       securityContext:
-        rfsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -267,10 +271,12 @@ spec:
               readOnly: true
 
             {{- with $.Values.integration.aws }}
+            {{- if .enable }}
             {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
             - name: aws-credentials
               mountPath: /root/.aws
               readOnly: true
+            {{- end }}
             {{- end }}
             {{- end }}
 
