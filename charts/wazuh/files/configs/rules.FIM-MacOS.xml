@@ -263,7 +263,7 @@
     <!-- System Binary Modifications with Noise Reduction -->
     <rule id="100045" level="12">
     <if_group >syscheck</if_group>
-    <field name="file">/usr/bin|/usr/sbin|/bin|/sbin</field>
+    <field name="file">/usr/sbin|/bin|/sbin</field>
     <description >macOS FIM: Critical system binary modified</description>
     <group
     >syscheck,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_80
@@ -339,7 +339,7 @@
     <!-- System Configuration Files with Noise Reduction -->
     <rule id="100054" level="10">
     <if_group >syscheck</if_group>
-    <field name="file">/etc|/private/etc</field>
+    <field name="file">/private/etc</field>
     <description >macOS FIM: System configuration file modified</description>
     <group
     >syscheck,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_80

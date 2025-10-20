@@ -83,7 +83,7 @@
 	</rule>	
 	<rule id="100021" level="12">	
 		<if_group >syslog</if_group>
-		<match >kernel panic|Oops</match>
+		<match >kernel panic</match>
 		<description >Kernel panic or critical error detected</description>
 	</rule>	
 	<rule id="100022" level="12">	
@@ -217,9 +217,9 @@
     	<match >!ansible|!puppet|!chef</match>
     	<description >Unexpected Sudoers file modification detected</description>
     </rule>
-    	 System Startup Scripts 
+    	 <!-- System Startup Scripts  -->
     <rule id="200016" level="9">
-    	<match >/etc/rc.local|/etc/init.d/</match>
+    	<match >/etc/rc.local|/etc/init.d/anacron/</match>
     	<description >System startup script modification detected</description>
     </rule>
     <rule id="200017" level="0">
@@ -237,8 +237,8 @@
     	<match >!ansible|!puppet|!chef|!cron</match>
     	<description >Unexpected system startup script modification detected</description>
     </rule>											
-    		 Filesystem Table 											
-    		
+    
+	<!-- Filesystem Table -->
     <rule id="200021" level="10">
     	<match >/etc/fstab</match>
     	<description >Filesystem table modification detected</description>
@@ -386,7 +386,7 @@
 		<match >!ansible|!puppet|!chef</match>
 		<description >Unexpected software package installation detected</description>
 	</rule>
-	 Detection of Package Removal 
+	 <!-- Detection of Package Removal  -->
 	<rule id="300021" level="8">
 		<if_group >syslog</if_group>
 		<match >apt-get remove|yum remove|dnf remove</match>
@@ -410,7 +410,7 @@
 	 <!--Detection of Firewall Changes -->
 	<rule id="300026" level="10">
 		<if_group >syslog</if_group>
-		<match >iptables|firewalld|ufw</match>
+		<match >iptables|firewalld|ufw|!k3s|!kube-proxy</match>
 		<description >Firewall configuration change detected</description>
 	</rule>
 	<rule id="300027" level="0">
@@ -420,20 +420,16 @@
 	</rule>
 	<rule id="300029" level="0">
 		<if_matched_sid >300026</if_matched_sid>
-		<match >ansible|puppet|chef</match>
+		<match >ansible|puppet|chef|k3s|kube-proxy</match>
 		<description >Ignore firewall changes from trusted automation tools</description>
 	</rule>
-	<rule id="300030" level="12">
-		<if_matched_sid >300026</if_matched_sid>
-		<match >!ansible|!puppet|!chef|!kube-proxy</match>
-		<description >Unexpected firewall configuration change detected</description>
-	</rule>
-	 <!--Detection of Suspicious Network Connections -->
-	<rule id="300031" level="12">
-		<if_group >syslog</if_group>
-		<match >connect from|connection attempt</match>
-		<description >Suspicious inbound network connection detected</description>
-	</rule>
+	
+	<!-- Detection of Suspicious Network Connections  -->
+	<!--<rule id="300031" level="12">-->
+	<!--	<if_group >syslog</if_group>-->
+	<!--	<match >connect from|connection attempt</match>-->
+	<!--	<description >Suspicious inbound network connection detected</description>-->
+	<!--</rule>-->
 	<rule id="300033" level="0">
 		<if_matched_sid >300031</if_matched_sid>
 		<match >port 80|port 443</match>
@@ -482,5 +478,5 @@
 		<match >!ansible|!puppet|!chef</match>
 		<description >Unexpected hosts file modification detected</description>
 	</rule>
-</group>													
-		
+
+</group>					
