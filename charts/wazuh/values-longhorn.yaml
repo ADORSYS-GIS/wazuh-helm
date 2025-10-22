@@ -11,6 +11,7 @@ storageClasses:
     provisioner: driver.longhorn.io
     volumeBindingMode: Immediate
     allowVolumeExpansion: true
+    enabled: true
     parameters:
       numberOfReplicas: "2"
       dataLocality: "disabled"
