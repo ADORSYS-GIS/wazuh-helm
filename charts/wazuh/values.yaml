@@ -294,6 +294,69 @@ indexer:
   ##
   affinity: ~
 
+  ##
+  ##
+  initContainers:
+    volume-mount-hack:
+      image: busybox
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 100m
+          memory: 256Mi
+      command:
+        - sh
+        - '-c'
+        - 'chown -R 1000:1000 /var/lib/wazuh-indexer'
+      volumeMounts:
+        - name: '{{ include "common.names.fullname" $ }}-indexer'
+          mountPath: /var/lib/wazuh-indexer
+    increase-the-vm-max-map-count:
+      image: busybox
+      command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+      securityContext:
+        privileged: true
+    config-init:
+      ##
+      image: ghcr.io/adorsys-gis/envsubt:main-7917c58
+      ##
+      imagePullPolicy: IfNotPresent
+      ##
+      ##
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          apk add --update --no-cache libintl gettext apache2-utils
+
+          export INDEXER_PASSWORD_BCRYPT=$(htpasswd -bnBC 12 "" $INDEXER_PASSWORD | tr -d ':\n')
+          export DASHBOARD_USERNAME_BCRYPT=$(htpasswd -bnBC 12 "" $DASHBOARD_PASSWORD | tr -d ':\n')
+          envsubst < /workdir/internal_users.yml > /processed/internal_users.yml
+
+      ##
+      ##
+      envFrom:
+        - secretRef:
+            name: '{{ include "secret.indexer-auth" $ }}'
+        - secretRef:
+            name: '{{ include "secret.dashboard-auth" $ }}'
+      ##
+      ##
+      volumeMounts:
+        - name: indexer-conf
+          mountPath: /workdir/internal_users.yml
+          subPath: internal_users.yml
+          readOnly: true
+        - name: wazuh-config-temp
+          mountPath: /processed
+
+    
 ##
 ##
 worker:
@@ -384,6 +447,13 @@ worker:
   ##
   ##
   affinity: ~
+  
+  ##
+  ##
+  securityContext:
+    capabilities:
+      add: [ "SYS_CHROOT" ]
+    privileged: true
 
 master:
   replicaCount: 1
@@ -493,6 +563,13 @@ master:
   ##
   ##
   affinity: ~
+  
+  ##
+  ##
+  securityContext:
+    capabilities:
+      add: [ "SYS_CHROOT" ]
+    privileged: true
 
 ##
 ##

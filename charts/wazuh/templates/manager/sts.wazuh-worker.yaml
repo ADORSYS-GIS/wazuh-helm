@@ -83,10 +83,6 @@ spec:
           imagePullPolicy: IfNotPresent
           ##
           ##
-          securityContext:
-            privileged: true
-          ##
-          ##
           command:
             - /bin/sh
             - -c
@@ -147,8 +143,10 @@ spec:
             {{- end }}
             {{- end }}
         {{ range $k, $v := .initContainers }}
+        {{ if $v }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
+        {{ end }}   
         {{- end }}   
       securityContext:
         fsGroup: 1000
@@ -159,10 +157,9 @@ spec:
           {{ with .resources -}}
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
-          securityContext:
-            capabilities:
-              add: [ "SYS_CHROOT" ]
-            privileged: true
+          {{ with .securityContext }}
+          securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{ end }}
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration

@@ -70,65 +70,15 @@ spec:
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
+      {{ with .initContainers }}
       initContainers:
-        - name: volume-mount-hack
-          image: busybox
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 100m
-              memory: 256Mi
-          command:
-            - sh
-            - '-c'
-            - 'chown -R 1000:1000 /var/lib/wazuh-indexer'
-          volumeMounts:
-            - name: {{ include "common.names.fullname" $ }}-indexer
-              mountPath: /var/lib/wazuh-indexer
-        - name: increase-the-vm-max-map-count
-          image: busybox
-          command:
-            - sysctl
-            - -w
-            - vm.max_map_count=262144
-          securityContext:
-            privileged: true
-        - name: config-init
-          ##
-          image: ghcr.io/adorsys-gis/envsubt:main-7917c58
-          ##
-          imagePullPolicy: IfNotPresent
-          ##
-          ##
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -e
-              apk add --update --no-cache libintl gettext apache2-utils
-
-              export INDEXER_PASSWORD_BCRYPT=$(htpasswd -bnBC 12 "" $INDEXER_PASSWORD | tr -d ':\n')
-              export DASHBOARD_USERNAME_BCRYPT=$(htpasswd -bnBC 12 "" $DASHBOARD_PASSWORD | tr -d ':\n')
-              envsubst < /workdir/internal_users.yml > /processed/internal_users.yml
-
-          ##
-          ##
-          envFrom:
-            - secretRef:
-                name: '{{ include "secret.indexer-auth" $ }}'
-            - secretRef:
-                name: '{{ include "secret.dashboard-auth" $ }}'
-          ##
-          ##
-          volumeMounts:
-            - name: indexer-conf
-              mountPath: /workdir/internal_users.yml
-              subPath: internal_users.yml
-              readOnly: true
-            - name: wazuh-config-temp
-              mountPath: /processed
+      {{ range $k, $v := . }}
+      {{ if $v }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
+      {{ end }}
+      {{ end }}
+      {{ end }}
       containers:
         - name: wazuh-indexer
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}

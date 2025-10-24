@@ -1,0 +1,86 @@
+global:
+  storageClassName: standard-rwo
+
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    enabled: false
+
+extraVolumeConfigs:
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    storageClassName: standard-rwx
+    accessModes:
+      - ReadWriteMany
+  snort-alerts:
+    storageClassName: standard-rwx
+    accessModes:
+      - ReadWriteMany
+  owasp-zap-alerts:
+    storageClassName: standard-rwx
+    accessModes:
+      - ReadWriteMany
+
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    enabled: true
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: '{"ingress": true}'
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: true
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: '{"ingress": true}'
+
+dashboard:
+  ingress:
+    enabled: true
+    className: gce
+    annotations: { }
+
+
+indexer:
+  replicas: 1
+  persistence:
+    size: 100Gi
+  additionalAnnotations:
+    app-group: '{{ include "common.names.fullname" $ }}-indexer'
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app-group: '{{ include "common.names.fullname" $ }}-indexer'
+
+worker:
+  replicaCount: 1
+  persistence:
+    size: 50Gi
+  additionalAnnotations:
+    app-group: '{{ include "common.names.fullname" $ }}-manager'
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app-group: '{{ include "common.names.fullname" $ }}-manager'
+master:
+  replicaCount: 1
+  persistence:
+    size: 50Gi
+  additionalAnnotations:
+    app-group: '{{ include "common.names.fullname" $ }}-manager'
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app-group: '{{ include "common.names.fullname" $ }}-manager'
