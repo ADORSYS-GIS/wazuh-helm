@@ -1,21 +1,32 @@
-global:
-  storageClassName: standard-rwo
-
 storageClasses:
   '{{ include "wazuh.storageClassName" $ }}':
-    enabled: false
-
+    allowVolumeExpansion: true
+    parameters:
+      type: pd-balanced
+    provisioner: pd.csi.storage.gke.io
+    reclaimPolicy: Delete
+    volumeBindingMode: WaitForFirstConsumer
+  '{{ include "common.names.fullname" $ }}-rwx':
+    parameters:
+      tier: standard
+      network: observe-prod-vpc
+    enabled: true
+    provisioner: filestore.csi.storage.gke.io
+    reclaimPolicy: Delete
+    volumeBindingMode: WaitForFirstConsumer
+    allowVolumeExpansion: true
+    
 extraVolumeConfigs:
   '{{ include "common.names.fullname" $ }}-manager-backup':
-    storageClassName: standard-rwx
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
     accessModes:
       - ReadWriteMany
   snort-alerts:
-    storageClassName: standard-rwx
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
     accessModes:
       - ReadWriteMany
   owasp-zap-alerts:
-    storageClassName: standard-rwx
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
     accessModes:
       - ReadWriteMany
 
