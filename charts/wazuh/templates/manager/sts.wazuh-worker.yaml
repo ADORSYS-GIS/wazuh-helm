@@ -294,16 +294,6 @@ spec:
               value: /etc/ssl/filebeat.pem
             - name: SSL_KEY
               value: /etc/ssl/filebeat.key
-            {{- with $.Values.integration.aws }}
-            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-            - name: AWS_SDK_LOAD_CONFIG
-              value: "1"
-            - name: AWS_SHARED_CREDENTIALS_FILE
-              value: "/root/.aws/credentials"
-            - name: AWS_CONFIG_FILE
-              value: "/root/.aws/config"
-            {{- end }}
-            {{- end }}
           {{ with .env -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
