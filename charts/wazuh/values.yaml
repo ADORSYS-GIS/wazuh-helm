@@ -1085,6 +1085,10 @@ integration:
       enabled: false
       bucketName: ~
       interval: 1m
+    ## AWS Config from S3 bucket
+    config:
+      enabled: false
+      bucketName: ~
     ## Security Hub via SQS
     securityHub:
       enabled: false
