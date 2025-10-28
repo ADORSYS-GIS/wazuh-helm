@@ -1060,6 +1060,7 @@ integration:
     ## top-level defaults reused by both blocks
     profile: ~
     roleArn: ~
+    awsOrganizationId: ~
     ## Optional k8s Secret to mount to /root/.aws containing credentials and/or config
     secrets:
       create: false
