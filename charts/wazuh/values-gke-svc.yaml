@@ -2,7 +2,13 @@ svcs:
   '{{ include "common.names.fullname" $ }}':
     type: ClusterIP
   '{{ include "common.names.fullname" $ }}-worker':
+    enabled: false
     type: ClusterIP
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
   '{{ include "common.names.fullname" $ }}-ext':
     enabled: false
     type: LoadBalancer
