@@ -1,9 +1,60 @@
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    allowVolumeExpansion: true
+    parameters:
+      type: pd-balanced
+    provisioner: pd.csi.storage.gke.io
+    reclaimPolicy: Delete
+    volumeBindingMode: WaitForFirstConsumer
+  '{{ include "common.names.fullname" $ }}-rwx':
+    parameters:
+      tier: standard
+      network: observe-prod-vpc
+    enabled: true
+    provisioner: filestore.csi.storage.gke.io
+    reclaimPolicy: Delete
+    volumeBindingMode: WaitForFirstConsumer
+    allowVolumeExpansion: true
+    
+extraVolumeConfigs:
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+    accessModes:
+      - ReadWriteMany
+  snort-alerts:
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+    accessModes:
+      - ReadWriteMany
+  owasp-zap-alerts:
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+    accessModes:
+      - ReadWriteMany
+
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    enabled: true
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: true
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
+
 dashboard:
   ingress:
     enabled: true
     className: gce
     annotations:
       kubernetes.io/ingress.class: "gce"
+
 
 indexer:
   replicas: 1
