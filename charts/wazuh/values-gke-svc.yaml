@@ -1,21 +1,16 @@
 svcs:
   '{{ include "common.names.fullname" $ }}':
-    type: LoadBalancer
-    annotations:
-      cloud.google.com/neg: |
-        {
-          "ingress": true
-        }
+    type: ClusterIP
   '{{ include "common.names.fullname" $ }}-worker':
-    type: LoadBalancer
-    annotations:
-      cloud.google.com/neg: |
-        {
-          "ingress": true
-        }
+    type: ClusterIP
   '{{ include "common.names.fullname" $ }}-ext':
     enabled: false
     type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
     selector:
       app: '{{ include "common.names.fullname" $ }}-manager'
     ports:
