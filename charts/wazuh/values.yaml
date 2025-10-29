@@ -671,6 +671,9 @@ dashboard:
     enabled: false
     ##
     ##
+    tls: true
+    ##
+    ##
     name: "wazuh-dashboard"
     ##
     ##
