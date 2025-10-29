@@ -671,7 +671,13 @@ dashboard:
     enabled: false
     ##
     ##
-    tls: true
+    tls:
+      ##
+      ##
+      enabled: true
+      ##
+      ##
+      useSecret: false 
     ##
     ##
     name: "wazuh-dashboard"
