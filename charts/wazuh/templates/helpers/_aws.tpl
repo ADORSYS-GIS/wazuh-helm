@@ -3,8 +3,13 @@
 {{- if $aws -}}
 {{- if or (and $aws.cloudtrail $aws.cloudtrail.enabled) (and $aws.config $aws.config.enabled) (and $aws.securityHub $aws.securityHub.enabled) -}}
     <wodle name="aws-s3">
+{{- $interval := (default "1m" (or (and $aws.cloudtrail $aws.cloudtrail.interval) (and $aws.securityHub $aws.securityHub.interval))) -}}
         <disabled>no</disabled>
-        <interval>{{- include "common.tplvalues.render" (dict "value" (default "1m" (or (and $aws.cloudtrail $aws.cloudtrail.interval) (and $aws.securityHub $aws.securityHub.interval))) "context" $) -}}</interval>
+{{- if $interval -}}        
+        <interval>{{- include "common.tplvalues.render" (dict "value" $interval "context" $) -}}</interval>
+{{- else -}}
+        <interval>1m</interval>
+{{- end -}}
         <run_on_start>yes</run_on_start>
         <skip_on_error>yes</skip_on_error>
 {{- if and $aws.cloudtrail $aws.cloudtrail.enabled }}
