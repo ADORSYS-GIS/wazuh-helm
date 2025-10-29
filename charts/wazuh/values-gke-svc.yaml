@@ -1,0 +1,29 @@
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
+  '{{ include "common.names.fullname" $ }}-worker':
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
+  '{{ include "common.names.fullname" $ }}-ext':
+    enabled: false
+    type: LoadBalancer
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+    ports:
+      - name: agents-events
+        port: 1514
+        protocol: TCP
+        targetPort: agents-events
+      - name: registration
+        port: 1515
+        protocol: TCP
+        targetPort: registration

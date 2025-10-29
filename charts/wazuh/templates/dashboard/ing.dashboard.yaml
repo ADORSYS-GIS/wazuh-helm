@@ -27,5 +27,6 @@ spec:
   tls:
     - hosts:
         - {{ include "common.tplvalues.render" (dict "value" .host "context" $) }}
+      secretName: {{ .name }}-tls
 {{- end }}
 {{- end }}
