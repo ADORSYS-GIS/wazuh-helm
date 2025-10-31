@@ -225,15 +225,15 @@ spec:
               subPath: 0005-audit-mitre_rules.xml
               readOnly: true
 
-{{/*            - name: config*/}}
-{{/*              mountPath: /wazuh-config-mount/etc/rules/0006-fim-macos.xml*/}}
-{{/*              subPath: 0006-fim-macos.xml*/}}
-{{/*              readOnly: true*/}}
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/0006-fim-macos.xml
+              subPath: 0006-fim-macos.xml
+              readOnly: true
 
-{{/*            - name: config*/}}
-{{/*              mountPath: /wazuh-config-mount/etc/rules/0007-fim-linux.xml*/}}
-{{/*              subPath: 0007-fim-linux.xml*/}}
-{{/*              readOnly: true  */}}
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/0007-fim-linux.xml
+              subPath: 0007-fim-linux.xml
+              readOnly: true
 
               
             {{ range $k, $v := $.Values.cluster.decoders -}}
