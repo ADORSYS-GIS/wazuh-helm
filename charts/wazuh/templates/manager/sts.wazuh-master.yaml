@@ -159,14 +159,15 @@ spec:
         fsGroup: 1000          
       containers:
         - name: wazuh-manager
-          {{- $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
-          {{- with .resources }}
+          {{ with .resources -}}
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
-          {{- with .securityContext }}
-          securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
-          {{- end }}
+          securityContext:
+            capabilities:
+              add: [ "SYS_CHROOT" ]
+            privileged: true
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
