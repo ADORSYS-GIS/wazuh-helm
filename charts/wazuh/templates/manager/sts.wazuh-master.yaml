@@ -116,22 +116,20 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            {{ if eq (include "integration.azure.exists" $) "true" -}}
+            {{- if eq (include "integration.azure.exists" $) "true" }}
             - name: AZURE_CONFIGS
               value: |
-                {{ include "integration.azure.conf" $ | nindent 16 }}
+{{ include "integration.azure.conf" $ }}
             {{- end }}
-
-            {{ with include "integration.aws.conf" $ -}}
+            {{- with include "integration.aws.conf" $ }}
             - name: AWS_CONFIGS
               value: |
-                {{ . | nindent 16 }}
+{{ . }}
             {{- end }}
-
-            {{ with include "integration.github.conf" $ -}}
+            {{- with include "integration.github.conf" $ }}
             - name: GITHUB_CONFIGS
               value: |
-                {{ . | nindent 16 }}
+{{ . }}
             {{- end }}
 
           ##

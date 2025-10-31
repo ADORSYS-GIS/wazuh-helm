@@ -3,7 +3,7 @@
     <disabled>no</disabled>
     <run_on_start>yes</run_on_start>
 
-    {{ if (eq (include "integration.azure.exists.log" $) "true") -}}
+{{ if (eq (include "integration.azure.exists.log" $) "true") -}}
     <log_analytics>
         <auth_path>/var/ossec/wodles/credentials/log_analytics_credentials</auth_path>
         <tenantdomain>{{- include "common.tplvalues.render" (dict "value" $.Values.integration.azure.domain "context" $) -}}</tenantdomain>
@@ -15,9 +15,9 @@
             <time_offset>1d</time_offset>
         </request>
     </log_analytics>
-    {{- end }}
+{{- end }}
 
-    {{ if (eq (include "integration.azure.exists.graph" $) "true") -}}
+{{ if (eq (include "integration.azure.exists.graph" $) "true") -}}
     <graph>
         <auth_path>/var/ossec/wodles/credentials/graph_credentials</auth_path>
         <tenantdomain>{{- include "common.tplvalues.render" (dict "value" $.Values.integration.azure.domain "context" $) -}}</tenantdomain>
@@ -26,9 +26,9 @@
             <time_offset>1d</time_offset>
         </request>
     </graph>
-    {{- end }}
+{{- end }}
 
-    {{ if (eq (include "integration.azure.exists.storage" $) "true") -}}
+{{ if (eq (include "integration.azure.exists.storage" $) "true") -}}
     <storage>
         <auth_path>/var/ossec/wodles/credentials/storage_credentials</auth_path>
         <container name="insights-activity-logs">
@@ -37,7 +37,7 @@
             <time_offset>24h</time_offset>
         </container>
     </storage>
-    {{- end }}
+{{- end }}
 </wodle>
 {{- end -}}
 
