@@ -98,13 +98,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-                
-            {{ with include "integration.github.conf" $ -}}
+            {{- with include "integration.github.conf" $ }}
             - name: GITHUB_CONFIGS
               value: |
 {{ . }}
             {{- end }}
-            {{ with include "integration.aws.conf" $ -}}
+            {{- with include "integration.aws.conf" $ }}
             - name: AWS_CONFIGS
               value: |
 {{ . }}
@@ -114,13 +113,11 @@ spec:
           envFrom:
             - secretRef:
                 name: '{{ include "secret.common" $ }}'
-
-            {{ if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled -}}
+            {{- if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled }}
             - secretRef:
                 name: '{{ include "secret.notification-slack" $ }}'
             {{- end }}
-            
-            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
+            {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
             {{- end }}  
