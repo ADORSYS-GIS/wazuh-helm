@@ -118,7 +118,7 @@ secretjob:
     registry: docker.io
     ##
     ##
-    repository: bitnami/kubectl
+    repository: bitnamilegacy/kubectl
     ##
     ##
     tag: latest
@@ -620,16 +620,16 @@ dashboard:
   ## 
   branding:
     logo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png"
     #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
     mark:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png"
     #   darkModeUrl: ""
     loadingLogo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png"
     #   darkModeUrl: ""
-    faviconUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
-    applicationTitle: "Wazuh | Adorsys"
+    faviconUrl: "https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png"
+    applicationTitle: "Wazuh | BVMAC"
     useExpandedHeader: false
 
 

@@ -68,6 +68,18 @@ spec:
             mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
             subPath: opensearch_dashboards.yml
             readOnly: false
+          # - name: config
+          #   mountPath: /usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom/images/customization.logo.app.png
+          #   readOnly: true
+          #   subPath: customization.logo.app.png      
+          # - name: config
+          #   mountPath: /usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom/images/customization.logo.healthcheck.png
+          #   readOnly: true
+          #   subPath: customization.logo.healthcheck.png
+          # - name: config
+          #   mountPath: /usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom/images/customization.logo.reports.jpg
+          #   readOnly: true
+          #   subPath: customization.logo.reports.jpg  
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10}}
           {{- end }}
