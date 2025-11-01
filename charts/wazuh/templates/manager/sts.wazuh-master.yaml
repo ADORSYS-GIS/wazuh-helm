@@ -156,7 +156,7 @@ spec:
             - name: wazuh-config-temp
               mountPath: /processed
       securityContext:
-        fsGroup: 1000          
+        fsGroup: 1000
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -164,7 +164,7 @@ spec:
           {{ with .resources -}}
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
-          {{ with .securityContext }}
+          {{ with .securityContext -}}
           securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
           volumeMounts:
