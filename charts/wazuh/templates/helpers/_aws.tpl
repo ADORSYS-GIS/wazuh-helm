@@ -2,20 +2,20 @@
 {{- $aws := .Values.integration.aws -}}
 {{- if $aws -}}
 {{- if or (and $aws.cloudtrail $aws.cloudtrail.enabled) (and $aws.config $aws.config.enabled) (and $aws.securityHub $aws.securityHub.enabled) -}}
-    <wodle name="aws-s3">
-{{- $interval := (default "1m" (or (and $aws.cloudtrail $aws.cloudtrail.interval) (and $aws.securityHub $aws.securityHub.interval))) -}}
+<wodle name="aws-s3">
+{{- $interval := (default "1m" (or (and $aws.cloudtrail $aws.cloudtrail.interval) (and $aws.securityHub $aws.securityHub.interval))) }}
         <disabled>no</disabled>
-{{- if $interval -}}        
+{{- if $interval }}
         <interval>{{- include "common.tplvalues.render" (dict "value" $interval "context" $) -}}</interval>
-{{- else -}}
+{{- else }}
         <interval>1m</interval>
-{{- end -}}
+{{- end }}
         <run_on_start>yes</run_on_start>
         <skip_on_error>yes</skip_on_error>
 {{- if and $aws.cloudtrail $aws.cloudtrail.enabled }}
         <bucket type="cloudtrail">
             <name>{{- include "common.tplvalues.render" (dict "value" $aws.cloudtrail.bucketName "context" $) -}}</name>
-            {{- if $aws.profile }}
+            {{- if and $aws.profile (ne $aws.profile "~") }}
             <aws_profile>{{- include "common.tplvalues.render" (dict "value" $aws.profile "context" $) -}}</aws_profile>
             {{- end }}
             {{- if $aws.roleArn }}
@@ -29,7 +29,7 @@
 {{- if and $aws.config $aws.config.enabled }}
         <bucket type="config">
             <name>{{- include "common.tplvalues.render" (dict "value" $aws.config.bucketName "context" $) -}}</name>
-            {{- if $aws.profile }}
+            {{- if and $aws.profile (ne $aws.profile "~") }}
             <aws_profile>{{- include "common.tplvalues.render" (dict "value" $aws.profile "context" $) -}}</aws_profile>
             {{- end }}
             {{- if $aws.roleArn }}
@@ -40,7 +40,7 @@
 {{- if and $aws.securityHub $aws.securityHub.enabled }}
         <subscriber type="security_hub">
             <sqs_name>{{- include "common.tplvalues.render" (dict "value" $aws.securityHub.sqsName "context" $) -}}</sqs_name>
-            {{- if $aws.profile }}
+            {{- if and $aws.profile (ne $aws.profile "~") }}
             <aws_profile>{{- include "common.tplvalues.render" (dict "value" $aws.profile "context" $) -}}</aws_profile>
             {{- end }}
             {{- if $aws.roleArn }}

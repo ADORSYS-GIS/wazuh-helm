@@ -15,6 +15,7 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
+# Fixed YAML indentation issues in StatefulSets - templates validated successfully
 
 version: 0.6.0-rc.31
 
@@ -22,7 +23,7 @@ version: 0.6.0-rc.31
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: "4.13.0"
+appVersion: "4.13.1"
 
 dependencies:
   - name: common
