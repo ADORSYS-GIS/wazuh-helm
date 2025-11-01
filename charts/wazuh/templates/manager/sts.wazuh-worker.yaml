@@ -158,7 +158,7 @@ spec:
           {{- end }}
           {{ with .securityContext }}
           securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
-          {{ end }}
+          {{- end }}
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
