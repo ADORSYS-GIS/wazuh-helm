@@ -27,7 +27,7 @@ spec:
             secretName: {{ include "wazuh.cert_root_name" $ }}
       initContainers:
         - name: cert-generator
-          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" (dict)) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
           volumeMounts:
             - mountPath: /certificates
@@ -59,7 +59,7 @@ spec:
               chmod -R 775 /certificates/*
       containers:
         - name: secret-creator
-          {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" $.Values.global) }}
+          {{ $secretImageTpl := include "common.images.image" (dict "imageRoot" .secretImage "global" (dict)) }}
           image: {{ include "common.tplvalues.render" (dict "value" $secretImageTpl "context" $) | quote }}
           volumeMounts:
             - mountPath: /certificates

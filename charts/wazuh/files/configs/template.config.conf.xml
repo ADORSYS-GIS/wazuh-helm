@@ -419,14 +419,4 @@
         <location>/var/log/owasp-zap/*.jsonl</location>
         <log_format>json</log_format>
     </localfile>
-
-    {{ if eq (include "integration.azure.exists" $) "true" -}}
-    ${AZURE_CONFIGS}
-    {{- end }}
-    
-    ${AWS_CONFIGS}
-
-    ${GITHUB_CONFIGS}
-    ${SLACK_CONFIG}
-    ${JIRA_CONFIG}
 </ossec_config>

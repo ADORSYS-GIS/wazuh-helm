@@ -1,0 +1,225 @@
+global:
+  domain: 'aws-test.dev.wazuh.adorsys.team'
+  storageClassName: "gp2" # Default EBS storage
+  imageRegistry: "917848404243.dkr.ecr.eu-central-1.amazonaws.com"
+# Disable storage class creation (we’ll reuse gp2)
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    enabled: false
+# ───────────────────────────────────────────────
+# INDEXER
+# ───────────────────────────────────────────────
+indexer:
+  replicas: 1
+  persistence:
+    enabled: false # Ephemeral for test
+  image:
+    repository: wazuh/wazuh-indexer
+  initContainers:
+    volume-mount-hack: null
+    increase-the-vm-max-map-count: null
+  keycloak:
+    enabled: false # Disable Keycloak for test
+# ───────────────────────────────────────────────
+# NOTIFICATIONS & INTEGRATIONS
+# ───────────────────────────────────────────────
+notification:
+  slack:
+    enabled: false
+integration:
+  jira:
+    enabled: false
+  aws:
+    enable: false
+    profile: main # Use the 'main' profile from AWS config
+    roleArn: "arn:aws:iam::020980146275:role/Wazuh-IAM-Role"
+    secrets:
+      create: false
+      existingSecret: "ext-wazuh-aws-secrets"
+    cloudtrail:
+      enabled: false
+      bucketName: "wazuh-cloudtrail-020980146275"
+      interval: 5m
+    config:
+      enabled: false # Enable if you have AWS Config bucket
+      # bucketName: "your-config-bucket"
+    securityHub:
+      enabled: false # Enable if you have Security Hub SQS
+      # sqsName: "your-security-hub-queue"
+      # interval: 1h
+# ───────────────────────────────────────────────
+# WAZUH WORKER
+# ───────────────────────────────────────────────
+worker:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+  image:
+    repository: wazuh/wazuh-manager
+  podSecurityContext:
+    fsGroup: 999
+  initContainers:
+    permission-fix:
+      image: busybox
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          addgroup -S -g 999 wazuh || true
+          adduser -S wazuh -G wazuh -u 999 || true
+          chown -R root:wazuh /var/ossec/integrations || true
+          chmod -R u=rwx,g=rx,o= /var/ossec/integrations || true
+      volumeMounts:
+        - name: snort-alerts
+          mountPath: /var/lib/snort
+        - name: owasp-zap-alerts
+          mountPath: /var/lib/owasp-zap
+  volumes:
+    - name: manager-backup
+      emptyDir: {}
+    - name: snort-alerts
+      emptyDir: {}
+    - name: owasp-zap-alerts
+      emptyDir: {}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app: '{{ include "common.names.fullname" $ }}-manager'
+                node-type: worker
+# ───────────────────────────────────────────────
+# WAZUH MASTER (MANAGER)
+# ───────────────────────────────────────────────
+master:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+  image:
+    repository: wazuh/wazuh-manager
+  podSecurityContext:
+    fsGroup: 999
+  # ✅ Enable API explicitly
+  api:
+    enabled: true
+    port: 55000
+    https: true
+  initContainers:
+    permission-fix:
+      image: busybox
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          addgroup -S -g 999 wazuh || true
+          adduser -S wazuh -G wazuh -u 999 || true
+          mkdir -p /var/lib/backup/wazuh/var/ossec/backup/db
+          chown -R wazuh:wazuh /var/lib/backup || true
+          chmod -R a+w /var/lib/backup || true
+          chown -R wazuh:wazuh /var/lib/snort || true
+          chown -R wazuh:wazuh /var/lib/owasp-zap || true
+          chown -R root:wazuh /var/ossec/integrations || true
+          chmod -R u=rwx,g=rx,o= /var/ossec/integrations || true
+      volumeMounts:
+        - name: manager-backup
+          mountPath: /var/lib/backup
+        - name: snort-alerts
+          mountPath: /var/lib/snort
+        - name: owasp-zap-alerts
+          mountPath: /var/lib/owasp-zap
+  volumes:
+    - name: manager-backup
+      emptyDir: {}
+    - name: snort-alerts
+      emptyDir: {}
+    - name: owasp-zap-alerts
+      emptyDir: {}
+# ───────────────────────────────────────────────
+# CLUSTER CONFIG
+# ───────────────────────────────────────────────
+cluster:
+  auth:
+    key: "e5936685316e99525aff962141335960"
+  rootCaSecretName: "ext-wazuh-root-ca-secrets" # Use same CA secret for test
+  secret:
+    enabled: true
+# ───────────────────────────────────────────────
+# SERVICES (API + AGENT CONNECTIONS)
+# ───────────────────────────────────────────────
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    enabled: true
+    type: ClusterIP
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: master
+    ports:
+      - name: api
+        port: 55000
+        targetPort: api
+        protocol: TCP
+      - name: registration
+        port: 1515
+        targetPort: registration
+        protocol: TCP
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: true
+    type: ClusterIP
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: worker
+    ports:
+      - name: agents
+        port: 1514
+        targetPort: agents
+        protocol: TCP
+# ───────────────────────────────────────────────
+# DASHBOARD
+# ───────────────────────────────────────────────
+dashboard:
+  image:
+    repository: wazuh/wazuh-dashboard
+  api:
+    insecure: true # Allow self-signed certs (disable in prod)
+  ingress:
+    enabled: false
+  authSecret: "ext-wazuh-dashboard-secrets"
+# ───────────────────────────────────────────────
+# API CREDENTIALS SECRET
+# ───────────────────────────────────────────────
+apiCred:
+  # Let the chart create the API credentials secret used by both manager and dashboard
+  auth:
+    username: "wazuh-wui"
+    password: "WazuhWui-TempP@ss-2025"
+  authSecret: ~
+# ───────────────────────────────────────────────
+# SECRET JOB (One-time job to create certificates)
+# ───────────────────────────────────────────────
+secretjob:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: alpine
+    tag: latest
+  secretImage:
+    registry: docker.io
+    repository: bitnami/kubectl
+    tag: latest
+# ───────────────────────────────────────────────
+# EXTRA VOLUMES (DISABLED FOR TEST)
+# ───────────────────────────────────────────────
+extraVolumeConfigs:
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    enabled: false
+  snort-alerts:
+    enabled: false
+  owasp-zap-alerts:
+    enabled: false
