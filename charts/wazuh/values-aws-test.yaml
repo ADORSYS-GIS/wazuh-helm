@@ -30,14 +30,15 @@ integration:
   jira:
     enabled: false
   aws:
-    enable: false
+    enable: true
     profile: main # Use the 'main' profile from AWS config
-    roleArn: "arn:aws:iam::020980146275:role/Wazuh-IAM-Role"
+    #roleArn: "arn:aws:iam::020980146275:role/Wazuh-IAM-Role"
+    awsOrganizationId: "o-rse1nyh5qe"
     secrets:
       create: false
       existingSecret: "ext-wazuh-aws-secrets"
     cloudtrail:
-      enabled: false
+      enabled: true
       bucketName: "wazuh-cloudtrail-020980146275"
       interval: 5m
     config:
