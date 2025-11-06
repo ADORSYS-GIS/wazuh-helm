@@ -106,7 +106,18 @@ spec:
             - -c
             - |
               set -ex
-              envsubst < /workdir/template.config.xml > /processed/ossec.conf
+              # Copy template
+              cp /workdir/template.config.xml /processed/ossec.conf
+              # Replace AWS_CONFIGS if set
+              if [ ! -z "$AWS_CONFIGS" ]; then
+                # Write AWS config to temp file with proper indentation (4 spaces)
+                echo "$AWS_CONFIGS" | sed 's/^/    /' > /tmp/aws.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${AWS_CONFIGS}/r /tmp/aws.xml' /processed/ossec.conf
+                sed -i '/\${AWS_CONFIGS}/d' /processed/ossec.conf
+              fi
+              # Replace other variables with envsubst
+              envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
           ##
           ##
           env:
@@ -121,17 +132,16 @@ spec:
               value: |
 {{ include "integration.azure.conf" $ }}
             {{- end }}
-            {{- with include "integration.aws.conf" $ }}
+            {{- if eq (include "integration.aws.exists" $) "true" }}
             - name: AWS_CONFIGS
               value: |
-{{ . }}
+                {{- include "integration.aws.conf" $ | nindent 16 }}
             {{- end }}
             {{- with include "integration.github.conf" $ }}
             - name: GITHUB_CONFIGS
               value: |
 {{ . }}
             {{- end }}
-
           ##
           ##
           envFrom:
