@@ -40,14 +40,14 @@ integration:
     cloudtrail:
       enabled: true
       bucketName: "wazuh-cloudtrail-020980146275"
-      interval: 5m
+      interval: 1m
     config:
       enabled: false # Enable if you have AWS Config bucket
       # bucketName: "your-config-bucket"
     securityHub:
-      enabled: false # Enable if you have Security Hub SQS
-      # sqsName: "your-security-hub-queue"
-      # interval: 1h
+      enabled: true
+      sqsName: "wazuh-securityhub-sqs"
+      interval: "1m"
 # ───────────────────────────────────────────────
 # WAZUH WORKER
 # ───────────────────────────────────────────────
@@ -55,7 +55,7 @@ worker:
   replicaCount: 1
   persistence:
     enabled: true
-    size: 10Gi
+    size: 50Gi
   image:
     repository: wazuh/wazuh-manager
   podSecurityContext:
@@ -101,7 +101,7 @@ master:
   replicas: 1
   persistence:
     enabled: true
-    size: 10Gi
+    size: 50Gi
   image:
     repository: wazuh/wazuh-manager
   podSecurityContext:
