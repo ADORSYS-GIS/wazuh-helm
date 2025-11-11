@@ -706,7 +706,7 @@ dashboard:
   ## 
   customization:
     enabled: true
-    healthCheckLogo: https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg
+    healthCheckLogo: https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.png
     reportLogo: https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/adorsys-logo.png
   branding:
     logo:

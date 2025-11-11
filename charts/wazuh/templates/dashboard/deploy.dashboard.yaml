@@ -56,10 +56,8 @@ spec:
       {{ if .customization.enabled }}
       initContainers:
         - name: branding-init
-          image: curlimages/curl:latest
+          image: curlimages/curl:8.17.0
           imagePullPolicy: IfNotPresent
-          securityContext:
-            runAsUser: 0
           command:
             - sh
             - -c
@@ -94,6 +92,10 @@ spec:
 
                     for i in {1..120}; do
                       if [ -f /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml ]; then
+                        if grep -q '#Custom branding' /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml; then
+                          echo "Attempt $i: Branding config already exists in wazuh.yml" >&2
+                          exit 0
+                        fi
                         if [ -f /tmp/branding/branding.wazuh.yml ]; then
                           echo "Attempt $i: Appending branding config to wazuh.yml" >&2
                           cat /tmp/branding/branding.wazuh.yml >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
