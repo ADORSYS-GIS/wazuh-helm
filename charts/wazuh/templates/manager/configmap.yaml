@@ -23,6 +23,9 @@ data:
   "0007-fim-linux.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
 
+  "custom-yara.xml":  |
+    {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}  
+
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
   {{ printf "0003-%s" $k | quote | nindent 2 }}: |
@@ -33,7 +36,6 @@ data:
     {{ $.Files.Get "files/configs/rules.snort.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.syscheck.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.trivy.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/rules.yara.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.false-positive.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.overwrite.xml" | nindent 6 }}
     

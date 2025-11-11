@@ -254,6 +254,11 @@ spec:
               subPath: 0007-fim-linux.xml
               readOnly: true
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/000-custom-yara.xml
+              subPath: custom-yara.xml
+              readOnly: true
+
             {{ range $k, $v := $.Values.cluster.decoders }}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
             {{- $n_k := printf "0003-%s" $k -}}

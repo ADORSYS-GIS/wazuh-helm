@@ -235,6 +235,11 @@ spec:
               subPath: 0007-fim-linux.xml
               readOnly: true
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/000-custom-yara.xml
+              subPath: custom-yara.xml
+              readOnly: true  
+
 
               
             {{ range $k, $v := $.Values.cluster.decoders -}}
