@@ -1,0 +1,14 @@
+{{- if $.Values.dashboard.customization.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-dashboard-branding-conf
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  {{- $branding_config := include "common.tplvalues.render" (dict "value" ($.Files.Get "files/configs/branding.wazuh.yml") "context" $) }}
+  "branding.wazuh.yml": |
+    {{ $branding_config | nindent 4 }}
+{{- end }}

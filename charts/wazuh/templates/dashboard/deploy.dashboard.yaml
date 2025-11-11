@@ -43,6 +43,37 @@ spec:
       {{ with .volumes }}
       {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 6}}
       {{ end }}
+      {{ if .customization.enabled }}
+      - name: branding-config
+        configMap:
+          name: '{{ include "common.names.fullname" $ }}-dashboard-branding-conf'
+          items:
+            - key: branding.wazuh.yml
+              path: branding.wazuh.yml
+      - name: branding-assets
+        emptyDir: {}
+      {{ end }}
+      {{ if .customization.enabled }}
+      initContainers:
+        - name: branding-init
+          image: curlimages/curl:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              # Download logos
+              mkdir -p /branding/images
+              curl -Lo /branding/images/customization.logo.healthcheck.svg {{ $.Values.dashboard.customization.healthCheckLogo }}
+              curl -Lo /branding/images/customization.logo.reports.png {{ $.Values.dashboard.customization.reportLogo }}
+          volumeMounts:
+            - name: branding-assets
+              mountPath: /branding/images
+      {{- end }}
       containers:
         - name: wazuh-dashboard
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -50,6 +81,34 @@ spec:
           {{ with .resources -}}
           resources:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+          {{ if .customization.enabled }}
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - |
+                    set -e
+
+                    for i in {1..120}; do
+                      if [ -f /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml ]; then
+                        if [ -f /tmp/branding/branding.wazuh.yml ]; then
+                          echo "Attempt $i: Appending branding config to wazuh.yml" >&2
+                          cat /tmp/branding/branding.wazuh.yml >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+                          exit 0
+                        else
+                          echo "Attempt $i: Branding config file not found, skipping append" >&2
+                          rm -rf /tmp/branding
+                          exit 0
+                        fi
+                      fi
+                      sleep 1
+                    done
+                    echo "Timeout waiting for wazuh.yml" >&2
+                    rm -rf /tmp/branding
+                    exit 1
           {{- end }}
           volumeMounts:
           - name: root-certs
@@ -68,6 +127,14 @@ spec:
             mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
             subPath: opensearch_dashboards.yml
             readOnly: false
+          {{ if .customization.enabled }}
+          - name: branding-assets
+            mountPath: /usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom/images
+            readOnly: true
+          - name: branding-config
+            mountPath: /tmp/branding
+            readOnly: true
+          {{- end }}
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10}}
           {{- end }}

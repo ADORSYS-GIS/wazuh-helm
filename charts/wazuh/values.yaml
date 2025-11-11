@@ -704,17 +704,21 @@ dashboard:
   envFrom: [ ]
   ## @branding more at https://opensearch.org/docs/latest/dashboards/branding/
   ## 
+  customization:
+    enabled: true
+    healthCheckLogo: https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg
+    reportLogo: https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/adorsys-logo.png
   branding:
     logo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.png"
     #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
     mark:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.png"
     #   darkModeUrl: ""
     loadingLogo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.png"
     #   darkModeUrl: ""
-    faviconUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    faviconUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.png"
     applicationTitle: "Wazuh | Adorsys"
     useExpandedHeader: false
 

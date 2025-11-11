@@ -1,0 +1,5 @@
+#Custom branding
+
+customization.enabled: true
+customization.logo.healthcheck: 'custom/images/customization.logo.healthcheck.svg'
+customization.logo.reports: 'custom/images/customization.logo.reports.png'
