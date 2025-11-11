@@ -66,7 +66,7 @@ spec:
 
               # Download logos
               mkdir -p /branding/images
-              curl -Lo /branding/images/customization.logo.healthcheck.svg {{ $.Values.dashboard.customization.healthCheckLogo }}
+              curl -Lo /branding/images/customization.logo.healthcheck.png {{ $.Values.dashboard.customization.healthCheckLogo }}
               curl -Lo /branding/images/customization.logo.reports.png {{ $.Values.dashboard.customization.reportLogo }}
           volumeMounts:
             - name: branding-assets
