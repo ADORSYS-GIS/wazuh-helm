@@ -3,7 +3,7 @@ name: Helm Publish
 on:
   push:
     branches:
-      - '*'  # Matches all branches
+      - '**'  # Matches all branches
     tags:
       - 'v*'
     paths:
