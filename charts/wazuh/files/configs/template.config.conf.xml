@@ -429,4 +429,5 @@
     ${GITHUB_CONFIGS}
     ${SLACK_CONFIG}
     ${JIRA_CONFIG}
+    ${TEAMS_CONFIG}
 </ossec_config>
