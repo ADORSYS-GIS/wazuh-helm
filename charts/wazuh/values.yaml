@@ -1068,8 +1068,7 @@ integration:
     enabled: true
     ##
     ##
-    webhookUrl: https://doualastockexchange.webhook.office.com/webhookb2/63f99059-b148-438c-90a1-2476d65dd3ae@800c0193-41ff-45e9-9971-20d3080fed83/IncomingWebhook/1acf5eff330b4672bd0fae01d0b906ca/3c65fc21-753b-48b9-a056-f2a4633a4dde/V2wQqy2U0KEW7Sst4TeZrnlRdmVLqmBZtLzd0Sc1PiGkM1
-    ##
+    webhookUrl: https://.teams.com/services/hooks/
     ##
     externalSecret: ~  
 
