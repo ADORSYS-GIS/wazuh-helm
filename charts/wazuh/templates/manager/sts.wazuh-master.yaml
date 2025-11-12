@@ -77,10 +77,10 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
-        {{ if eq (include "integration.azure.exists" $) "true" -}}
         - name: teams-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-teams
+        {{ if eq (include "integration.azure.exists" $) "true" -}}
         - name: azure-auth
           secret:
             secretName: {{ include "secret.common" $ }}-azure
