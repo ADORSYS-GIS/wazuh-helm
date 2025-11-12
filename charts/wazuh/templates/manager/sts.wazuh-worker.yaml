@@ -72,6 +72,9 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
+        - name: teams-conf
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-wazuh-conf-teams    
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -122,7 +125,11 @@ spec:
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
-            {{- end }}  
+            {{- end }}
+            {{ if and $.Values.integration $.Values.integration.teams $.Values.integration.teams.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.integration-teams" $ }}'
+            {{- end }}    
           ##
           ##
           volumeMounts:
@@ -234,6 +241,13 @@ spec:
               mountPath: /wazuh-config-mount/etc/rules/0007-fim-linux.xml
               subPath: 0007-fim-linux.xml
               readOnly: true
+
+            - name: teams-conf
+              mountPath: /wazuh-config-mount/integrations/custom-teams
+              subPath: custom-teams
+            - name: teams-conf
+              mountPath: /wazuh-config-mount/integrations/custom-teams.py
+              subPath: custom-teams.py     
 
               
             {{ range $k, $v := $.Values.cluster.decoders -}}

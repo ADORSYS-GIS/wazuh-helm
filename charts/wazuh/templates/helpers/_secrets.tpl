@@ -63,3 +63,14 @@ Jira integration credentials
 {{- $.Values.integration.jira.externalSecret -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Teams integration credentials
+*/}}
+{{- define "secret.integration-teams" -}}
+{{- if not $.Values.integration.teams.externalSecret -}}
+{{ include "common.names.fullname" $ }}-teams-cred
+{{- else -}}
+{{- $.Values.integration.teams.externalSecret -}}
+{{- end -}}
+{{- end -}}
