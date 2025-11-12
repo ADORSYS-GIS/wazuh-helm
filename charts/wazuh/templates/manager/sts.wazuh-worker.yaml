@@ -233,7 +233,7 @@ spec:
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/0007-fim-linux.xml
               subPath: 0007-fim-linux.xml
-              readOnly: true
+              readOnly: true  
 
               
             {{ range $k, $v := $.Values.cluster.decoders -}}
