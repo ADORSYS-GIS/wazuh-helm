@@ -731,15 +731,15 @@ dashboard:
   ## 
   branding:
     logo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
     mark:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #   darkModeUrl: ""
     loadingLogo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #   darkModeUrl: ""
-    faviconUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    faviconUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     applicationTitle: "Wazuh | Adorsys"
     useExpandedHeader: false
 
