@@ -1051,10 +1051,10 @@ integration:
     enabled: true
     ##
     ##
-    webhookUrl: https://jira.com/services/hooks/
+    webhookUrl: https://api-private.atlassian.com/automation/webhooks/jira/a/b2b7cde4-6a6b-4596-9133-6ed039991dd1/0196c557-09d9-7083-8c6a-dea58a9bcd34
     ##
     ##
-    apikey: 101010
+    apikey: 82da2fa2b2bde6d819a6ba7ae7f97204caf541af
     ##
     ##
     externalSecret: ~
