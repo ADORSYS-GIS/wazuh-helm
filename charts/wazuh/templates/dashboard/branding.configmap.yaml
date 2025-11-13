@@ -10,11 +10,10 @@ metadata:
 data:
   branding.wazuh.yml: |
 
-    # Custom branding
+    #Custom branding
 
-    customization:
-    enabled: true
-    customization.logo.healthcheck: 'custom/images/customization.logo.healthcheck.png'
+    customization.enabled: true
+    customization.logo.healthcheck: 'custom/images/customization.logo.healthcheck.svg'
     customization.logo.reports: 'custom/images/customization.logo.reports.png'
     customization.reports.footer: {{ .Values.opensearchDashboards.branding.reports.footer | quote }}
     customization.reports.header: {{- toYaml .Values.opensearchDashboards.branding.reports.header | indent 10 }}
