@@ -14,14 +14,18 @@ data:
     {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
-  "0005-audit-mitre_rules.xml":  |
+  
+  "7005-audit-mitre_rules.xml":  |
     {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
 
-  "0006-fim-macos.xml":  |
+  "7006-fim-macos.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-MacOS.xml" | nindent 6 }}
 
-  "0007-fim-linux.xml":  |
+  "7007-fim-linux.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
+
+  "7008-custom-yara.xml":  |
+    {{ $.Files.Get "files/configs/rules.custom-yara.xml" | nindent 6 }}  
 
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
@@ -33,7 +37,6 @@ data:
     {{ $.Files.Get "files/configs/rules.snort.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.syscheck.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.trivy.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/rules.yara.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.false-positive.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules.overwrite.xml" | nindent 6 }}
     
