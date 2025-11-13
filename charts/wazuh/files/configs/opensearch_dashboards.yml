@@ -33,8 +33,28 @@ opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.rend
 
 {{- end -}}
 {{- end }}
-  
-{{ with $.Values.dashboard.branding -}}
+
+{{- with $.Values.opensearchDashboards.branding }}
 opensearchDashboards.branding:
-  {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+  applicationTitle: "{{ .applicationTitle }}"
+  faviconUrl: "{{ .faviconUrl }}"
+  useExpandedHeader: {{ .useExpandedHeader }}
+  
+  logo:
+    defaultUrl: "{{ .logo.defaultUrl }}"
+    {{- if hasKey .logo "darkModeUrl" }}
+    darkModeUrl: "{{ .logo.darkModeUrl }}"
+    {{- end }}
+  
+  loadingLogo:
+    defaultUrl: "{{ .loadingLogo.defaultUrl }}"
+    {{- if hasKey .loadingLogo "darkModeUrl" }}
+    darkModeUrl: "{{ .loadingLogo.darkModeUrl }}"
+    {{- end }}
+  
+  mark:
+    defaultUrl: "{{ .mark.defaultUrl }}"
+    {{- if hasKey .mark "darkModeUrl" }}
+    darkModeUrl: "{{ .mark.darkModeUrl }}"
+    {{- end }}
 {{- end }}

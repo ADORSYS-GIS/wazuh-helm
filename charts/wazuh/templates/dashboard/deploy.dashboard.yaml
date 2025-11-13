@@ -43,7 +43,7 @@ spec:
       {{ with .volumes }}
       {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 6}}
       {{ end }}
-      {{ if .customization.enabled }}
+      {{ if $.Values.opensearchDashboards.branding.enabled }}
       - name: branding-config
         configMap:
           name: '{{ include "common.names.fullname" $ }}-dashboard-branding-conf'
@@ -53,7 +53,7 @@ spec:
       - name: branding-assets
         emptyDir: {}
       {{ end }}
-      {{ if .customization.enabled }}
+      {{ if $.Values.opensearchDashboards.branding.enabled }}
       initContainers:
         - name: branding-init
           image: curlimages/curl:8.17.0
@@ -66,8 +66,8 @@ spec:
 
               # Download logos
               mkdir -p /branding/images
-              curl -Lo /branding/images/customization.logo.healthcheck.png {{ $.Values.dashboard.customization.healthCheckLogo }}
-              curl -Lo /branding/images/customization.logo.reports.png {{ $.Values.dashboard.customization.reportLogo }}
+              curl -Lo /branding/images/customization.logo.healthcheck.png {{ $.Values.opensearchDashboards.branding.healthCheckLogo }}
+              curl -Lo /branding/images/customization.logo.reports.png {{ $.Values.opensearchDashboards.branding.reportLogo }}
           volumeMounts:
             - name: branding-assets
               mountPath: /branding/images
@@ -80,7 +80,7 @@ spec:
           resources:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
-          {{ if .customization.enabled }}
+          {{ if $.Values.opensearchDashboards.branding.enabled }}
           lifecycle:
             postStart:
               exec:
@@ -129,7 +129,7 @@ spec:
             mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
             subPath: opensearch_dashboards.yml
             readOnly: false
-          {{ if .customization.enabled }}
+          {{ if $.Values.opensearchDashboards.branding.enabled }}
           - name: branding-assets
             mountPath: /usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom/images
             readOnly: true

@@ -1,14 +1,21 @@
-{{- if $.Values.dashboard.customization.enabled }}
+{{- if .Values.opensearchDashboards.branding.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "common.names.fullname" $ }}-dashboard-branding-conf
+  name: {{ include "common.names.fullname" . }}-dashboard-branding-conf
   annotations:
-    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+    {{- include "common.annotations.standard" (dict "customAnnotations" .Values.commonAnnotations "context" $) | nindent 4 }}
   labels:
-    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
 data:
-  {{- $branding_config := include "common.tplvalues.render" (dict "value" ($.Files.Get "files/configs/branding.wazuh.yml") "context" $) }}
-  "branding.wazuh.yml": |
-    {{ $branding_config | nindent 4 }}
+  branding.wazuh.yml: |
+
+    # Custom branding
+
+    customization:
+    enabled: true
+    customization.logo.healthcheck: 'custom/images/customization.logo.healthcheck.png'
+    customization.logo.reports: 'custom/images/customization.logo.reports.png'
+    customization.reports.footer: {{ .Values.opensearchDashboards.branding.reports.footer | quote }}
+    customization.reports.header: {{- toYaml .Values.opensearchDashboards.branding.reports.header | indent 10 }}
 {{- end }}
