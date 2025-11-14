@@ -107,11 +107,25 @@ spec:
             - |
               set -ex
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
+              if [ -n "$WAZUH_ENROLLMENT_PASSWORD" ]; then
+                echo "$WAZUH_ENROLLMENT_PASSWORD" > /processed/authd.pass
+              fi
           ##
           ##
           env:
             - name: NODE_TYPE
               value: "master"
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: WAZUH_ENROLLMENT_PASSWORD
+              {{- if $.Values.master.auth.enrollment.passwordSecret.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.master.auth.enrollment.passwordSecret.name }}
+                  key: {{ $.Values.master.auth.enrollment.passwordSecret.key }}
+              {{- else }}
+              value: {{ $.Values.master.auth.enrollment.password | quote }}
+              {{- end }}
+            {{- end }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -211,6 +225,12 @@ spec:
               mountPath: /wazuh-config-mount/etc/ossec.conf
               subPath: ossec.conf
               readOnly: true
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: wazuh-config-temp
+              mountPath: /var/ossec/etc/authd.pass
+              subPath: authd.pass
+              readOnly: true
+            {{- end }}
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
