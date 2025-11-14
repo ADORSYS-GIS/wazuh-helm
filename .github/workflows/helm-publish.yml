@@ -56,7 +56,7 @@ jobs:
       - name: Install Helm push plugin
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-candidate/')
         run: |
-          helm plugin install https://github.com/chartmuseum/helm-push --verify=false
+          helm plugin install https://github.com/chartmuseum/helm-push
 
       - name: Fetch existing charts
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-candidate/')
