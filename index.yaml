@@ -1,0 +1,85 @@
+apiVersion: v1
+entries:
+  owasp-zap:
+  - apiVersion: v2
+    appVersion: "1.0"
+    created: "2025-11-14T00:42:12.141463703Z"
+    dependencies:
+    - name: common
+      repository: https://charts.bitnami.com/bitnami
+      tags:
+      - common
+      - bitnami-common
+      version: 2.20.5
+    description: A Helm chart for deploying a Tekton pipeline
+    digest: deb1c39d5f16d78c97fefacc894c42a47575ed6b359840df56aa84c9e1907631
+    name: owasp-zap
+    urls:
+    - https://github.com/ADORSYS-GIS/wazuh-helm/releases/download/owasp-zap-0.1.5/owasp-zap-0.1.5.tgz
+    version: 0.1.5
+  wazuh-helm:
+  - apiVersion: v2
+    appVersion: 4.13.1
+    created: "2025-11-14T00:42:12.364292228Z"
+    dependencies:
+    - name: common
+      repository: https://charts.bitnami.com/bitnami
+      tags:
+      - common
+      - bitnami-common
+      version: '*'
+    description: Wazuh is a free, open-source host-based intrusion detection system
+      (HIDS), security information and event management (SIEM) and log management
+      solution.
+    digest: 55118862ce94914afdff41068db79c6155c57f2d6a40668de888bc4b255e5550
+    name: wazuh-helm
+    type: application
+    urls:
+    - https://github.com/ADORSYS-GIS/wazuh-helm/releases/download/wazuh-helm-0.6.0-rc.203/wazuh-helm-0.6.0-rc.203.tgz
+    version: 0.6.0-rc.203
+  wazuh-monitoring:
+  - apiVersion: v2
+    appVersion: 1.0.1
+    created: "2025-11-14T00:42:12.693036681Z"
+    dependencies:
+    - name: common
+      repository: https://charts.bitnami.com/bitnami
+      tags:
+      - common
+      - bitnami-common
+      version: '*'
+    - alias: pushgateway
+      condition: pushgateway.enabled
+      name: prometheus-pushgateway
+      repository: https://prometheus-community.github.io/helm-charts
+      tags:
+      - pushgateway
+      version: '*'
+    - alias: prom-stack
+      condition: prom-stack.enabled
+      name: kube-prometheus-stack
+      repository: https://prometheus-community.github.io/helm-charts
+      tags:
+      - prometheus
+      - grafana
+      version: '*'
+    - condition: loki.enabled
+      name: loki
+      repository: https://grafana.github.io/helm-charts
+      tags:
+      - loki
+      version: '*'
+    - condition: alloy.enabled
+      name: alloy
+      repository: https://grafana.github.io/helm-charts
+      tags:
+      - alloy
+      version: '*'
+    description: A Helm chart for Kubernetes
+    digest: f2feaaea7c1df103254952e7f58bebaa211a33ae2e0869936d8a6d66b8ab877d
+    name: wazuh-monitoring
+    type: application
+    urls:
+    - https://github.com/ADORSYS-GIS/wazuh-helm/releases/download/wazuh-monitoring-0.1.0/wazuh-monitoring-0.1.0.tgz
+    version: 0.1.0
+generated: "2025-11-14T00:42:12.693045468Z"
