@@ -77,11 +77,11 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
-        {{ if eq (include "integration.azure.exists" $) "true" -}}
+        {{- if eq (include "integration.azure.exists" $) "true" }}
         - name: azure-auth
           secret:
             secretName: {{ include "secret.common" $ }}-azure
-        {{ end }}
+        {{- end }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -130,7 +130,7 @@ spec:
             {{- if eq (include "integration.azure.exists" $) "true" }}
             - name: AZURE_CONFIGS
               value: |
-{{ include "integration.azure.conf" $ }}
+                {{- include "integration.azure.conf" $ | nindent 16 }}
             {{- end }}
             {{- if eq (include "integration.aws.exists" $) "true" }}
             - name: AWS_CONFIGS
@@ -169,7 +169,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: wazuh-manager
-          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          {{- $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
           {{ with .resources -}}
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}

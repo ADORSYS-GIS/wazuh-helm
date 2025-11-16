@@ -419,7 +419,10 @@
         <location>/var/log/owasp-zap/*.jsonl</location>
         <log_format>json</log_format>
     </localfile>
-    
+
     <!-- AWS configurations -->
     ${AWS_CONFIGS}
+
+    <!-- Azure configurations -->
+    ${AZURE_CONFIGS}
 </ossec_config>
