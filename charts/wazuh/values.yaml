@@ -1098,6 +1098,11 @@ integration:
     config:
       enabled: false
       bucketName: ~
+      ## Multi-account support: Comma-separated list of AWS account IDs
+      ## Example: "020980146275,564357927993,590183746717"
+      ## Wazuh will automatically look for Config data in the format:
+      ##   s3://bucketName/AWSLogs/{accountId}/Config/...
+      awsAccountIds: ~
     ## Security Hub via SQS
     securityHub:
       enabled: false

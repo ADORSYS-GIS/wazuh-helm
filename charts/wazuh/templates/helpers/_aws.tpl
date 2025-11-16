@@ -42,6 +42,9 @@ false
 {{- if and $aws.config $aws.config.enabled }}
   <bucket type="config">
     <name>{{ include "common.tplvalues.render" (dict "value" $aws.config.bucketName "context" $) }}</name>
+{{- if $aws.config.awsAccountIds }}
+    <aws_account_id>{{ include "common.tplvalues.render" (dict "value" $aws.config.awsAccountIds "context" $) }}</aws_account_id>
+{{- end }}
 {{- if and $aws.profile (ne $aws.profile "~") }}
     <aws_profile>{{ include "common.tplvalues.render" (dict "value" $aws.profile "context" $) }}</aws_profile>
 {{- end }}
@@ -53,11 +56,13 @@ false
 {{- if and $aws.securityHub $aws.securityHub.enabled }}
   <subscriber type="security_hub">
     <sqs_name>{{ include "common.tplvalues.render" (dict "value" $aws.securityHub.sqsName "context" $) }}</sqs_name>
-{{- if and $aws.profile (ne $aws.profile "~") }}
-    <aws_profile>{{ include "common.tplvalues.render" (dict "value" $aws.profile "context" $) }}</aws_profile>
+{{- $securityHubProfile := default $aws.profile $aws.securityHub.profile }}
+{{- if and $securityHubProfile (ne $securityHubProfile "~") }}
+    <aws_profile>{{ include "common.tplvalues.render" (dict "value" $securityHubProfile "context" $) }}</aws_profile>
 {{- end }}
-{{- if $aws.roleArn }}
-    <iam_role_arn>{{ include "common.tplvalues.render" (dict "value" $aws.roleArn "context" $) }}</iam_role_arn>
+{{- $securityHubRole := default $aws.roleArn $aws.securityHub.roleArn }}
+{{- if $securityHubRole }}
+    <iam_role_arn>{{ include "common.tplvalues.render" (dict "value" $securityHubRole "context" $) }}</iam_role_arn>
 {{- end }}
   </subscriber>
 {{- end }}
