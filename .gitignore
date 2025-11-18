@@ -6,3 +6,4 @@ test.yaml
 *.csr
 *.srl
 *.tgz
+*tmp*
