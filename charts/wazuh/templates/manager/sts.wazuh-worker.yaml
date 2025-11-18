@@ -101,12 +101,12 @@ spec:
             {{- with include "integration.github.conf" $ }}
             - name: GITHUB_CONFIGS
               value: |
-{{ . }}
+                {{ . | nindent 16 }}
             {{- end }}
             {{- with include "integration.aws.conf" $ }}
             - name: AWS_CONFIGS
               value: |
-{{ . }}
+                {{ . | nindent 16 }}
             {{- end }}
           ##
           ##
@@ -156,10 +156,9 @@ spec:
           {{ with .resources -}}
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
-          securityContext:
-            capabilities:
-              add: [ "SYS_CHROOT" ]
-            privileged: true
+          {{- with .securityContext }}
+          securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
