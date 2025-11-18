@@ -116,6 +116,14 @@ spec:
                 sed -i '/\${AWS_CONFIGS}/r /tmp/aws.xml' /processed/ossec.conf
                 sed -i '/\${AWS_CONFIGS}/d' /processed/ossec.conf
               fi
+              # Replace AZURE_CONFIGS if set
+              if [ ! -z "$AZURE_CONFIGS" ]; then
+                # Write Azure config to temp file with proper indentation (4 spaces)
+                echo "$AZURE_CONFIGS" | sed 's/^/    /' > /tmp/azure.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${AZURE_CONFIGS}/r /tmp/azure.xml' /processed/ossec.conf
+                sed -i '/\${AZURE_CONFIGS}/d' /processed/ossec.conf
+              fi
               # Replace other variables with envsubst
               envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
           ##
