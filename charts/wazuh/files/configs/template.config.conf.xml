@@ -425,4 +425,10 @@
 
     <!-- Azure configurations -->
     ${AZURE_CONFIGS}
+
+    <!-- Slack notifications -->
+    ${SLACK_CONFIG}
+
+    <!-- Jira integration -->
+    ${JIRA_CONFIG}
 </ossec_config>

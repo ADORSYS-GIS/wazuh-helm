@@ -69,9 +69,11 @@ spec:
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
+        {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
+        {{- end }}
         {{- if eq (include "integration.azure.exists" $) "true" }}
         - name: azure-auth
           secret:
@@ -110,6 +112,22 @@ spec:
                 # Use sed to replace placeholder with file content
                 sed -i '/\${AZURE_CONFIGS}/r /tmp/azure.xml' /processed/ossec.conf
                 sed -i '/\${AZURE_CONFIGS}/d' /processed/ossec.conf
+              fi
+              # Replace SLACK_CONFIG if set
+              if [ ! -z "$SLACK_CONFIG" ]; then
+                # Write Slack config to temp file with proper indentation (4 spaces)
+                echo "$SLACK_CONFIG" | sed 's/^/    /' > /tmp/slack.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${SLACK_CONFIG}/r /tmp/slack.xml' /processed/ossec.conf
+                sed -i '/\${SLACK_CONFIG}/d' /processed/ossec.conf
+              fi
+              # Replace JIRA_CONFIG if set
+              if [ ! -z "$JIRA_CONFIG" ]; then
+                # Write Jira config to temp file with proper indentation (4 spaces)
+                echo "$JIRA_CONFIG" | sed 's/^/    /' > /tmp/jira.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${JIRA_CONFIG}/r /tmp/jira.xml' /processed/ossec.conf
+                sed -i '/\${JIRA_CONFIG}/d' /processed/ossec.conf
               fi
               # Replace other variables with envsubst
               envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
@@ -242,12 +260,14 @@ spec:
               subPath: 0004-custom-decoder.xml
               readOnly: true
 
+            {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira
               subPath: custom-jira
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira.py
-              subPath: custom-jira.py    
+              subPath: custom-jira.py
+            {{- end }}    
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/0005-audit-mitre_rules.xml
