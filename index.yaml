@@ -20,6 +20,25 @@ entries:
   wazuh-helm:
   - apiVersion: v2
     appVersion: 4.13.1
+    created: "2025-11-18T08:46:24.646965138Z"
+    dependencies:
+    - name: common
+      repository: https://charts.bitnami.com/bitnami
+      tags:
+      - common
+      - bitnami-common
+      version: '*'
+    description: Wazuh is a free, open-source host-based intrusion detection system
+      (HIDS), security information and event management (SIEM) and log management
+      solution.
+    digest: 713c43ac1ffd693ba779116eabb4ec23fd1edbbe406add78ac5029f50822f842
+    name: wazuh-helm
+    type: application
+    urls:
+    - https://github.com/ADORSYS-GIS/wazuh-helm/releases/download/wazuh-helm-0.6.1-rc.3/wazuh-helm-0.6.1-rc.3.tgz
+    version: 0.6.1-rc.3
+  - apiVersion: v2
+    appVersion: 4.13.1
     created: "2025-11-18T08:11:23.138704077Z"
     dependencies:
     - name: common
@@ -120,4 +139,4 @@ entries:
     urls:
     - https://github.com/ADORSYS-GIS/wazuh-helm/releases/download/wazuh-monitoring-0.1.0/wazuh-monitoring-0.1.0.tgz
     version: 0.1.0
-generated: "2025-11-18T08:11:23.138724446Z"
+generated: "2025-11-18T08:46:24.646993942Z"
