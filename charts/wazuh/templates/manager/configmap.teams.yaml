@@ -1,3 +1,4 @@
+{{- if $.Values.integration.teams.enable }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -13,3 +14,4 @@ data:
   
   "custom-teams.py": |
     {{ $.Files.Get "files/scripts/custom-teams.py" | nindent 6 }}    
+{{- end }}
