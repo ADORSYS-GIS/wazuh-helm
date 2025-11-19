@@ -571,6 +571,31 @@ master:
       add: [ "SYS_CHROOT" ]
     privileged: true
 
+  auth:
+    enrollment:
+      enabled: true
+      # Enrollment method. Can be 'certificates', 'password', or 'apikey'.
+      # If 'apikey' is selected, agent enrollment via ossec-authd will be disabled.
+      # Agent registration must then be performed via the Wazuh API.
+      method: "certificates"
+      # Password to use for agent enrollment if method is 'password'.
+      password: ""
+      passwordSecret:
+        enabled: false
+        name: "wazuh-enrollment-password"
+        key: "password"
+      force:
+        enabled: true
+        key_mismatch: true
+        disconnected_time:
+          enabled: true
+          value: "1800h"
+        after_registration_time: "1h"
+      purge: false
+      use_source_ip: false
+      ssl_verify_host: false
+      ssl_auto_negotiate: false
+
 ##
 ##
 extraVolumeConfigs:
@@ -706,15 +731,15 @@ dashboard:
   ## 
   branding:
     logo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
     mark:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #   darkModeUrl: ""
     loadingLogo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #   darkModeUrl: ""
-    faviconUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    faviconUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     applicationTitle: "Wazuh | Adorsys"
     useExpandedHeader: false
 
@@ -992,44 +1017,62 @@ notification:
 ##
 integration:
   ##
-  ## https://documentation.wazuh.com/current/cloud-security/azure/platform-and-services.html#getting-access-credentials-for-microsoft-azure-storage
+  ## Azure integrations for Log Analytics, Graph API, and Storage
+  ## https://documentation.wazuh.com/current/cloud-security/azure/index.html
   azure:
-    ##
-    ##
-    workspace: ~
-    ##
-    ##
-    domain: gisudm.onmicrosoft.com
-    ##
-    ##
-    auth:
-      ##
-      ##
-      log:
-        ##
-        ##
-        application_id: ~
-        ##
-        ##
-        application_key: ~
-      ##
-      ##
-      graph:
-        ##
-        ##
-        application_id: ~
-        ##
-        ##
-        application_key: ~
-      ##
-      ##
-      storage:
-        ##
-        ##
-        account_name: ~
-        ##
-        ##
-        account_key: ~
+    ## Azure tenant domain (e.g., company.onmicrosoft.com)
+    tenantDomain: ~
+
+    ## Credentials stored in Kubernetes secrets
+    ## Create secret with:
+    ##   kubectl create secret generic wazuh-azure-secrets \
+    ##     --from-literal=log_analytics_credentials='{"application_id":"xxx","application_key":"yyy"}' \
+    ##     --from-literal=graph_credentials='{"application_id":"xxx","application_key":"yyy"}' \
+    ##     --from-literal=storage_credentials='{"account_name":"xxx","account_key":"yyy"}' \
+    ##     -n <namespace>
+    secrets:
+      create: false
+      existingSecret: ~  # Name of existing secret (e.g., "wazuh-azure-secrets")
+
+    ## Azure Log Analytics integration
+    logAnalytics:
+      enabled: false
+      workspace: ~  # Default workspace ID (optional, can be overridden per query)
+      ## Multiple queries support
+      ## queries:
+      ##   - query: "AzureActivity"
+      ##     workspace: "workspace-id-1"  # Optional, defaults to top-level workspace
+      ##     timeOffset: "1d"              # Optional, defaults to "1d"
+      ##   - query: "SecurityEvent"
+      ##     workspace: "workspace-id-2"
+      ##     timeOffset: "12h"
+      queries: []
+
+    ## Azure Graph API integration (Microsoft Entra ID / Azure AD)
+    graph:
+      enabled: false
+      ## Multiple queries support
+      ## queries:
+      ##   - query: "auditLogs/directoryAudits"
+      ##     timeOffset: "1d"
+      ##   - query: "auditLogs/signIns"
+      ##     timeOffset: "12h"
+      queries: []
+
+    ## Azure Storage integration
+    storage:
+      enabled: false
+      ## Multiple containers support
+      ## containers:
+      ##   - name: "insights-activity-logs"
+      ##     blobs: ".json"
+      ##     contentType: "json_inline"
+      ##     timeOffset: "24h"
+      ##   - name: "insights-logs-audit"
+      ##     blobs: ".json"
+      ##     contentType: "json_inline"
+      ##     timeOffset: "12h"
+      containers: []
 
 
   ##
@@ -1108,6 +1151,11 @@ integration:
     config:
       enabled: false
       bucketName: ~
+      ## Multi-account support: Comma-separated list of AWS account IDs
+      ## Example: "020980146275,564357927993,590183746717"
+      ## Wazuh will automatically look for Config data in the format:
+      ##   s3://bucketName/AWSLogs/{accountId}/Config/...
+      awsAccountIds: ~
     ## Security Hub via SQS
     securityHub:
       enabled: false

@@ -74,6 +74,7 @@ spec:
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
+        {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
@@ -117,11 +118,25 @@ spec:
             - |
               set -ex
               envsubst < /workdir/template.config.xml > /processed/ossec.conf
+              if [ -n "$WAZUH_ENROLLMENT_PASSWORD" ]; then
+                echo "$WAZUH_ENROLLMENT_PASSWORD" > /processed/authd.pass
+              fi
           ##
           ##
           env:
             - name: NODE_TYPE
               value: "master"
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: WAZUH_ENROLLMENT_PASSWORD
+              {{- if $.Values.master.auth.enrollment.passwordSecret.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.master.auth.enrollment.passwordSecret.name }}
+                  key: {{ $.Values.master.auth.enrollment.passwordSecret.key }}
+              {{- else }}
+              value: {{ $.Values.master.auth.enrollment.password | quote }}
+              {{- end }}
+            {{- end }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -129,19 +144,18 @@ spec:
             {{- if eq (include "integration.azure.exists" $) "true" }}
             - name: AZURE_CONFIGS
               value: |
-{{ include "integration.azure.conf" $ }}
+                {{- include "integration.azure.conf" $ | nindent 16 }}
             {{- end }}
-            {{- with include "integration.aws.conf" $ }}
+            {{- if eq (include "integration.aws.exists" $) "true" }}
             - name: AWS_CONFIGS
               value: |
-{{ . }}
+                {{- include "integration.aws.conf" $ | nindent 16 }}
             {{- end }}
             {{- with include "integration.github.conf" $ }}
             - name: GITHUB_CONFIGS
               value: |
-{{ . }}
+                {{ . | nindent 16 }}
             {{- end }}
-
           ##
           ##
           envFrom:
@@ -174,15 +188,14 @@ spec:
         fsGroup: 1000
       containers:
         - name: wazuh-manager
-          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          {{- $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
           image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
           {{ with .resources -}}
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
-          securityContext:
-            capabilities:
-              add: [ "SYS_CHROOT" ]
-            privileged: true
+          {{- with .securityContext }}
+          securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
@@ -226,6 +239,12 @@ spec:
               mountPath: /wazuh-config-mount/etc/ossec.conf
               subPath: ossec.conf
               readOnly: true
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: wazuh-config-temp
+              mountPath: /var/ossec/etc/authd.pass
+              subPath: authd.pass
+              readOnly: true
+            {{- end }}
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
@@ -236,16 +255,18 @@ spec:
               subPath: 0004-custom-decoder.xml
               readOnly: true
 
+            {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira
               subPath: custom-jira
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira.py
               subPath: custom-jira.py
+            {{- end }}
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/0005-audit-mitre_rules.xml
-              subPath: 0005-audit-mitre_rules.xml
+              mountPath: /wazuh-config-mount/etc/rules/7005-audit-mitre_rules.xml
+              subPath: 7005-audit-mitre_rules.xml
               readOnly: true
 
             {{- with $.Values.integration.teams }}
@@ -272,14 +293,24 @@ spec:
             {{- end }}
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/0006-fim-macos.xml
-              subPath: 0006-fim-macos.xml
+              mountPath: /wazuh-config-mount/etc/rules/7006-fim-macos.xml
+              subPath: 7006-fim-macos.xml
               readOnly: true
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/0007-fim-linux.xml
-              subPath: 0007-fim-linux.xml
+              mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
+              subPath: 7007-fim-linux.xml
               readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7008-custom-yara.xml
+              subPath: 7008-custom-yara.xml
+              readOnly: true  
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml
+              subPath: 7009-fim-windows.xml
+              readOnly: true      
 
             {{ range $k, $v := $.Values.cluster.decoders }}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}

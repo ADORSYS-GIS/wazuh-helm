@@ -331,24 +331,26 @@
     </active-response>
 
     <auth>
-        <disabled>no</disabled>
+        <disabled>{{ if eq .Values.master.auth.enrollment.method "apikey" }}yes{{ else }}{{ .Values.master.auth.enrollment.enabled | ternary "no" "yes" }}{{ end }}</disabled>
         <port>1515</port>
-        <use_source_ip>no</use_source_ip>
-        <purge>yes</purge>
+        <use_source_ip>{{ .Values.master.auth.enrollment.use_source_ip | ternary "yes" "no" }}</use_source_ip>
+        <purge>{{ .Values.master.auth.enrollment.purge | ternary "yes" "no" }}</purge>
         <force>
-            <enabled>yes</enabled>
-            <key_mismatch>yes</key_mismatch>
-            <disconnected_time enabled="yes">1800h</disconnected_time>
-            <after_registration_time>1h</after_registration_time>
+            <enabled>{{ .Values.master.auth.enrollment.force.enabled | ternary "yes" "no" }}</enabled>
+            <key_mismatch>{{ .Values.master.auth.enrollment.force.key_mismatch | ternary "yes" "no" }}</key_mismatch>
+            <disconnected_time enabled="{{ if .Values.master.auth.enrollment.force.disconnected_time.enabled }}yes{{ else }}no{{ end }}">{{ .Values.master.auth.enrollment.force.disconnected_time.value }}</disconnected_time>
+            <after_registration_time>{{ .Values.master.auth.enrollment.force.after_registration_time }}</after_registration_time>
         </force>
-        <purge>no</purge>
-        <use_password>no</use_password>
         <ciphers>HIGH:!ADH:!EXP:!MD5:!RC4:!3DES:!CAMELLIA:@STRENGTH</ciphers>
+        {{- if eq .Values.master.auth.enrollment.method "certificates" }}
         <ssl_agent_ca>/etc/ssl/root-ca.pem</ssl_agent_ca>
-        <ssl_verify_host>no</ssl_verify_host>
+        <ssl_verify_host>{{ .Values.master.auth.enrollment.ssl_verify_host | ternary "yes" "no" }}</ssl_verify_host>
         <ssl_manager_cert>/var/ossec/etc/sslmanager.cert</ssl_manager_cert>
         <ssl_manager_key>/var/ossec/etc/sslmanager.key</ssl_manager_key>
-        <ssl_auto_negotiate>no</ssl_auto_negotiate>
+        <ssl_auto_negotiate>{{ .Values.master.auth.enrollment.ssl_auto_negotiate | ternary "yes" "no" }}</ssl_auto_negotiate>
+        {{- else if eq .Values.master.auth.enrollment.method "password" }}
+        <use_password>yes</use_password>
+        {{- end }}
     </auth>
 
     <cluster>
@@ -420,14 +422,16 @@
         <log_format>json</log_format>
     </localfile>
 
-    {{ if eq (include "integration.azure.exists" $) "true" -}}
-    ${AZURE_CONFIGS}
-    {{- end }}
-    
+    <!-- AWS configurations -->
     ${AWS_CONFIGS}
 
-    ${GITHUB_CONFIGS}
+    <!-- Azure configurations -->
+    ${AZURE_CONFIGS}
+
+    <!-- Slack notifications -->
     ${SLACK_CONFIG}
+
+    <!-- Jira integration -->
     ${JIRA_CONFIG}
     ${TEAMS_CONFIG}
 </ossec_config>

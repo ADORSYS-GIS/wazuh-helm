@@ -3,3 +3,29 @@ storageClasses:
     provisioner: driver.longhorn.io
     volumeBindingMode: Immediate
     allowVolumeExpansion: true
+    parameters:
+      numberOfReplicas: "2"
+      dataLocality: "enabled"
+
+  '{{ include "wazuh.storageClassName" $ }}-rwx':
+    provisioner: driver.longhorn.io
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    enabled: true
+    parameters:
+      numberOfReplicas: "2"
+      dataLocality: "disabled"
+
+extraVolumeConfigs:
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+    accessModes:
+      - ReadWriteMany
+  snort-alerts:
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+    accessModes:
+      - ReadWriteMany
+  owasp-zap-alerts:
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+    accessModes:
+      - ReadWriteMany
