@@ -108,47 +108,26 @@ spec:
             - -c
             - |
               set -ex
-              # Copy template
-              cp /workdir/template.config.xml /processed/ossec.conf
-              # Replace AWS_CONFIGS if set
-              if [ ! -z "$AWS_CONFIGS" ]; then
-                # Write AWS config to temp file with proper indentation (4 spaces)
-                echo "$AWS_CONFIGS" | sed 's/^/    /' > /tmp/aws.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${AWS_CONFIGS}/r /tmp/aws.xml' /processed/ossec.conf
-                sed -i '/\${AWS_CONFIGS}/d' /processed/ossec.conf
+              envsubst < /workdir/template.config.xml > /processed/ossec.conf
+              if [ -n "$WAZUH_ENROLLMENT_PASSWORD" ]; then
+                echo "$WAZUH_ENROLLMENT_PASSWORD" > /processed/authd.pass
               fi
-              # Replace AZURE_CONFIGS if set
-              if [ ! -z "$AZURE_CONFIGS" ]; then
-                # Write Azure config to temp file with proper indentation (4 spaces)
-                echo "$AZURE_CONFIGS" | sed 's/^/    /' > /tmp/azure.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${AZURE_CONFIGS}/r /tmp/azure.xml' /processed/ossec.conf
-                sed -i '/\${AZURE_CONFIGS}/d' /processed/ossec.conf
-              fi
-              # Replace SLACK_CONFIG if set
-              if [ ! -z "$SLACK_CONFIG" ]; then
-                # Write Slack config to temp file with proper indentation (4 spaces)
-                echo "$SLACK_CONFIG" | sed 's/^/    /' > /tmp/slack.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${SLACK_CONFIG}/r /tmp/slack.xml' /processed/ossec.conf
-                sed -i '/\${SLACK_CONFIG}/d' /processed/ossec.conf
-              fi
-              # Replace JIRA_CONFIG if set
-              if [ ! -z "$JIRA_CONFIG" ]; then
-                # Write Jira config to temp file with proper indentation (4 spaces)
-                echo "$JIRA_CONFIG" | sed 's/^/    /' > /tmp/jira.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${JIRA_CONFIG}/r /tmp/jira.xml' /processed/ossec.conf
-                sed -i '/\${JIRA_CONFIG}/d' /processed/ossec.conf
-              fi
-              # Replace other variables with envsubst
-              envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
           ##
           ##
           env:
             - name: NODE_TYPE
               value: "master"
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: WAZUH_ENROLLMENT_PASSWORD
+              {{- if $.Values.master.auth.enrollment.passwordSecret.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.master.auth.enrollment.passwordSecret.name }}
+                  key: {{ $.Values.master.auth.enrollment.passwordSecret.key }}
+              {{- else }}
+              value: {{ $.Values.master.auth.enrollment.password | quote }}
+              {{- end }}
+            {{- end }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -246,6 +225,12 @@ spec:
               mountPath: /wazuh-config-mount/etc/ossec.conf
               subPath: ossec.conf
               readOnly: true
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: wazuh-config-temp
+              mountPath: /var/ossec/etc/authd.pass
+              subPath: authd.pass
+              readOnly: true
+            {{- end }}
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
