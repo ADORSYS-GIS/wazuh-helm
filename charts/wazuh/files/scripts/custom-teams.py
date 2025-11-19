@@ -33,7 +33,7 @@ def build_card(alert):
     level = rule.get('level', 0)
     return {
         "@type": "MessageCard",
-        "@context": "http://schema.org/extensions",
+        "@context": "https://schema.org/extensions",
         "themeColor": "0078D7" if int(level) < 10 else "FF0000",
         "summary": "Wazuh Alert",
         "sections": [{
