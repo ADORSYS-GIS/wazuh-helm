@@ -431,4 +431,5 @@
 
     <!-- Jira integration -->
     ${JIRA_CONFIG}
+    ${TEAMS_CONFIG}
 </ossec_config>
