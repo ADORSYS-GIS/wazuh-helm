@@ -19,6 +19,9 @@ spec:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/dashboard/configmap.yaml") $ | sha256sum }}
+        {{- if $.Values.opensearchDashboards.branding.enabled }}
+        checksum/config.wazuh: {{ include (print $.Template.BasePath "/dashboard/wazuh.configmap.yaml") $ | sha256sum }}
+        {{- end }}
         {{ with $.Values.dashboard.auth -}}
         checksum/secret: {{ include (print $.Template.BasePath "/dashboard/secret.yaml") $ | sha256sum }}
         {{- end }}
@@ -43,16 +46,16 @@ spec:
       {{ with .volumes }}
       {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 6}}
       {{ end }}
-      {{ if $.Values.opensearchDashboards.branding.enabled }}
       - name: branding-config
         configMap:
-          name: '{{ include "common.names.fullname" $ }}-dashboard-branding-conf'
+          name: '{{ include "common.names.fullname" $ }}-wazuh-config'
           items:
-            - key: branding.wazuh.yml
-              path: branding.wazuh.yml
+            - key: wazuh.yml
+              path: wazuh.yml
+      {{ if $.Values.opensearchDashboards.branding.enabled }}
       - name: branding-assets
         emptyDir: {}
-      {{ end }}
+      {{- end }}
       {{ if $.Values.opensearchDashboards.branding.enabled }}
       initContainers:
         - name: branding-init
@@ -79,39 +82,7 @@ spec:
           {{ with .resources -}}
           resources:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
-          {{- end }}
-          {{ if $.Values.opensearchDashboards.branding.enabled }}
-          lifecycle:
-            postStart:
-              exec:
-                command:
-                  - sh
-                  - -c
-                  - |
-                    set -e
-
-                    for i in {1..120}; do
-                      if [ -f /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml ]; then
-                        if grep -q '#Custom branding' /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml; then
-                          echo "Attempt $i: Branding config already exists in wazuh.yml" >&2
-                          exit 0
-                        fi
-                        if [ -f /tmp/branding/branding.wazuh.yml ]; then
-                          echo "Attempt $i: Appending branding config to wazuh.yml" >&2
-                          cat /tmp/branding/branding.wazuh.yml >> /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
-                          exit 0
-                        else
-                          echo "Attempt $i: Branding config file not found, skipping append" >&2
-                          rm -rf /tmp/branding
-                          exit 0
-                        fi
-                      fi
-                      sleep 1
-                    done
-                    echo "Timeout waiting for wazuh.yml" >&2
-                    rm -rf /tmp/branding
-                    exit 1
-          {{- end }}
+          {{- end }}  
           volumeMounts:
           - name: root-certs
             mountPath: /usr/share/wazuh-dashboard/certs/root-ca.pem
@@ -129,12 +100,13 @@ spec:
             mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
             subPath: opensearch_dashboards.yml
             readOnly: false
+          - name: branding-config
+            mountPath: /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+            subPath: wazuh.yml
+            readOnly: true
           {{ if $.Values.opensearchDashboards.branding.enabled }}
           - name: branding-assets
             mountPath: /usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom/images
-            readOnly: true
-          - name: branding-config
-            mountPath: /tmp/branding
             readOnly: true
           {{- end }}
           {{ with .volumeMounts -}}
@@ -146,8 +118,6 @@ spec:
           env:
             - name: INDEXER_URL
               value: 'https://{{ include "common.names.fullname" $ }}-indexer-api:9200'
-            - name: WAZUH_API_URL
-              value: 'https://{{ include "common.names.fullname" $ }}'
             - name: SERVER_SSL_ENABLED
               value: "true"
             - name: SERVER_SSL_CERTIFICATE
@@ -160,8 +130,6 @@ spec:
           envFrom:
             - secretRef:
                 name: '{{ include "secret.indexer-auth" $ }}'
-            - secretRef:
-                name: '{{ include "secret.api-auth" $ }}'
             - secretRef:
                 name: '{{ include "secret.dashboard-auth" $ }}'
           {{ with .envFrom -}}
