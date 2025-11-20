@@ -51,15 +51,6 @@ spec:
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
-        {{- with $.Values.integration.aws }}
-        {{ if .enable }}
-        {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-        - name: aws-credentials
-          secret:
-            secretName: {{ coalesce .secrets.existingSecret .secrets.name (printf "%s-aws" (include "secret.common" $)) }}
-        {{- end }}
-        {{- end }}
-        {{- end }}
         - name: config
           configMap:
             name: '{{ include "common.names.fullname" $ }}-wazuh-conf'
@@ -150,11 +141,6 @@ spec:
               value: |
                 {{ . | nindent 16 }}
             {{- end }}
-            {{- with include "integration.aws.conf" $ }}
-            - name: AWS_CONFIGS
-              value: |
-                {{ . | nindent 16 }}
-            {{- end }}
           ##
           ##
           envFrom:
@@ -179,15 +165,6 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
-            {{- with $.Values.integration.aws }}
-            {{ if .enable }}
-            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-            - name: aws-credentials
-              mountPath: /root/.aws
-              readOnly: true
-            {{- end }}
-            {{- end }}
-            {{- end }}
         {{ range $k, $v := .initContainers }}
         {{ if $v }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
@@ -324,16 +301,6 @@ spec:
               mountPath: /etc/ssl/filebeat.key
               subPath: server-key.pem
               readOnly: true
-
-            {{- with $.Values.integration.aws }}
-            {{- if .enable }}
-            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-            - name: aws-credentials
-              mountPath: /root/.aws
-              readOnly: true
-            {{- end }}
-            {{- end }}
-            {{- end }}
 
             {{- if eq (include "integration.azure.exists.log" $) "true" }}
             - name: azure-auth
