@@ -1,0 +1,18 @@
+hosts:
+  - api:
+      url: https://{{ include "common.names.fullname" $ }}
+      port: 55000
+      username: {{ .Values.apiCred.auth.username | quote }}
+      password: {{ .Values.apiCred.auth.password | quote }}
+      run_as: false
+
+{{- if $.Values.opensearchDashboards.branding.enabled }}
+
+# Custom branding
+customization.enabled: true
+customization.logo.healthcheck: custom/images/customization.logo.healthcheck.svg
+customization.logo.reports: custom/images/customization.logo.reports.png
+customization.reports.footer: {{ .Values.opensearchDashboards.branding.reports.footer | quote }}
+customization.reports.header: |-
+{{ .Values.opensearchDashboards.branding.reports.header | indent 2 }}
+{{- end }}

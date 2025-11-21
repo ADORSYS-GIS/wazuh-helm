@@ -19,6 +19,9 @@ spec:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/dashboard/configmap.yaml") $ | sha256sum }}
+        {{- if $.Values.opensearchDashboards.branding.enabled }}
+        checksum/config.wazuh: {{ include (print $.Template.BasePath "/dashboard/wazuh.configmap.yaml") $ | sha256sum }}
+        {{- end }}
         {{ with $.Values.dashboard.auth -}}
         checksum/secret: {{ include (print $.Template.BasePath "/dashboard/secret.yaml") $ | sha256sum }}
         {{- end }}
@@ -43,6 +46,37 @@ spec:
       {{ with .volumes }}
       {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 6}}
       {{ end }}
+      - name: branding-config
+        configMap:
+          name: '{{ include "common.names.fullname" $ }}-wazuh-config'
+          items:
+            - key: wazuh.yml
+              path: wazuh.yml
+      {{ if $.Values.opensearchDashboards.branding.enabled }}
+      - name: branding-assets
+        emptyDir: {}
+      {{- end }}
+      {{ if $.Values.opensearchDashboards.branding.enabled }}
+      initContainers:
+        - name: branding-init
+          image: curlimages/curl:8.17.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              # Download logos
+              mkdir -p /branding/images
+              curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
+                -o /branding/images/customization.logo.healthcheck.svg {{ $.Values.opensearchDashboards.branding.healthCheckLogo }}
+              curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
+                -o /branding/images/customization.logo.reports.png {{ $.Values.opensearchDashboards.branding.reportLogo }}
+          volumeMounts:
+            - name: branding-assets
+              mountPath: /branding/images
+      {{- end }}
       containers:
         - name: wazuh-dashboard
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -50,7 +84,7 @@ spec:
           {{ with .resources -}}
           resources:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
-          {{- end }}
+          {{- end }}  
           volumeMounts:
           - name: root-certs
             mountPath: /usr/share/wazuh-dashboard/certs/root-ca.pem
@@ -68,6 +102,15 @@ spec:
             mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
             subPath: opensearch_dashboards.yml
             readOnly: false
+          - name: branding-config
+            mountPath: /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+            subPath: wazuh.yml
+            readOnly: true
+          {{ if $.Values.opensearchDashboards.branding.enabled }}
+          - name: branding-assets
+            mountPath: /usr/share/wazuh-dashboard/plugins/wazuh/public/assets/custom/images
+            readOnly: true
+          {{- end }}
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10}}
           {{- end }}
@@ -77,8 +120,6 @@ spec:
           env:
             - name: INDEXER_URL
               value: 'https://{{ include "common.names.fullname" $ }}-indexer-api:9200'
-            - name: WAZUH_API_URL
-              value: 'https://{{ include "common.names.fullname" $ }}'
             - name: SERVER_SSL_ENABLED
               value: "true"
             - name: SERVER_SSL_CERTIFICATE
@@ -91,8 +132,6 @@ spec:
           envFrom:
             - secretRef:
                 name: '{{ include "secret.indexer-auth" $ }}'
-            - secretRef:
-                name: '{{ include "secret.api-auth" $ }}'
             - secretRef:
                 name: '{{ include "secret.dashboard-auth" $ }}'
           {{ with .envFrom -}}
