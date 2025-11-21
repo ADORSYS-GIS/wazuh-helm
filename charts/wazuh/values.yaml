@@ -457,7 +457,7 @@ worker:
 
 ##
 ##
-worker_integrations:
+worker_integration:
   ##
   ##
   enabled: false

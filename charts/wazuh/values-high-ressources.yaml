@@ -23,7 +23,7 @@ worker:
       cpu: 2
       memory: 4Gi
 
-worker_integrations:
+worker_integration:
   resources:
     requests:
       cpu: 1

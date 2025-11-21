@@ -18,7 +18,7 @@ worker:
   persistence:
     storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
 
-worker_integrations:
+worker_integration:
   persistence:
     storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
 
