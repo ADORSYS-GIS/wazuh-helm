@@ -7,3 +7,6 @@ master:
 
 worker:
   securityContext: null
+
+worker_integration:
+  securityContext: null
