@@ -1105,6 +1105,16 @@ integration:
     ##
     externalSecret: ~
 
+  teams:
+    ##
+    ##
+    enabled: true
+    ##
+    ##
+    webhookUrl: https://.teams.com/services/hooks/
+    ##
+    externalSecret: ~    
+
   ##
   ## AWS integrations for CloudTrail and Security Hub
   aws:

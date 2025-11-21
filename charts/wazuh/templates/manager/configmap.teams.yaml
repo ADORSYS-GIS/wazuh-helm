@@ -1,0 +1,19 @@
+{{ with .Values.integration.teams -}}
+{{- if and .enabled (not .externalSecret) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-wazuh-conf-teams
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+
+  "custom-teams": |
+    {{ $.Files.Get "files/scripts/custom-teams.sh" | nindent 6 }}  
+  
+  "custom-teams.py": |
+    {{ $.Files.Get "files/scripts/custom-teams.py" | nindent 6 }}    
+{{- end }}
+{{- end }}

@@ -79,6 +79,15 @@ spec:
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
         {{- end }}
+        {{- with $.Values.integration.teams }}
+        {{ if .enable }}
+        {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+        - name: teams-conf
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-wazuh-conf-teams
+        {{- end }}
+        {{- end }}
+        {{- end }}   
         {{- if eq (include "integration.azure.exists" $) "true" }}
         - name: azure-auth
           secret:
@@ -160,6 +169,10 @@ spec:
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
+            {{- end }}
+            {{ if and $.Values.integration $.Values.integration.teams $.Values.integration.teams.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.integration-teams" $ }}'
             {{- end }}
           ##
           ##
@@ -254,6 +267,19 @@ spec:
               mountPath: /wazuh-config-mount/etc/rules/7005-audit-mitre_rules.xml
               subPath: 7005-audit-mitre_rules.xml
               readOnly: true
+
+            {{- with $.Values.integration.teams }}
+            {{ if .enable }}
+            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+            - name: teams-conf
+              mountPath: /wazuh-config-mount/integrations/custom-teams
+              subPath: custom-teams
+            - name: teams-conf
+              mountPath: /wazuh-config-mount/integrations/custom-teams.py
+              subPath: custom-teams.py
+            {{- end }}
+            {{- end }}
+            {{- end }}    
 
             {{- with $.Values.integration.aws }}
             {{ if .enable -}}
