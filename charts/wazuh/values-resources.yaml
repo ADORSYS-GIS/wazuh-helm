@@ -23,7 +23,7 @@ worker:
       cpu: 500m
       memory: 512Mi
 
-worker-integration:
+worker_integration:
   resources:
     requests:
       cpu: 100m
