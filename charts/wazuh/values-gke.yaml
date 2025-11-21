@@ -33,7 +33,7 @@ worker:
               matchLabels:
                 app-group: '{{ include "common.names.fullname" $ }}-manager'
 
-worker_integration:
+worker_integrations:
   replicaCount: 1
   additionalAnnotations:
     app-group: '{{ include "common.names.fullname" $ }}-manager'

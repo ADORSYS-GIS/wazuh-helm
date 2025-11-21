@@ -8,5 +8,5 @@ master:
 worker:
   securityContext: null
 
-worker_integration:
+worker_integrations:
   securityContext: null
