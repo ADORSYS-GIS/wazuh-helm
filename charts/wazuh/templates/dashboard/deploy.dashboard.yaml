@@ -69,8 +69,10 @@ spec:
 
               # Download logos
               mkdir -p /branding/images
-              curl -Lo /branding/images/customization.logo.healthcheck.svg {{ $.Values.opensearchDashboards.branding.healthCheckLogo }}
-              curl -Lo /branding/images/customization.logo.reports.png {{ $.Values.opensearchDashboards.branding.reportLogo }}
+              curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
+                -o /branding/images/customization.logo.healthcheck.svg {{ $.Values.opensearchDashboards.branding.healthCheckLogo }}
+              curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
+                -o /branding/images/customization.logo.reports.png {{ $.Values.opensearchDashboards.branding.reportLogo }}
           volumeMounts:
             - name: branding-assets
               mountPath: /branding/images
