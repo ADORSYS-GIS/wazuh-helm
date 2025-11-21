@@ -1,6 +1,6 @@
 {{ with .Values.worker_integration }}
 {{- if and .enabled  -}}
-{{- $name := printf "%s-manager-worker_integrations" (include "common.names.fullname" $) -}}
+{{- $name := printf "%s-manager-worker-integration" (include "common.names.fullname" $) -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
