@@ -55,16 +55,6 @@ spec:
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
-          
-        {{- with $.Values.integration.aws }}
-        {{ if .enable }}
-        {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-        - name: aws-credentials
-          secret:
-            secretName: {{ coalesce .secrets.existingSecret .secrets.name (printf "%s-aws" (include "secret.common" $)) }}
-        {{- end }}
-        {{- end }}
-        {{- end }}
         - name: config
           configMap:
             name: '{{ include "common.names.fullname" $ }}-wazuh-conf'
@@ -78,11 +68,6 @@ spec:
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
-        {{- end }}
-        {{- if eq (include "integration.azure.exists" $) "true" }}
-        - name: azure-auth
-          secret:
-            secretName: {{ include "secret.common" $ }}-azure
         {{- end }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
@@ -153,21 +138,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            {{- if eq (include "integration.azure.exists" $) "true" }}
-            - name: AZURE_CONFIGS
-              value: |
-                {{- include "integration.azure.conf" $ | nindent 16 }}
-            {{- end }}
-            {{- if eq (include "integration.aws.exists" $) "true" }}
-            - name: AWS_CONFIGS
-              value: |
-                {{- include "integration.aws.conf" $ | nindent 16 }}
-            {{- end }}
-            {{- with include "integration.github.conf" $ }}
-            - name: GITHUB_CONFIGS
-              value: |
-                {{ . | nindent 16 }}
-            {{- end }}
           ##
           ##
           envFrom:
@@ -270,16 +240,6 @@ spec:
               subPath: 7005-audit-mitre_rules.xml
               readOnly: true
 
-            {{- with $.Values.integration.aws }}
-            {{ if .enable -}}
-            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-            - name: aws-credentials
-              mountPath: /root/.aws
-              readOnly: true
-            {{- end }}
-            {{- end }}
-            {{- end }}
-
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7006-fim-macos.xml
               subPath: 7006-fim-macos.xml
@@ -331,26 +291,6 @@ spec:
               subPath: server-key.pem
               readOnly: true
 
-            {{ if (eq (include "integration.azure.exists.log" $) "true") -}}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/log_analytics_credentials
-              subPath: log_auth
-              readOnly: true
-            {{- end }}
-
-            {{ if (eq (include "integration.azure.exists.graph" $) "true") -}}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/graph_credentials
-              subPath: graph_auth
-              readOnly: true
-            {{- end }}
-
-            {{ if (eq (include "integration.azure.exists.storage" $) "true") -}}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/storage_credentials
-              subPath: storage_auth
-              readOnly: true
-            {{- end }}
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
