@@ -729,18 +729,30 @@ dashboard:
   envFrom: [ ]
   ## @branding more at https://opensearch.org/docs/latest/dashboards/branding/
   ## 
+
+## OpenSearch Dashboards configuration
+##
+opensearchDashboards:
   branding:
+    enabled: true
+    healthCheckLogo: https://upload.wikimedia.org/wikipedia/fr/archive/1/16/20250603062052%21BVMAC_logo.png
+    reportLogo: https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png
+    reports:
+      footer: "Généré par Wazuh SIEM - BVMAC"
+      header: |
+        Rapport de sécurité - Wazuh SIEM
+        Confidentiel - Usage interne
     logo:
-      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
-    #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
+      defaultUrl: "https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png"
+      # darkModeUrl: "https://example.com/dark-mode-sample.svg"
     mark:
-      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
-    #   darkModeUrl: ""
+      defaultUrl: "https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png"
+      # darkModeUrl: ""
     loadingLogo:
-      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
-    #   darkModeUrl: ""
-    faviconUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
-    applicationTitle: "Wazuh | Adorsys"
+      defaultUrl: "https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png"
+      # darkModeUrl: ""
+    faviconUrl: "https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png"
+    applicationTitle: "Wazuh | BVMAC"
     useExpandedHeader: false
 
 
