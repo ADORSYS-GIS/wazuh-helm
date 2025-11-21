@@ -1,4 +1,5 @@
-{{ with .Values.worker }}
+{{ with .Values.worker-integration }}
+{{- if and .enabled  -}}
 {{- $name := printf "%s-manager-worker-integrations" (include "common.names.fullname" $) -}}
 apiVersion: apps/v1
 kind: StatefulSet
@@ -400,4 +401,5 @@ spec:
         resources:
           requests:
             storage: {{ .persistence.size }}
+{{- end -}}
 {{- end -}}

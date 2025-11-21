@@ -47,6 +47,11 @@ worker:
                     app: '{{ include "common.names.fullname" $ }}-manager'
                     node-type: worker
 
+worker-integration:
+  replicaCount: 1
+  persistence:
+    size: 50Gi
+
 master:
   persistence:
     size: 50Gi

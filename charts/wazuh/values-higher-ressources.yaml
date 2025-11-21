@@ -22,6 +22,16 @@ worker:
     limits:
       cpu: 3
       memory: 6Gi
+
+worker-integration:
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 3
+      memory: 6Gi
+
 indexer:
   resources:
     requests:

@@ -5,6 +5,10 @@ master:
 worker: 
   replicaCount: 1
   resources: ~
+
+worker-integration: 
+  enabled: false
+  resources: ~
   
 indexer: 
   replicas: 1
