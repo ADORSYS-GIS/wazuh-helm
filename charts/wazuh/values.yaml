@@ -1094,13 +1094,10 @@ integration:
     enabled: true
     ##
     ##
-    webhookUrl: https://<example1>.jira.com/services/hooks/<example2>
+    webhookUrl: https://jira.com/services/hooks/
     ##
     ##
     apikey: 101010
-    ##
-    ##
-    projectKey: WAZUH
     ##
     ##
     externalSecret: ~
