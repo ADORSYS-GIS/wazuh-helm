@@ -238,6 +238,20 @@
         <executable>netsh.exe</executable>
         <timeout_allowed>yes</timeout_allowed>
     </command>
+    
+    <!-- Wazuh - Manager - Remote adorsys update -->
+    
+    <command>
+        <name>unix-update</name>
+        <executable>adorsys-update.sh</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
+    
+    <command>
+        <name>windows-update</name>
+        <executable>adorsys-update.ps1</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
 
     <!--
     <active-response>
@@ -271,8 +285,12 @@
         <rule_dir>ruleset/rules</rule_dir>
         <rule_exclude>0215-policy_rules.xml</rule_exclude>
         <list>etc/lists/audit-keys</list>
+        <list>etc/lists/amazon/aws-sources</list>
         <list>etc/lists/amazon/aws-eventnames</list>
         <list>etc/lists/security-eventchannel</list>
+        <list>etc/lists/malicious-ioc/malicious-ip</list>
+        <list>etc/lists/malicious-ioc/malicious-domains</list>
+        <list>etc/lists/malicious-ioc/malware-hashes</list>
 
         <!-- User-defined ruleset -->
         <decoder_dir>etc/decoders</decoder_dir>
@@ -290,6 +308,28 @@
       To enable this service, run:
       wazuh-control enable auth
     -->
+    <!-- Active-response  -->
+    <active-response>
+        <command>firewall-drop</command>
+        <location>local</location>
+        <rules_id>5712</rules_id>
+        <timeout>180</timeout>
+    </active-response>
+
+    <active-response>
+       <disabled>no</disabled>
+       <command>restart-wazuh</command>
+       <location>local</location>
+       <rules_id>100009</rules_id>
+    </active-response>
+    
+    <active-response>
+        <command>disable-account</command>
+        <location>local</location>
+        <rules_id>120100</rules_id>
+        <timeout>300</timeout>
+    </active-response>
+
     <auth>
         <disabled>no</disabled>
         <port>1515</port>
@@ -298,7 +338,7 @@
         <force>
             <enabled>yes</enabled>
             <key_mismatch>yes</key_mismatch>
-            <disconnected_time enabled="yes">1h</disconnected_time>
+            <disconnected_time enabled="yes">1800h</disconnected_time>
             <after_registration_time>1h</after_registration_time>
         </force>
         <purge>no</purge>
@@ -349,10 +389,46 @@
         <location>local</location>
         <rules_id>100300,100301</rules_id>
     </active-response>
+    
+    <command>
+        <name>yara_bat</name>
+        <executable>yara.bat</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
+
+    <active-response>
+        <command>yara_bat</command>
+        <location>local</location>
+        <rules_id>100302,100304</rules_id>
+    </active-response>
+    
+    <command>
+        <name>yara_powershell</name>
+        <executable>yara.ps1</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
+
+    <active-response>
+        <command>yara_powershell</command>
+        <location>local</location>
+        <rules_id>100302,100304</rules_id>
+    </active-response>
 
     <!-- Wazuh - Owasp-ZAP configuration -->
     <localfile>
         <location>/var/log/owasp-zap/*.jsonl</location>
         <log_format>json</log_format>
     </localfile>
+
+    <!-- AWS configurations -->
+    ${AWS_CONFIGS}
+
+    <!-- Azure configurations -->
+    ${AZURE_CONFIGS}
+
+    <!-- Slack notifications -->
+    ${SLACK_CONFIG}
+
+    <!-- Jira integration -->
+    ${JIRA_CONFIG}
 </ossec_config>

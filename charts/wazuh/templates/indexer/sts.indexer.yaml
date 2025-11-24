@@ -25,7 +25,10 @@ spec:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/indexer/configmap.yaml") $ | sha256sum }}
-        {{ with $.Values.indexer.auth -}}
+        {{ with .keycloak -}}
+        checksum/secret-kc: {{ include (print $.Template.BasePath "/indexer/keycloak.secret.yaml") $ | sha256sum }}
+        {{- end }}
+        {{ with .auth -}}
         checksum/secret: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
         {{- end }}
         {{ with $.Values.dashboard.auth -}}
@@ -55,68 +58,27 @@ spec:
         - name: indexer-conf
           configMap:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
+            
+        {{ with .keycloak }}
+        {{- if .enabled -}}
+        - name: wazuh-keycloak-config
+          secret:
+            secretName: '{{ include "common.names.fullname" $ }}-keycloak-conf'
+        {{- end -}}
+        {{ end }}
+        
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
+      {{ with .initContainers }}
       initContainers:
-        - name: volume-mount-hack
-          image: busybox
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 100m
-              memory: 256Mi
-          command:
-            - sh
-            - '-c'
-            - 'chown -R 1000:1000 /var/lib/wazuh-indexer'
-          volumeMounts:
-            - name: {{ include "common.names.fullname" $ }}-indexer
-              mountPath: /var/lib/wazuh-indexer
-        - name: increase-the-vm-max-map-count
-          image: busybox
-          command:
-            - sysctl
-            - -w
-            - vm.max_map_count=262144
-          securityContext:
-            privileged: true
-        - name: config-init
-          ##
-          image: alpine:latest
-          ##
-          imagePullPolicy: IfNotPresent
-          ##
-          ##
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -e
-              apk add --update --no-cache libintl gettext apache2-utils
-
-              export INDEXER_PASSWORD_BCRYPT=$(htpasswd -bnBC 12 "" $INDEXER_PASSWORD | tr -d ':\n')
-              export DASHBOARD_USERNAME_BCRYPT=$(htpasswd -bnBC 12 "" $DASHBOARD_PASSWORD | tr -d ':\n')
-              envsubst < /workdir/internal_users.yml > /processed/internal_users.yml
-
-          ##
-          ##
-          envFrom:
-            - secretRef:
-                name: '{{ include "secret.indexer-auth" $ }}'
-            - secretRef:
-                name: '{{ include "secret.dashboard-auth" $ }}'
-          ##
-          ##
-          volumeMounts:
-            - name: indexer-conf
-              mountPath: /workdir/internal_users.yml
-              subPath: internal_users.yml
-              readOnly: true
-            - name: wazuh-config-temp
-              mountPath: /processed
+      {{ range $k, $v := . }}
+      {{ if $v }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
+      {{ end }}
+      {{ end }}
+      {{ end }}
       containers:
         - name: wazuh-indexer
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -189,6 +151,38 @@ spec:
               mountPath: /usr/share/wazuh-indexer/opensearch-security/internal_users.yml
               subPath: internal_users.yml
               readOnly: true
+
+            {{ with .keycloak -}}
+            {{- if .enabled -}}
+            - name: wazuh-keycloak-config
+              mountPath: /usr/share/wazuh-indexer/opensearch-security/config.yml
+              subPath: config.yml
+              readOnly: true
+              
+              {{ if .roles_mapping }}
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/custom_roles_mapping.yml
+              subPath: custom_roles_mapping.yml
+              readOnly: true
+              {{- end }}
+
+              {{ if .roles }}
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/custom_roles.yml
+              subPath: custom_roles.yml
+              readOnly: true
+              {{- end }}
+
+              {{ if .tenants }}
+            - name: wazuh-keycloak-config
+              mountPath: /etc/wazuh-indexer/opensearch-security/custom_tenants.yml
+              subPath: custom_tenants.yml
+              readOnly: true
+              {{- end }}
+              
+            {{- end -}}
+            {{- end }}
+              
           {{ with .volumeMounts }}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}

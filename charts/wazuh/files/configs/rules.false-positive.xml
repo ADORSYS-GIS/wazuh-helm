@@ -1,0 +1,8 @@
+<!-- False positive rules -->
+<group name="ossec,">
+  <rule id="100500" level="0">
+    <if_group>rootcheck</if_group>
+    <match>^/tmp/(\.mount_cursor|\.cursor|Cursor|\.vscode-ipc).*</match>
+    <description>Ignore false positives for Cursor/IntelliJ IDEA temp files in /tmp</description>
+  </rule>
+</group>

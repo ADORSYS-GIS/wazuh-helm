@@ -1,19 +1,31 @@
 global:
   domain: 'dev.wazuh.adorsys.team'
 
-service:
-  enabled: true
-  type: LoadBalancer
-  loadBalancerClass: service.k8s.aws/nlb
-  additionalLabels:
-    dns: route53
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-name: '{{ include "common.names.fullname" $ }}'
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
-    service.beta.kubernetes.io/aws-load-balancer-type: "external"
-    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
-    external-dns.alpha.kubernetes.io/hostname: 'master.{{ .Values.global.domain }}'
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    enabled: true
+    type: LoadBalancer
+    loadBalancerClass: service.k8s.aws/nlb
+    additionalLabels:
+      dns: route53
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-name: '{{ include "common.names.fullname" $ }}-master'
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+      service.beta.kubernetes.io/aws-load-balancer-type: "external"
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+      external-dns.alpha.kubernetes.io/hostname: 'register.{{ .Values.global.domain }}'
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: true
+    type: LoadBalancer
+    loadBalancerClass: service.k8s.aws/nlb
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-name: '{{ include "common.names.fullname" $ }}-worker'
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+      service.beta.kubernetes.io/aws-load-balancer-type: "external"
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+      external-dns.alpha.kubernetes.io/hostname: 'events.{{ .Values.global.domain }}'
 
 indexer:
   replicas: 2
@@ -22,6 +34,21 @@ indexer:
 
 worker:
   replicaCount: 2
+  persistence:
+    size: 50Gi
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+                  matchLabels:
+                    app: '{{ include "common.names.fullname" $ }}-manager'
+                    node-type: worker
+
+worker_integration:
+  replicaCount: 1
   persistence:
     size: 50Gi
 
@@ -64,8 +91,9 @@ dashboard:
           }
         }
       alb.ingress.kubernetes.io/ssl-redirect: '443'
-      alb.ingress.kubernetes.io/healthcheck-path: '/app/login'
+      alb.ingress.kubernetes.io/healthcheck-path: '/_cluster/health'
       alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+      alb.ingress.kubernetes.io/success-codes: '401'
       external-dns.alpha.kubernetes.io/hostname: '{{ .Values.global.domain }}'
 
 extraVolumeConfigs:

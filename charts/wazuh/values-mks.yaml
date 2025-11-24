@@ -3,18 +3,6 @@ storageClasses:
   volumeBindingMode: WaitForFirstConsumer
   reclaimPolicy: Delete
 
-dashboard:
-  service:
+svcs:
+  '{{ include "common.names.fullname" $ }}-dashboard':
     type: LoadBalancer
-  resources: ~
-
-master:
-  service:
-    type: LoadBalancer
-  resources: ~
-worker:
-  replicaCount: 1
-  resources: ~
-indexer:
-  replicas: 2
-  resources: ~

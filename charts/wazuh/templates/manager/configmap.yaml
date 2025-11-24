@@ -7,7 +7,44 @@ metadata:
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
 data:
-  "template.config.conf": {{ $.Files.Get "files/configs/template.config.conf.xml" | quote }}
-  "local_rules.xml": {{ $.Files.Get "files/configs/local_rules.xml" | quote }}
-  "local_decoder.xml": {{ $.Files.Get "files/configs/local_decoder.xml" | quote }}
-  "0004-owasp-zap.xml": {{ $.Files.Get "files/configs/owasp_zap_decoder.xml" | quote }}
+  {{ $template := $.Files.Get "files/configs/template.config.conf.xml" -}}
+  "template.config.xml": |
+    {{ include "common.tplvalues.render" (dict "value" $template "context" $) | nindent 6 }}
+  "0004-custom-decoder.xml":  |
+    {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
+  
+  "7005-audit-mitre_rules.xml":  |
+    {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
+
+  "7006-fim-macos.xml":  |
+    {{ $.Files.Get "files/configs/rules.FIM-MacOS.xml" | nindent 6 }}
+
+  "7007-fim-linux.xml":  |
+    {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
+
+  "7008-custom-yara.xml":  |
+    {{ $.Files.Get "files/configs/rules.custom-yara.xml" | nindent 6 }}  
+
+  "7009-fim-windows.xml":  |
+    {{ $.Files.Get "files/configs/rules.custom-windows.xml" | nindent 6 }}    
+
+  {{ range $k, $v := $.Values.cluster.decoders }}
+    {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+  {{ printf "0003-%s" $k | quote | nindent 2 }}: |
+    {{ include "common.tplvalues.render" (dict "value" $f "context" $) | nindent 6 }}
+  {{- end }}
+  
+  "local_rules.xml":  |
+    {{ $.Files.Get "files/configs/rules.snort.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules.syscheck.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules.trivy.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules.false-positive.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules.overwrite.xml" | nindent 6 }}
+    
+  {{ range $k, $v := $.Values.cluster.rules }}
+    {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+  {{ printf "0003-%s" $k | quote | nindent 2 }}: |
+    {{ include "common.tplvalues.render" (dict "value" $f "context" $) | nindent 6 }}
+  {{- end }}

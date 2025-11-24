@@ -1,0 +1,4 @@
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    provisioner: docker.io/hostpath
+    volumeBindingMode: Immediate
