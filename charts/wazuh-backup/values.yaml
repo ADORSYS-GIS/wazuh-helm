@@ -91,45 +91,45 @@ backup:
           - ".cache/"                                         # Cache directories
           - "*/lost+found"                                    # Filesystem artifacts
 
-    indexer:
-      enabled: true
-      statefulsetName: "wazuh-wazuh-helm-indexer"
-      pvcName: "wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0"
-      replicas: 1
-      backupSubdir: "indexer-backup"
-      schedule: "0 2 * * *"  # Daily at 2 AM
+    # indexer:
+    #   enabled: true
+    #   statefulsetName: "wazuh-wazuh-helm-indexer"
+    #   pvcName: "wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0"
+    #   replicas: 1
+    #   backupSubdir: "indexer-backup"
+    #   schedule: "0 2 * * *"  # Daily at 2 AM
 
-      # Indexer backup paths
-      # NOTE: Indexer stores all data at /var/lib/wazuh-indexer (PVC root)
-      # Configuration files (opensearch.yml, internal_users.yml) are ConfigMap mounts
-      # and will be restored automatically from Helm
-      backupPaths:
-        include:
-          - "nodes"      # Elasticsearch node data (in PVC)
-          - "indices"    # All indices (in PVC)
-          - "_state"     # Cluster state (in PVC)
-        exclude:
-          - "*.lock"     # Skip lock files
-          - "write.lock" # Skip write locks
+    #   # Indexer backup paths
+    #   # NOTE: Indexer stores all data at /var/lib/wazuh-indexer (PVC root)
+    #   # Configuration files (opensearch.yml, internal_users.yml) are ConfigMap mounts
+    #   # and will be restored automatically from Helm
+    #   backupPaths:
+    #     include:
+    #       - "nodes"      # Elasticsearch node data (in PVC)
+    #       - "indices"    # All indices (in PVC)
+    #       - "_state"     # Cluster state (in PVC)
+    #     exclude:
+    #       - "*.lock"     # Skip lock files
+    #       - "write.lock" # Skip write locks
 
-    worker:
-      enabled: false  # Disabled by default (workers sync from master)
-      statefulsetName: "wazuh-wazuh-helm-manager-worker"
-      pvcName: "wazuh-wazuh-helm-manager-worker-wazuh-wazuh-helm-manager-worker-0"
-      replicas: 1
-      backupSubdir: "worker-backup"
-      schedule: "0 2 * * *"  # Daily at 2 AM
+    # worker:
+    #   enabled: false  # Disabled by default (workers sync from master)
+    #   statefulsetName: "wazuh-wazuh-helm-manager-worker"
+    #   pvcName: "wazuh-wazuh-helm-manager-worker-wazuh-wazuh-helm-manager-worker-0"
+    #   replicas: 1
+    #   backupSubdir: "worker-backup"
+    #   schedule: "0 2 * * *"  # Daily at 2 AM
 
-      # Worker backup paths (similar to master)
-      # NOTE: Workers sync from master, so backup is typically not needed
-      # Configuration files (local_rules.xml, local_decoder.xml, 0004-owasp-zap.xml)
-      # are ConfigMap mounts and will be restored automatically from Helm
-      backupPaths:
-        include:
-          - "wazuh/var/ossec/logs"   # Worker logs only (in PVC)
-          - "wazuh/var/ossec/queue"  # Processing queues (in PVC)
-        exclude:
-          - "*.tmp"
+    #   # Worker backup paths (similar to master)
+    #   # NOTE: Workers sync from master, so backup is typically not needed
+    #   # Configuration files (local_rules.xml, local_decoder.xml, 0004-owasp-zap.xml)
+    #   # are ConfigMap mounts and will be restored automatically from Helm
+    #   backupPaths:
+    #     include:
+    #       - "wazuh/var/ossec/logs"   # Worker logs only (in PVC)
+    #       - "wazuh/var/ossec/queue"  # Processing queues (in PVC)
+    #     exclude:
+    #       - "*.tmp"
 
 # ------------------------------------------------------------------------------
 # Tekton Task Images & Settings
