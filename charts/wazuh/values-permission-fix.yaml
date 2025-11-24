@@ -77,5 +77,4 @@ master:
           subPath: wazuh/var/ossec/integrations
         - name: wazuh-config-temp
           mountPath: /var/ossec/etc/authd.pass
-          subPath: authd.pass
-  
+
