@@ -34,27 +34,35 @@ opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.rend
 {{- end -}}
 {{- end }}
 
-{{- if $.Values.opensearchDashboards.branding.enabled }}
+{{- with $.Values.opensearchDashboards.branding }}
+{{- if .enabled }}
 opensearchDashboards.branding:
-  applicationTitle: "{{ $.Values.opensearchDashboards.branding.applicationTitle }}"
-  faviconUrl: "{{ $.Values.opensearchDashboards.branding.faviconUrl }}"
-  useExpandedHeader: {{ $.Values.opensearchDashboards.branding.useExpandedHeader }}
+  applicationTitle: "{{ .applicationTitle }}"
+  faviconUrl: "{{ .faviconUrl }}"
+  useExpandedHeader: {{ .useExpandedHeader }}
   
+  {{- with .logo }}
   logo:
-    defaultUrl: "{{ $.Values.opensearchDashboards.branding.logo.defaultUrl }}"
-    {{- if hasKey $.Values.opensearchDashboards.branding.logo "darkModeUrl" }}
-    darkModeUrl: "{{ $.Values.opensearchDashboards.branding.logo.darkModeUrl }}"
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
     {{- end }}
+  {{- end }}
   
+  {{- with .loadingLogo }}
   loadingLogo:
-    defaultUrl: "{{ $.Values.opensearchDashboards.branding.loadingLogo.defaultUrl }}"
-    {{- if hasKey $.Values.opensearchDashboards.branding.loadingLogo "darkModeUrl" }}
-    darkModeUrl: "{{ $.Values.opensearchDashboards.branding.loadingLogo.darkModeUrl }}"
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
     {{- end }}
+  {{- end }}
   
+  {{- with .mark }}
   mark:
-    defaultUrl: "{{ $.Values.opensearchDashboards.branding.mark.defaultUrl }}"
-    {{- if hasKey $.Values.opensearchDashboards.branding.mark "darkModeUrl" }}
-    darkModeUrl: "{{ $.Values.opensearchDashboards.branding.mark.darkModeUrl }}"
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
     {{- end }}
+  {{- end }}
+{{- end }}
 {{- end }}
