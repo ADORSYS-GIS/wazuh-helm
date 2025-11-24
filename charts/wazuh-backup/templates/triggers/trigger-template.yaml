@@ -59,6 +59,7 @@ spec:
           - name: s3EndpointUrl
             value: "$(tt.params.s3EndpointUrl)"
 
+{{- if .Values.backup.components.indexer }}
 ---
 # Template for Indexer backups
 apiVersion: triggers.tekton.dev/v1beta1
@@ -117,7 +118,9 @@ spec:
             value: "$(tt.params.s3BucketName)"
           - name: s3EndpointUrl
             value: "$(tt.params.s3EndpointUrl)"
+{{- end }}
 
+{{- if .Values.backup.components.worker }}
 ---
 # Template for Worker backups
 apiVersion: triggers.tekton.dev/v1beta1
@@ -176,3 +179,4 @@ spec:
             value: "$(tt.params.s3BucketName)"
           - name: s3EndpointUrl
             value: "$(tt.params.s3EndpointUrl)"
+{{- end }}

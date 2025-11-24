@@ -19,6 +19,7 @@ spec:
         - name: "filter"
           value: "body.component == 'master'"
 
+{{- if .Values.backup.components.indexer }}
 ---
 # Trigger for Indexer backups
 apiVersion: triggers.tekton.dev/v1beta1
@@ -38,7 +39,9 @@ spec:
       params:
         - name: "filter"
           value: "body.component == 'indexer'"
+{{- end }}
 
+{{- if .Values.backup.components.worker }}
 ---
 # Trigger for Worker backups
 apiVersion: triggers.tekton.dev/v1beta1
@@ -58,3 +61,4 @@ spec:
       params:
         - name: "filter"
           value: "body.component == 'worker'"
+{{- end }}
