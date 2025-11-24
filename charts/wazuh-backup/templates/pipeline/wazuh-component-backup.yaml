@@ -38,7 +38,16 @@ spec:
       description: "Name of the source PVC to backup."
     - name: sourcePvcPath
       type: string
-      description: "Path in component PVC (ends with '/')."
+      description: "Path in component PVC (simple mode). Leave empty if using includePaths."
+      default: ""
+    - name: includePaths
+      type: string
+      description: "Comma-separated list of paths to include (advanced mode)."
+      default: ""
+    - name: excludePatterns
+      type: string
+      description: "Comma-separated list of exclude patterns."
+      default: ""
     - name: backupSubdir
       type: string
       description: "Subdirectory in staging PVC."
@@ -101,6 +110,10 @@ spec:
           value: "$(params.sourcePvcName)"
         - name: sourcePath
           value: "$(params.sourcePvcPath)"
+        - name: includePaths
+          value: "$(params.includePaths)"
+        - name: excludePatterns
+          value: "$(params.excludePatterns)"
         - name: destinationPath
           value: "$(params.backupSubdir)"
 

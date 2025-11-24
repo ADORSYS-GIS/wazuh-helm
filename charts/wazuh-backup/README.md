@@ -84,51 +84,95 @@ This Helm chart provides automated backup capabilities for Wazuh security platfo
 
 ### Core Configuration (values.yaml)
 
-```yaml
-# Namespace for all resources
-namespace: wazuh
+The backup system supports two modes for specifying what to back up:
 
-# Backup configuration
+1. **Simple Mode**: Back up a single path or entire PVC
+2. **Advanced Mode**: Specify multiple paths with include/exclude patterns
+
+#### Simple Mode Configuration
+
+```yaml
 backup:
-  # Enable/disable backup methods
+  components:
+    master:
+      enabled: true
+      statefulsetName: "wazuh-wazuh-helm-manager-master"
+      pvcName: "wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0"
+      replicas: 1
+      backupSubdir: "master-backup"
+      schedule: "0 2 * * *"
+
+      # Simple mode: single path
+      sourcePvcPath: "./"  # Backs up entire PVC
+```
+
+#### Advanced Mode Configuration (Recommended)
+
+```yaml
+backup:
   mode:
     cronjobs: true    # Automatic scheduled backups
     triggers: true    # Manual HTTP-triggered backups
-  
-  # S3 storage configuration
+
   s3:
     bucketName: "your-backup-bucket"
     endpointUrl: ""   # Leave empty for AWS S3
     pathPrefix: "wazuh-backup"
-  
-  # Component-specific settings
+
   components:
     master:           # Wazuh Manager Master
       enabled: true
       statefulsetName: "wazuh-wazuh-helm-manager-master"
       pvcName: "wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0"
       replicas: 1
-      sourcePvcPath: "var/lib/wazuh/data/"
       backupSubdir: "master-backup"
-      schedule: "0 2 * * *"  # Daily at 2 AM
-    
+      schedule: "0 2 * * *"
+
+      # Advanced mode: specify multiple paths with patterns
+      backupPaths:
+        include:
+          - "wazuh/var/ossec/etc"              # Configs, rules, decoders
+          - "wazuh/var/ossec/api/configuration" # API configuration
+          - "wazuh/var/ossec/logs"             # Logs
+          - "wazuh/var/ossec/queue"            # Event queues
+          - "wazuh/var/ossec/var/multigroups"  # Agent groups
+          - "wazuh/var/ossec/integrations"     # Integration scripts
+        exclude:
+          - "*.tmp"                            # Skip temp files
+          - "*.log.gz"                         # Skip compressed logs
+          - ".cache/"                          # Skip cache directories
+
     indexer:          # Wazuh Indexer
       enabled: true
       statefulsetName: "wazuh-wazuh-helm-indexer"
       pvcName: "wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0"
       replicas: 2
-      sourcePvcPath: "usr/share/wazuh-indexer/data/"
       backupSubdir: "indexer-backup"
-      schedule: "0 3 * * *"  # Daily at 3 AM
-    
+      schedule: "0 3 * * *"
+
+      backupPaths:
+        include:
+          - "nodes"      # Elasticsearch node data
+          - "indices"    # All indices
+          - "_state"     # Cluster state
+        exclude:
+          - "*.lock"     # Skip lock files
+          - "write.lock"
+
     worker:           # Wazuh Manager Worker
-      enabled: true
+      enabled: false  # Disabled by default (workers sync from master)
       statefulsetName: "wazuh-wazuh-helm-manager-worker"
       pvcName: "wazuh-wazuh-helm-manager-worker-wazuh-wazuh-helm-manager-worker-0"
       replicas: 2
-      sourcePvcPath: "var/lib/wazuh/data/"
       backupSubdir: "worker-backup"
-      schedule: "0 4 * * *"  # Daily at 4 AM
+      schedule: "0 4 * * *"
+
+      backupPaths:
+        include:
+          - "wazuh/var/ossec/logs"   # Worker logs only
+          - "wazuh/var/ossec/queue"  # Processing queues
+        exclude:
+          - "*.tmp"
 
 # AWS credentials
 aws:
@@ -147,13 +191,103 @@ pvc:
     storageClass: "standard"  # Adjust for your cluster
 ```
 
+### Backup Path Configuration Modes
+
+#### **Simple Mode** (Backward Compatible)
+Use `sourcePvcPath` to specify a single directory to back up:
+
+```yaml
+components:
+  master:
+    sourcePvcPath: "./"               # Entire PVC
+    # OR
+    sourcePvcPath: "wazuh/var/ossec/" # Specific directory
+```
+
+#### **Advanced Mode** (Recommended for Granular Control)
+Use `backupPaths` with `include` and `exclude` lists:
+
+```yaml
+components:
+  master:
+    backupPaths:
+      include:
+        - "path/to/important/config"
+        - "path/to/data"
+        - "path/to/logs"
+      exclude:
+        - "*.tmp"
+        - "*.cache"
+        - "temp/"
+```
+
+**Benefits of Advanced Mode:**
+- ✅ Back up only what you need (reduces backup size)
+- ✅ Exclude temporary files and caches
+- ✅ Fine-grained control over backup contents
+- ✅ Faster backups and restores
+- ✅ Lower S3 storage costs
+
+### Backup Path Examples
+
+#### Example 1: Minimal Master Backup (Config Only)
+```yaml
+master:
+  backupPaths:
+    include:
+      - "wazuh/var/ossec/etc"              # Only configs
+      - "wazuh/var/ossec/api/configuration" # API config
+    exclude:
+      - "*.bak"
+```
+
+#### Example 2: Master Backup Without Logs (Save Space)
+```yaml
+master:
+  backupPaths:
+    include:
+      - "wazuh/var/ossec/etc"
+      - "wazuh/var/ossec/api/configuration"
+      - "wazuh/var/ossec/queue"
+      - "wazuh/var/ossec/var/multigroups"
+      - "wazuh/var/ossec/integrations"
+    exclude:
+      - "*.tmp"
+      - "*.log.gz"
+```
+
+#### Example 3: Indexer Critical Data Only
+```yaml
+indexer:
+  backupPaths:
+    include:
+      - "nodes"
+      - "_state"
+    exclude:
+      - "*.lock"
+      - "translog"  # Skip transaction logs to save space
+```
+
+#### Example 4: Logs Only (Audit Purpose)
+```yaml
+master:
+  backupPaths:
+    include:
+      - "wazuh/var/ossec/logs"
+    exclude:
+      - "*.log.gz"   # Only active logs
+      - "*.old"
+```
+
 ### Component Data Breakdown
 
-| Component | Source Path | Data Backed Up |
+| Component | Default Path | Data Backed Up |
 |-----------|-------------|----------------|
-| **Master** | `/var/lib/wazuh/data/` | Agent keys, rules, decoders, logs, configurations |
-| **Indexer** | `/usr/share/wazuh-indexer/data/` | Security events, indices, cluster state, plugins |
-| **Worker** | `/var/lib/wazuh/data/` | Worker processing data, agent communications, queues |
+| **Master** | Multiple subPaths in `/var/ossec` | Agent keys, rules, decoders, logs, configurations |
+| **Indexer** | `/var/lib/wazuh-indexer` | Security events, indices, cluster state, plugins |
+| **Worker** | Multiple subPaths in `/var/ossec` | Worker processing data, agent communications, queues |
+
+**Note**: The paths in `backupPaths.include` are relative to the PVC mount point, which uses subPath mounts. See [values.yaml](values.yaml) for the exact paths configured for your deployment.
 
 ---
 

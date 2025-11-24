@@ -47,7 +47,11 @@ spec:
           - name: sourcePvcName
             value: "{{ .Values.backup.components.master.pvcName }}"
           - name: sourcePvcPath
-            value: "{{ .Values.backup.components.master.sourcePvcPath }}"
+            value: "{{ include "backup.sourcePath" .Values.backup.components.master }}"
+          - name: includePaths
+            value: "{{ include "backup.includePaths" .Values.backup.components.master }}"
+          - name: excludePatterns
+            value: "{{ include "backup.excludePatterns" .Values.backup.components.master }}"
           - name: backupSubdir
             value: "{{ .Values.backup.components.master.backupSubdir }}"
           - name: s3BucketName
@@ -102,7 +106,11 @@ spec:
           - name: sourcePvcName
             value: "{{ .Values.backup.components.indexer.pvcName }}"
           - name: sourcePvcPath
-            value: "{{ .Values.backup.components.indexer.sourcePvcPath }}"
+            value: "{{ include "backup.sourcePath" .Values.backup.components.indexer }}"
+          - name: includePaths
+            value: "{{ include "backup.includePaths" .Values.backup.components.indexer }}"
+          - name: excludePatterns
+            value: "{{ include "backup.excludePatterns" .Values.backup.components.indexer }}"
           - name: backupSubdir
             value: "{{ .Values.backup.components.indexer.backupSubdir }}"
           - name: s3BucketName
@@ -157,7 +165,11 @@ spec:
           - name: sourcePvcName
             value: "{{ .Values.backup.components.worker.pvcName }}"
           - name: sourcePvcPath
-            value: "{{ .Values.backup.components.worker.sourcePvcPath }}"
+            value: "{{ include "backup.sourcePath" .Values.backup.components.worker }}"
+          - name: includePaths
+            value: "{{ include "backup.includePaths" .Values.backup.components.worker }}"
+          - name: excludePatterns
+            value: "{{ include "backup.excludePatterns" .Values.backup.components.worker }}"
           - name: backupSubdir
             value: "{{ .Values.backup.components.worker.backupSubdir }}"
           - name: s3BucketName

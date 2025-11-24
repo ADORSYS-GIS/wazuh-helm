@@ -19,7 +19,15 @@ spec:
       description: "Name of the source PVC to copy from"
     - name: sourcePath
       type: string
-      description: "Relative path under the source PVC to copy from (e.g. 'data/')."
+      description: "Relative path under the source PVC to copy from (e.g. 'data/'). Used in simple mode."
+      default: ""
+    - name: includePaths
+      type: string
+      description: "Comma-separated list of paths to include (e.g. 'path1,path2,path3'). Used in advanced mode."
+      default: ""
+    - name: excludePatterns
+      type: string
+      description: "Comma-separated list of rsync exclude patterns (e.g. '*.tmp,*.log.gz,.cache/')."
       default: ""
     - name: destinationPath
       type: string
@@ -37,6 +45,10 @@ spec:
       env:
         - name: SOURCE_PATH
           value: "$(params.sourcePath)"
+        - name: INCLUDE_PATHS
+          value: "$(params.includePaths)"
+        - name: EXCLUDE_PATTERNS
+          value: "$(params.excludePatterns)"
         - name: DESTINATION_PATH
           value: "$(params.destinationPath)"
       volumeMounts:

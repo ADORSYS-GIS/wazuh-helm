@@ -49,27 +49,87 @@ backup:
       statefulsetName: "wazuh-wazuh-helm-manager-master"
       pvcName: "wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0"
       replicas: 1
-      sourcePvcPath: "./"
       backupSubdir: "master-backup"
       schedule: "0 2 * * *"  # Daily at 2 AM
-    
+
+      # Backup path configuration - Custom paths for Wazuh Manager
+      backupPaths:
+        include:
+          # Authentication & Security
+          - "wazuh/var/ossec/etc/client.keys"                # Agent authentication keys
+          - "wazuh/var/ossec/etc/sslmanager.cert"            # SSL certificates
+          - "wazuh/var/ossec/etc/sslmanager.key"             # SSL keys
+
+          # Configuration Files
+          - "wazuh/var/ossec/etc/shared"                     # Shared agent configs
+          - "wazuh/var/ossec/etc/internal_options.conf"      # Internal options
+          - "wazuh/var/ossec/etc/local_internal_options.conf" # Local internal options
+          # NOTE: local_rules.xml and local_decoder.xml are ConfigMap mounts (not in PVC)
+          # They are version-controlled in Helm and will be restored automatically
+
+          # Agent & Queue Data
+          - "wazuh/var/ossec/queue/agents-timestamp"         # Agent timestamps
+          - "wazuh/var/ossec/var/multigroups"                # Agent group assignments
+          - "wazuh/var/ossec/queue/agentless"                # Agentless monitoring
+          - "wazuh/var/ossec/queue/fts"                      # File integrity monitoring
+          - "wazuh/var/ossec/queue/rids"                     # Rule IDs
+          - "wazuh/var/ossec/queue/db"                       # Queue databases
+
+          # Logs & Statistics
+          - "wazuh/var/ossec/logs"                           # All logs
+          - "wazuh/var/ossec/stats"                          # Statistics
+
+          # API Configuration
+          - "wazuh/var/ossec/api/configuration"              # API configs
+
+          # Filebeat Configuration
+          - "filebeat/etc/filebeat"                          # Filebeat config
+
+        exclude:
+          - "*.tmp"                                           # Temporary files
+          - "*.swp"                                           # Swap files
+          - ".cache/"                                         # Cache directories
+          - "*/lost+found"                                    # Filesystem artifacts
+
     indexer:
       enabled: true
       statefulsetName: "wazuh-wazuh-helm-indexer"
       pvcName: "wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0"
-      replicas: 2
-      sourcePvcPath: ""
+      replicas: 1
       backupSubdir: "indexer-backup"
-      schedule: "0 3 * * *"  # Daily at 3 AM
-    
+      schedule: "0 2 * * *"  # Daily at 2 AM
+
+      # Indexer backup paths
+      # NOTE: Indexer stores all data at /var/lib/wazuh-indexer (PVC root)
+      # Configuration files (opensearch.yml, internal_users.yml) are ConfigMap mounts
+      # and will be restored automatically from Helm
+      backupPaths:
+        include:
+          - "nodes"      # Elasticsearch node data (in PVC)
+          - "indices"    # All indices (in PVC)
+          - "_state"     # Cluster state (in PVC)
+        exclude:
+          - "*.lock"     # Skip lock files
+          - "write.lock" # Skip write locks
+
     worker:
-      enabled: true
+      enabled: false  # Disabled by default (workers sync from master)
       statefulsetName: "wazuh-wazuh-helm-manager-worker"
       pvcName: "wazuh-wazuh-helm-manager-worker-wazuh-wazuh-helm-manager-worker-0"
-      replicas: 2
-      sourcePvcPath: ""
+      replicas: 1
       backupSubdir: "worker-backup"
-      schedule: "0 4 * * *"  # Daily at 4 AM
+      schedule: "0 2 * * *"  # Daily at 2 AM
+
+      # Worker backup paths (similar to master)
+      # NOTE: Workers sync from master, so backup is typically not needed
+      # Configuration files (local_rules.xml, local_decoder.xml, 0004-owasp-zap.xml)
+      # are ConfigMap mounts and will be restored automatically from Helm
+      backupPaths:
+        include:
+          - "wazuh/var/ossec/logs"   # Worker logs only (in PVC)
+          - "wazuh/var/ossec/queue"  # Processing queues (in PVC)
+        exclude:
+          - "*.tmp"
 
 # ------------------------------------------------------------------------------
 # Tekton Task Images & Settings
@@ -139,5 +199,12 @@ pvc:
     name: "backup-staging-pvc"
     size: "20Gi"
     accessMode: "ReadWriteOnce"
-    storageClass: "wazuh-wazuh-helm"
+    storageClass: ""  # Empty = use cluster default StorageClass
 
+
+# ------------------------------------------------------------------------------
+# Debug Configuration
+# ------------------------------------------------------------------------------
+debug:
+  enabled: true  # Set to false to disable debug pod
+  # The debug pod mounts all PVCs and provides a shell for troubleshooting
