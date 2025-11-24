@@ -149,7 +149,7 @@ tekton:
       image:
         registry: docker.io
         repository: bitnami/kubectl
-        tag: "1.27"
+        tag: "sha256-d8969c685d238230cb9be0cbdbfc0ec26308db5893154ff4b5400f1beae15790"
         digest: ""
         pullPolicy: IfNotPresent
         pullSecrets: []
