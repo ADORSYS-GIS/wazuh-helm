@@ -6,13 +6,15 @@ hosts:
       password: {{ .Values.apiCred.auth.password | quote }}
       run_as: false
 
-{{- if $.Values.opensearchDashboards.branding.enabled }}
+{{- with .Values.opensearchDashboards.branding }}
+{{- if .enabled }}
 
 # Custom branding
 customization.enabled: true
 customization.logo.healthcheck: custom/images/customization.logo.healthcheck.svg
 customization.logo.reports: custom/images/customization.logo.reports.png
-customization.reports.footer: {{ .Values.opensearchDashboards.branding.reports.footer | quote }}
+customization.reports.footer: {{ .reports.footer | quote }}
 customization.reports.header: |-
-{{ .Values.opensearchDashboards.branding.reports.header | indent 2 }}
+{{ .reports.header | indent 2 }}
+{{- end }}
 {{- end }}

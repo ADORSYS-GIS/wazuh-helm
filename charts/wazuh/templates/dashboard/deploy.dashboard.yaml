@@ -53,10 +53,18 @@ spec:
             - key: wazuh.yml
               path: wazuh.yml
       {{ if $.Values.opensearchDashboards.branding.enabled }}
+      - name: branding-config
+        configMap:
+          name: '{{ include "common.names.fullname" $ }}-wazuh-config'
+          items:
+            - key: wazuh.yml
+              path: wazuh.yml
+      {{ if $.Values.opensearchDashboards.branding.enabled }}
       - name: branding-assets
         emptyDir: {}
       {{- end }}
-      {{ if $.Values.opensearchDashboards.branding.enabled }}
+      {{- with $.Values.opensearchDashboards.branding }}
+      {{- if .enabled }}
       initContainers:
         - name: branding-init
           image: curlimages/curl:8.17.0
@@ -66,16 +74,16 @@ spec:
             - -c
             - |
               set -e
-
               # Download logos
               mkdir -p /branding/images
               curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
-                -o /branding/images/customization.logo.healthcheck.svg {{ $.Values.opensearchDashboards.branding.healthCheckLogo }}
+                -o /branding/images/customization.logo.healthcheck.svg {{ .healthCheckLogo }}
               curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
-                -o /branding/images/customization.logo.reports.png {{ $.Values.opensearchDashboards.branding.reportLogo }}
+                -o /branding/images/customization.logo.reports.png {{ .reportLogo }}
           volumeMounts:
             - name: branding-assets
               mountPath: /branding/images
+      {{- end }}
       {{- end }}
       containers:
         - name: wazuh-dashboard
