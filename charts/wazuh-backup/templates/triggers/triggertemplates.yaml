@@ -9,7 +9,7 @@ apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
   name: {{ include "common.names.fullname" $ }}-{{ .name }}-template
-  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  namespace: {{ include "common.names.namespace" $ }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
     component: {{ .name }}
@@ -31,7 +31,7 @@ spec:
       kind: PipelineRun
       metadata:
         generateName: {{ include "common.names.fullname" $ }}-{{ .name }}-
-        namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+        namespace: {{ include "common.names.namespace" $ }}
         labels:
           {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 10 }}
           component: {{ .name }}

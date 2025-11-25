@@ -110,3 +110,19 @@ This helper is used for backward compatibility with existing _images.tpl
 {{- define "image.ref" -}}
 {{- include "common.images.image" (dict "imageRoot" . "global" $.Values.global) -}}
 {{- end -}}
+
+{{/*
+Check if any backup components are enabled
+Returns "true" if at least one component is enabled, empty string otherwise
+*/}}
+{{- define "wazuh-backup.hasEnabledComponents" -}}
+{{- $hasEnabled := false -}}
+{{- range .Values.backup.components -}}
+{{- if .enabled -}}
+{{- $hasEnabled = true -}}
+{{- end -}}
+{{- end -}}
+{{- if $hasEnabled -}}
+true
+{{- end -}}
+{{- end -}}
