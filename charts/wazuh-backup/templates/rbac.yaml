@@ -1,71 +1,88 @@
 # templates/rbac.yaml
+# Dynamic RBAC resources (Roles, RoleBindings, ClusterRoles, ClusterRoleBindings)
 
-# Additional RBAC for EventListener
+{{- if .Values.rbac.create }}
+
+{{/* Render Roles */}}
+{{- range .Values.rbac.roles }}
+{{- if .enabled | default true }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: wazuh-backup-eventlistener-role
-  namespace: {{ .Values.global.namespace }}
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
 rules:
-  # EventListener needs to create PipelineRuns
-  - apiGroups: ["tekton.dev"]
-    resources: ["pipelineruns"]
-    verbs: ["create", "get", "list", "watch"]
-  # EventListener needs to read and watch all trigger resources
-  - apiGroups: ["triggers.tekton.dev"]
-    resources: ["triggerbindings", "triggertemplates", "triggers", "eventlisteners", "interceptors"]
-    verbs: ["get", "list", "watch"]
-  # EventListener needs to manage its own deployment
-  - apiGroups: ["apps"]
-    resources: ["deployments"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # EventListener needs to manage services
-  - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # EventListener needs to manage pods
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch"]
+{{ include "common.tplvalues.render" (dict "value" .rules "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
 
+{{/* Render ClusterRoles */}}
+{{- range .Values.rbac.clusterroles }}
+{{- if .enabled | default true }}
 ---
-# ClusterRole for cluster-scoped resources that EventListener needs
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: wazuh-backup-eventlistener-cluster-role
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
 rules:
-  # EventListener needs to read cluster-scoped trigger resources
-  - apiGroups: ["triggers.tekton.dev"]
-    resources: ["clusterinterceptors", "clustertriggerbindings"]
-    verbs: ["get", "list", "watch"]
+{{ include "common.tplvalues.render" (dict "value" .rules "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
 
----
-# ClusterRoleBinding for cluster-scoped permissions
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: wazuh-backup-eventlistener-cluster-binding
-subjects:
-  - kind: ServiceAccount
-    name: wazuh-backup-sa
-    namespace: {{ .Values.global.namespace }}
-roleRef:
-  kind: ClusterRole
-  name: wazuh-backup-eventlistener-cluster-role
-  apiGroup: rbac.authorization.k8s.io
-
+{{/* Render RoleBindings */}}
+{{- range .Values.rbac.rolebindings }}
+{{- if .enabled | default true }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: wazuh-backup-eventlistener-binding
-  namespace: {{ .Values.global.namespace }}
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
 subjects:
-  - kind: ServiceAccount
-    name: wazuh-backup-sa
-    namespace: {{ .Values.global.namespace }}
+{{ include "common.tplvalues.render" (dict "value" .subjects "context" $) | nindent 2 }}
 roleRef:
-  kind: Role
-  name: wazuh-backup-eventlistener-role
-  apiGroup: rbac.authorization.k8s.io
+{{ include "common.tplvalues.render" (dict "value" .roleRef "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/* Render ClusterRoleBindings */}}
+{{- range .Values.rbac.clusterrolebindings }}
+{{- if .enabled | default true }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
+subjects:
+{{ include "common.tplvalues.render" (dict "value" .subjects "context" $) | nindent 2 }}
+roleRef:
+{{ include "common.tplvalues.render" (dict "value" .roleRef "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- end }}

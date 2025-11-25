@@ -1,34 +1,48 @@
 # templates/triggers/event-listener.yaml
+# Dynamic EventListener that references all enabled component triggers
 
+{{- if .Values.features.eventListener.enabled }}
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
-  name: wazuh-backup-listener
-  namespace: {{ .Values.namespace }}
+  name: {{ include "common.names.fullname" $ }}-listener
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: eventlistener
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
 spec:
-  serviceAccountName: wazuh-backup-sa
+  serviceAccountName: {{ include "wazuh-backup.serviceAccountName" $ | trim }}
   triggers:
-    - triggerRef: wazuh-backup-master-trigger
-    - triggerRef: wazuh-backup-indexer-trigger
-    - triggerRef: wazuh-backup-worker-trigger
+{{- range .Values.backup.components }}
+{{- if .enabled }}
+    - name: {{ .name }}-trigger-ref
+      triggerRef: {{ printf "%s-%s-trigger" (include "common.names.fullname" $) .name }}
+{{- end }}
+{{- end }}
 
 ---
 # Service - exposes the EventListener
 apiVersion: v1
 kind: Service
 metadata:
-  name: wazuh-backup-listener-svc
-  namespace: {{ .Values.namespace }}
+  name: {{ include "wazuh-backup.eventListenerService" $ }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
   labels:
-    app.kubernetes.io/name: wazuh-backup-eventlistener
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: eventlistener-service
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
 spec:
   selector:
     app.kubernetes.io/managed-by: EventListener
     app.kubernetes.io/part-of: Triggers
-    eventlistener: wazuh-backup-listener
+    eventlistener: {{ include "common.names.fullname" $ }}-listener
   ports:
     - name: http-listener
       port: 8080
       protocol: TCP
       targetPort: 8080
   type: ClusterIP
+{{- end }}

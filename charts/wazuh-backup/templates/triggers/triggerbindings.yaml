@@ -1,14 +1,14 @@
-# templates/triggers/triggers.yaml
-# Dynamic triggers for all enabled components
+# templates/triggers/triggerbindings.yaml
+# Dynamic trigger bindings for all enabled components
 
 {{- if .Values.features.triggers.enabled }}
 {{- range .Values.backup.components }}
 {{- if .enabled }}
 ---
 apiVersion: triggers.tekton.dev/v1beta1
-kind: Trigger
+kind: TriggerBinding
 metadata:
-  name: {{ include "common.names.fullname" $ }}-{{ .name }}-trigger
+  name: {{ include "common.names.fullname" $ }}-{{ .name }}-binding
   namespace: {{ .namespace | default (include "common.names.namespace" $) }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
@@ -16,17 +16,13 @@ metadata:
   annotations:
     {{- include "common.annotations.standard" ( dict "customAnnotations" (merge .additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
 spec:
-  bindings:
-    - ref: {{ include "common.names.fullname" $ }}-{{ .name }}-binding
-  template:
-    ref: {{ include "common.names.fullname" $ }}-{{ .name }}-template
-  interceptors:
-    - name: "validate-component"
-      ref:
-        name: "cel"
-      params:
-        - name: "filter"
-          value: "body.component == '{{ .name }}'"
+  params:
+    - name: s3BucketName
+      value: $(body.s3BucketName)
+    - name: s3EndpointUrl
+      value: $(body.s3EndpointUrl)
+    - name: triggeredBy
+      value: $(body.triggeredBy)
 {{- end }}
 {{- end }}
 {{- end }}
