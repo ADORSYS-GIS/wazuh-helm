@@ -71,7 +71,7 @@ spec:
               # Download logos
               mkdir -p /branding/images
               curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
-                -o /branding/images/customization.logo.healthcheck.svg {{ .healthCheckLogo }}
+                -o /branding/images/customization.logo.healthcheck.png {{ .healthCheckLogo }}
               curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
                 -o /branding/images/customization.logo.reports.png {{ .reportLogo }}
           volumeMounts:
