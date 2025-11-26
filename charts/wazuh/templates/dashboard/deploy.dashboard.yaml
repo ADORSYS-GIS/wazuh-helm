@@ -53,13 +53,6 @@ spec:
             - key: wazuh.yml
               path: wazuh.yml
       {{ if $.Values.opensearchDashboards.branding.enabled }}
-      - name: branding-config
-        configMap:
-          name: '{{ include "common.names.fullname" $ }}-wazuh-config'
-          items:
-            - key: wazuh.yml
-              path: wazuh.yml
-      {{ if $.Values.opensearchDashboards.branding.enabled }}
       - name: branding-assets
         emptyDir: {}
       {{- end }}
@@ -74,6 +67,7 @@ spec:
             - -c
             - |
               set -e
+
               # Download logos
               mkdir -p /branding/images
               curl --retry 5 --retry-delay 2 --fail --location --max-time 60 \
