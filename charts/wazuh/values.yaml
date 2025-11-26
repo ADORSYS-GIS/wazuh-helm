@@ -735,7 +735,7 @@ dashboard:
 opensearchDashboards:
   branding:
     enabled: true
-    healthCheckLogo: https://upload.wikimedia.org/wikipedia/fr/archive/1/16/20250603062052%21BVMAC_logo.png
+    healthCheckLogo: https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png
     reportLogo: https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png
     reports:
       footer: "Généré par Wazuh SIEM - BVMAC"
