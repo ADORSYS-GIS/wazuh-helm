@@ -127,10 +127,10 @@ if ! kubectl scale statefulset "${STATEFULSET_NAME}" -n "${NAMESPACE}" --replica
     # Try to get current state again
     RETRY_REPLICAS=$(kubectl get statefulset "${STATEFULSET_NAME}" -n "${NAMESPACE}" -o jsonpath="${JSONPATH_SPEC_REPLICAS}" 2>/dev/null || echo "unknown")
     if [[ "${RETRY_REPLICAS}" = "${REPLICAS}" ]]; then
-      echo "✅ Scale command may have succeeded despite error"
+      echo "✅ Scale command may have succeeded despite error" >&2
     else
-      echo "❌ Scale command definitely failed"
-      echo "💡 Manual intervention may be required"
+      echo "❌ Scale command definitely failed" >&2
+      echo "💡 Manual intervention may be required" >&2
     fi
 
     # Don't exit in emergency mode - continue with status report

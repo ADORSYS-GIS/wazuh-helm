@@ -3,8 +3,11 @@
 # Wazuh Control Script - Stop/Start Wazuh services using wazuh-control binary
 # This is more graceful than scaling StatefulSets and ensures proper service shutdown
 
+# Constants
+readonly MODE_EMERGENCY="emergency"
+
 # Set error handling based on mode
-if [[ "${MODE}" = "emergency" ]]; then
+if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
   # Emergency mode: lenient error handling
   set -eu
   echo "🚨 EMERGENCY MODE: Lenient error handling active" >&2
@@ -25,7 +28,7 @@ echo "Timestamp: $(date)"
 echo "================================"
 
 # Skip emergency recovery if the pipeline already succeeded (finally block still runs)
-if [[ "${MODE}" = "emergency" ]] && [[ "${PIPELINE_STATUS:-}" = "Succeeded" ]]; then
+if [[ "${MODE}" = "${MODE_EMERGENCY}" ]] && [[ "${PIPELINE_STATUS:-}" = "Succeeded" ]]; then
   echo "✅ Pipeline succeeded; skipping emergency recovery start"
   exit 0
 fi
@@ -37,7 +40,7 @@ if [[ -z "${POD_NAME}" ]] || [[ -z "${NAMESPACE}" ]] || [[ -z "${OPERATION}" ]];
   echo "   NAMESPACE: ${NAMESPACE:-<not set>}" >&2
   echo "   OPERATION: ${OPERATION:-<not set>}" >&2
 
-  if [[ "${MODE}" = "emergency" ]]; then
+  if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
     echo "🚨 Emergency mode: Continuing despite missing parameters" >&2
     exit 0
   else
@@ -78,7 +81,7 @@ handle_error() {
   local error_msg="$1"
   local exit_code="${2:-1}"
 
-  if [[ "${MODE}" = "emergency" ]]; then
+  if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
     emergency_handle_error "$error_msg"
   else
     normal_handle_error "$error_msg" "$exit_code"
@@ -93,7 +96,7 @@ check_pod_status() {
   if ! kubectl get pod "${POD_NAME}" -n "${NAMESPACE}" >/dev/null 2>&1; then
     ERROR_MSG="Pod ${POD_NAME} not found in namespace ${NAMESPACE}"
 
-    if [[ "${MODE}" = "emergency" ]]; then
+    if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
       echo "⚠️  $ERROR_MSG" >&2
       echo "🔍 Available pods in namespace:" >&2
       kubectl get pods -n "${NAMESPACE}" >&2 || echo "Cannot list pods" >&2
@@ -158,7 +161,7 @@ stop_wazuh_services() {
   else
     ERROR_MSG="Failed to execute wazuh-control stop"
 
-    if [[ "${MODE}" = "emergency" ]]; then
+    if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
       echo "⚠️  $ERROR_MSG" >&2
       echo "🔄 Emergency mode: Attempting to verify if services are stopped anyway..." >&2
     else
@@ -192,6 +195,7 @@ stop_wazuh_services() {
       echo "✅ No Wazuh processes detected - services appear stopped"
     fi
   fi
+  return 0
 }
 
 # Function to start Wazuh services
@@ -206,7 +210,7 @@ start_wazuh_services() {
   else
     ERROR_MSG="Failed to execute wazuh-control start"
 
-    if [[ "${MODE}" = "emergency" ]]; then
+    if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
       echo "⚠️  $ERROR_MSG" >&2
       echo "🔄 Emergency mode: Attempting alternative start methods..." >&2
 
@@ -223,7 +227,7 @@ start_wazuh_services() {
   fi
 
   # Wait for services to fully start
-  if [[ "${MODE}" = "emergency" ]]; then
+  if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
     echo "⏳ Emergency mode: Shorter wait for services (15s)..."
     sleep 15
     MAX_RETRIES=3
@@ -250,7 +254,7 @@ start_wazuh_services() {
       else
         echo "⚠️  Could not confirm services are fully running after ${MAX_RETRIES} attempts"
 
-        if [[ "${MODE}" = "emergency" ]]; then
+        if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
           echo "🚨 Emergency mode: Accepting partial startup"
         else
           # Show process list for debugging
@@ -263,6 +267,7 @@ start_wazuh_services() {
       fi
     fi
   done
+  return 0
 }
 
 # Function to show current status
@@ -290,6 +295,7 @@ show_status() {
   echo ""
   echo "📊 Pod Status:"
   kubectl get pod "${POD_NAME}" -n "${NAMESPACE}" -o wide 2>/dev/null || echo "Cannot get pod status"
+  return 0
 }
 
 # Main execution flow
@@ -299,7 +305,7 @@ echo ""
 
 # Step 1: Check pod exists
 if ! check_pod_status; then
-  if [[ "${MODE}" = "emergency" ]]; then
+  if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
     echo "✅ Emergency mode: Operation completed (no pod to operate on)"
     exit 0
   else
@@ -320,7 +326,7 @@ elif [[ "${OPERATION}" = "start" ]]; then
 else
   ERROR_MSG="Invalid operation: ${OPERATION} (must be 'stop' or 'start')"
 
-  if [[ "${MODE}" = "emergency" ]]; then
+  if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
     echo "⚠️  $ERROR_MSG" >&2
     echo "🚨 Emergency mode: Skipping invalid operation" >&2
     exit 0
@@ -352,7 +358,7 @@ elif [[ "${OPERATION}" = "start" ]]; then
 fi
 
 # Emergency mode: Always succeed to avoid failing the finally block
-if [[ "${MODE}" = "emergency" ]]; then
+if [[ "${MODE}" = "${MODE_EMERGENCY}" ]]; then
   echo ""
   echo "🚨 Emergency mode: Task completed (never fails)"
   echo "✅ Wazuh control task finished"

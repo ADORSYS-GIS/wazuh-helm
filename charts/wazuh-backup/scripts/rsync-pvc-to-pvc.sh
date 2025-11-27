@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+# Constant for trimming whitespace
+readonly TRIM_WHITESPACE_SED='s/^[[:space:]]*//;s/[[:space:]]*$//'
+
 # Parameters passed via environment variables
 SOURCE_PATH="${SOURCE_PATH:-}"
 DESTINATION_PATH="${DESTINATION_PATH:-}"
@@ -47,7 +50,7 @@ if [ -n "$INCLUDE_PATHS" ]; then
     echo "🚫 Exclude patterns:"
     # Convert comma-separated patterns to rsync --exclude arguments
     echo "$EXCLUDE_PATTERNS" | tr ',' '\n' | while IFS= read -r pattern; do
-      pattern=$(echo "$pattern" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')  # trim whitespace
+      pattern=$(echo "$pattern" | sed "${TRIM_WHITESPACE_SED}")  # trim whitespace
       if [ -n "$pattern" ]; then
         echo "   - $pattern"
         RSYNC_ARGS="$RSYNC_ARGS --exclude=$pattern"
@@ -59,7 +62,7 @@ if [ -n "$INCLUDE_PATHS" ]; then
   echo "✅ Include paths:"
   PATHS_TO_BACKUP=""
   echo "$INCLUDE_PATHS" | tr ',' '\n' | while IFS= read -r path; do
-    path=$(echo "$path" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')  # trim whitespace
+    path=$(echo "$path" | sed "${TRIM_WHITESPACE_SED}")  # trim whitespace
     if [ -n "$path" ]; then
       echo "   - $path"
       FULL_PATH="/source/$path"
@@ -78,7 +81,7 @@ if [ -n "$INCLUDE_PATHS" ]; then
   > "$INCLUDE_FILE"  # Clear file
 
   echo "$INCLUDE_PATHS" | tr ',' '\n' | while IFS= read -r path; do
-    path=$(echo "$path" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    path=$(echo "$path" | sed "${TRIM_WHITESPACE_SED}")
     if [ -n "$path" ] && [ -e "/source/$path" ]; then
       echo "$path" >> "$INCLUDE_FILE"
     fi
@@ -99,7 +102,7 @@ if [ -n "$INCLUDE_PATHS" ]; then
   EXCLUDE_ARGS=""
   if [ -n "$EXCLUDE_PATTERNS" ]; then
     echo "$EXCLUDE_PATTERNS" | tr ',' '\n' | while IFS= read -r pattern; do
-      pattern=$(echo "$pattern" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      pattern=$(echo "$pattern" | sed "${TRIM_WHITESPACE_SED}")
       if [ -n "$pattern" ]; then
         EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$pattern"
       fi
@@ -146,7 +149,7 @@ elif [ -n "$SOURCE_PATH" ]; then
   if [ -n "$EXCLUDE_PATTERNS" ]; then
     echo "🚫 Applying exclude patterns:"
     echo "$EXCLUDE_PATTERNS" | tr ',' '\n' | while IFS= read -r pattern; do
-      pattern=$(echo "$pattern" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      pattern=$(echo "$pattern" | sed "${TRIM_WHITESPACE_SED}")
       if [ -n "$pattern" ]; then
         echo "   - $pattern"
         EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$pattern"
