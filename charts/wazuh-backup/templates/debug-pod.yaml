@@ -1,0 +1,66 @@
+{{- if .Values.debug.pod.enabled }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .Values.debug.pod.name "context" $) }}
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.debug.pod.additionalLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: debug
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.debug.pod.additionalAnnotations "context" $ ) | nindent 4 }}
+spec:
+  containers:
+  - name: debug
+    image: {{ include "common.images.image" ( dict "imageRoot" .Values.debug.image "global" .Values.global ) }}
+    command:
+      - "/bin/sh"
+      - "-c"
+      - |
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "🔧 Wazuh Backup Debug Pod"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "This pod has both PVCs mounted for inspection:"
+        echo "  📁 Source PVC: {{ .Values.debug.pod.sourcePvc.mountPath }}"
+        echo "  📁 Backup PVC: {{ .Values.debug.pod.stagingPvc.mountPath }}"
+        echo ""
+        echo "Commands you can use:"
+        echo "  - ls -lah {{ .Values.debug.pod.sourcePvc.mountPath }}"
+        echo "  - ls -lah {{ .Values.debug.pod.stagingPvc.mountPath }}"
+        echo "  - tree {{ .Values.debug.pod.stagingPvc.mountPath }}"
+        echo "  - du -sh {{ .Values.debug.pod.stagingPvc.mountPath }}/*"
+        echo ""
+        echo "To shell into this pod:"
+        echo "  kubectl exec -it -n {{ include "common.names.namespace" $ }} {{ include "common.tplvalues.render" (dict "value" .Values.debug.pod.name "context" $) }} -- sh"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "🔄 Keeping pod alive... (Press Ctrl+C to exit)"
+        echo "═══════════════════════════════════════════════════════════════"
+
+        # Keep container running indefinitely
+        tail -f /dev/null
+    imagePullPolicy: {{ .Values.debug.image.pullPolicy }}
+    volumeMounts:
+    - name: source-volume
+      mountPath: {{ .Values.debug.pod.sourcePvc.mountPath }}
+    - name: staging-volume
+      mountPath: {{ .Values.debug.pod.stagingPvc.mountPath }}
+    resources:
+      {{- toYaml .Values.debug.pod.resources | nindent 6 }}
+  volumes:
+  - name: source-volume
+    persistentVolumeClaim:
+      claimName: {{ .Values.debug.pod.sourcePvc.name }}
+  - name: staging-volume
+    persistentVolumeClaim:
+      claimName: {{ include "wazuh-backup.stagingPvcName" $ }}
+  restartPolicy: Always
+  {{- if .Values.global.imagePullSecrets }}
+  imagePullSecrets:
+    {{- range .Values.global.imagePullSecrets }}
+    - name: {{ . }}
+    {{- end }}
+  {{- end }}
+{{- end }}

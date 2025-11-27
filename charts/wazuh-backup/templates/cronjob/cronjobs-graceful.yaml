@@ -1,0 +1,64 @@
+# templates/cronjob/cronjobs-graceful.yaml
+# CronJobs that trigger graceful backups via EventListener
+
+{{- if and .Values.features.gracefulShutdown.enabled .Values.features.cronjobs.enabled }}
+{{- range .Values.backup.components }}
+{{- if .enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.names.fullname" $ }}-{{ .name }}-graceful-cron
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+    component: {{ .name }}
+    backup-method: graceful
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge .additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
+    description: "Graceful backup using wazuh-control stop/start"
+spec:
+  schedule: "{{ .schedule | default $.Values.backup.schedule }}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "common.names.fullname" $ }}-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: trigger-graceful-backup
+              image: "curlimages/curl:8.1.0"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+
+                  echo "🕐 Scheduled graceful backup triggered for {{ .name }} at $(date)"
+                  echo "📋 Method: wazuh-control stop/start (graceful shutdown)"
+
+                  # Call the EventListener service with method=graceful
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                      "component": "{{ .name }}",
+                      "method": "graceful",
+                      "s3BucketName": "{{ $.Values.backup.s3.bucketName }}",
+                      "s3EndpointUrl": "{{ $.Values.backup.s3.endpointUrl }}",
+                      "triggeredBy": "cronjob-graceful"
+                    }' \
+                    "http://{{ include "common.names.fullname" $ }}-listener-svc.{{ include "common.names.namespace" $ }}.svc.cluster.local:8080/"
+
+                  if [ $? -eq 0 ]; then
+                    echo "✅ Graceful backup request sent successfully for {{ .name }}"
+                    echo "🔄 Pipeline will use wazuh-control to gracefully stop/start services"
+                  else
+                    echo "❌ Failed to send graceful backup request for {{ .name }}"
+                    exit 1
+                  fi
+{{- end }}
+{{- end }}
+{{- end }}

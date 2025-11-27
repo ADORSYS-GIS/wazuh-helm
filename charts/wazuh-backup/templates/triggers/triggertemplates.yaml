@@ -1,0 +1,101 @@
+# templates/triggers/triggertemplates.yaml
+# Dynamic trigger templates for all enabled components
+
+{{- if .Values.features.triggers.enabled }}
+{{- range .Values.backup.components }}
+{{- if .enabled }}
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ include "common.names.fullname" $ }}-{{ .name }}-template
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+    component: {{ .name }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge .additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
+spec:
+  params:
+    - name: s3BucketName
+      description: "S3 bucket for backups"
+      default: "{{ $.Values.backup.s3.bucketName }}"
+    - name: s3EndpointUrl
+      description: "Optional S3 endpoint URL"
+      default: "{{ $.Values.backup.s3.endpointUrl }}"
+    - name: triggeredBy
+      description: "How the backup was triggered"
+      default: "manual"
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: {{ include "common.names.fullname" $ }}-{{ .name }}-
+        namespace: {{ include "common.names.namespace" $ }}
+        labels:
+          {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 10 }}
+          component: {{ .name }}
+          triggered-by: "$(tt.params.triggeredBy)"
+        annotations:
+          backup.wazuh.io/component: "{{ .name }}"
+          backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
+      spec:
+        serviceAccountName: {{ include "common.names.fullname" $ }}-sa
+        {{- if $.Values.features.gracefulShutdown.enabled }}
+        pipelineRef:
+          name: {{ include "common.names.fullname" $ }}-component-backup-graceful
+        params:
+          - name: componentName
+            value: "{{ .name }}"
+          - name: podName
+            value: "{{ .podName }}"
+          - name: podNamespace
+            value: "{{ $.Values.global.namespace }}"
+          - name: containerName
+            value: "{{ $.Values.backup.gracefulShutdown.containerName }}"
+          - name: wazuhControlPath
+            value: "{{ $.Values.backup.gracefulShutdown.wazuhControlPath }}"
+          - name: sourcePvcName
+            value: "{{ .pvcName }}"
+          - name: sourcePvcPath
+            value: "{{ include "backup.sourcePath" . }}"
+          - name: includePaths
+            value: "{{ include "backup.includePaths" . }}"
+          - name: excludePatterns
+            value: "{{ include "backup.excludePatterns" . }}"
+          - name: backupSubdir
+            value: "{{ .backupSubdir }}"
+          - name: s3BucketName
+            value: "$(tt.params.s3BucketName)"
+          - name: s3EndpointUrl
+            value: "$(tt.params.s3EndpointUrl)"
+        {{- else }}
+        pipelineRef:
+          name: {{ include "common.names.fullname" $ }}-component-backup
+        params:
+          - name: componentName
+            value: "{{ .name }}"
+          - name: statefulsetName
+            value: "{{ .statefulsetName }}"
+          - name: statefulsetNamespace
+            value: "{{ $.Values.global.namespace }}"
+          - name: replicas
+            value: "{{ .replicas }}"
+          - name: sourcePvcName
+            value: "{{ .pvcName }}"
+          - name: sourcePvcPath
+            value: "{{ include "backup.sourcePath" . }}"
+          - name: includePaths
+            value: "{{ include "backup.includePaths" . }}"
+          - name: excludePatterns
+            value: "{{ include "backup.excludePatterns" . }}"
+          - name: backupSubdir
+            value: "{{ .backupSubdir }}"
+          - name: s3BucketName
+            value: "$(tt.params.s3BucketName)"
+          - name: s3EndpointUrl
+            value: "$(tt.params.s3EndpointUrl)"
+        {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
