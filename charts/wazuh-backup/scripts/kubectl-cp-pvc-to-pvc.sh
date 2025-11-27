@@ -17,43 +17,43 @@ echo "  DESTINATION_PATH: ${DESTINATION_PATH}"
 echo ""
 
 # Validate required parameters
-if [ -z "$POD_NAME" ]; then
-  echo "❌ POD_NAME environment variable must be set"
+if [[ -z "$POD_NAME" ]]; then
+  echo "❌ POD_NAME environment variable must be set" >&2
   exit 1
 fi
 
-if [ -z "$POD_NAMESPACE" ]; then
-  echo "❌ POD_NAMESPACE environment variable must be set"
+if [[ -z "$POD_NAMESPACE" ]]; then
+  echo "❌ POD_NAMESPACE environment variable must be set" >&2
   exit 1
 fi
 
-if [ -z "$DESTINATION_PATH" ]; then
-  echo "❌ DESTINATION_PATH environment variable must be set"
+if [[ -z "$DESTINATION_PATH" ]]; then
+  echo "❌ DESTINATION_PATH environment variable must be set" >&2
   exit 1
 fi
 
-if [ -z "$INCLUDE_PATHS" ]; then
-  echo "❌ INCLUDE_PATHS environment variable must be set"
+if [[ -z "$INCLUDE_PATHS" ]]; then
+  echo "❌ INCLUDE_PATHS environment variable must be set" >&2
   exit 1
 fi
 
 DEST_DIR="/backup/${DESTINATION_PATH}"
 
 # Refuse to treat / (root) as destination
-if [ "$DEST_DIR" = "/" ]; then
-  echo "❌ Refusing to use / as destination."
+if [[ "$DEST_DIR" = "/" ]]; then
+  echo "❌ Refusing to use / as destination." >&2
   exit 1
 fi
 
 # Create destination if it is missing
-if [ ! -d "$DEST_DIR" ]; then
+if [[ ! -d "$DEST_DIR" ]]; then
   echo "📂 Destination $DEST_DIR not found. Creating it…"
   mkdir -p "$DEST_DIR"
 fi
 
 # Build container argument if specified
 CONTAINER_ARG=""
-if [ -n "$CONTAINER_NAME" ]; then
+if [[ -n "$CONTAINER_NAME" ]]; then
   CONTAINER_ARG="-c $CONTAINER_NAME"
 fi
 
@@ -67,11 +67,14 @@ TEMP_EXPANDED="/tmp/backup-expanded-$$.txt"
 > "$TEMP_EXPANDED"
 
 # Parse paths from INCLUDE_PATHS
+# Constant for trimming whitespace
+readonly TRIM_WHITESPACE_SED='s/^[[:space:]]*//;s/[[:space:]]*$//'
+
 echo "📋 Parsing backup paths..."
 echo "$INCLUDE_PATHS" | tr ',' '\n' | while IFS= read -r path; do
   # Trim whitespace
-  path=$(echo "$path" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-  if [ -n "$path" ]; then
+  path=$(echo "$path" | sed "${TRIM_WHITESPACE_SED}")
+  if [[ -n "$path" ]]; then
     echo "$path" >> "$TEMP_PATHS"
   fi
 done
@@ -81,7 +84,7 @@ echo "🔎 Checking and expanding paths in pod..."
 echo ""
 
 while IFS= read -r path; do
-  if [ -z "$path" ]; then
+  if [[ -z "$path" ]]; then
     continue
   fi
 
@@ -92,9 +95,9 @@ while IFS= read -r path; do
     # Use kubectl exec to expand wildcards in the pod
     EXPANDED=$(kubectl exec -n "$POD_NAMESPACE" "$POD_NAME" $CONTAINER_ARG -- sh -c "ls -1d $path 2>/dev/null || true")
 
-    if [ -n "$EXPANDED" ]; then
+    if [[ -n "$EXPANDED" ]]; then
       echo "$EXPANDED" | while IFS= read -r expanded_path; do
-        if [ -n "$expanded_path" ]; then
+        if [[ -n "$expanded_path" ]]; then
           echo "   ✓ Found: $expanded_path"
           echo "$expanded_path" >> "$TEMP_EXPANDED"
         fi
@@ -118,8 +121,8 @@ echo ""
 # Count expanded paths
 PATH_COUNT=$(wc -l < "$TEMP_EXPANDED" 2>/dev/null | tr -d ' ' || echo "0")
 
-if [ "$PATH_COUNT" -eq 0 ]; then
-  echo "❌ No valid paths found to backup (all paths were missing or wildcards didn't match)"
+if [[ "$PATH_COUNT" -eq 0 ]]; then
+  echo "❌ No valid paths found to backup (all paths were missing or wildcards didn't match)" >&2
   rm -f "$TEMP_PATHS" "$TEMP_EXPANDED"
   exit 1
 fi
@@ -132,7 +135,7 @@ SUCCESS_COUNT=0
 FAIL_COUNT=0
 
 while IFS= read -r path; do
-  if [ -z "$path" ]; then
+  if [[ -z "$path" ]]; then
     continue
   fi
 
@@ -146,9 +149,9 @@ while IFS= read -r path; do
   dest_parent="$DEST_DIR/$parent_dir"
 
   # Create parent directory structure if needed
-  if [ ! -d "$dest_parent" ]; then
+  if [[ ! -d "$dest_parent" ]]; then
     mkdir -p "$dest_parent" 2>/dev/null || {
-      echo "   ⚠️  Warning: Failed to create directory $dest_parent"
+      echo "   ⚠️  Warning: Failed to create directory $dest_parent" >&2
       FAIL_COUNT=$((FAIL_COUNT + 1))
       echo ""
       continue
@@ -159,13 +162,13 @@ while IFS= read -r path; do
   OUTPUT=$(kubectl cp $CONTAINER_ARG "$POD_SOURCE" "$DEST_DIR/$path" 2>&1)
   EXIT_CODE=$?
 
-  if [ $EXIT_CODE -eq 0 ]; then
+  if [[ $EXIT_CODE -eq 0 ]]; then
     echo "   ✓ Copied successfully"
     SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
   else
-    echo "   ⚠️  Warning: kubectl cp failed for $path"
+    echo "   ⚠️  Warning: kubectl cp failed for $path" >&2
     # Show error details (filter out tar warnings)
-    echo "$OUTPUT" | grep -v "^tar:" | sed 's/^/      /' || true
+    echo "$OUTPUT" | grep -v "^tar:" | sed 's/^/      /' >&2 || true
     FAIL_COUNT=$((FAIL_COUNT + 1))
   fi
   echo ""
@@ -182,10 +185,10 @@ echo "   Successful: $SUCCESS_COUNT"
 echo "   Failed: $FAIL_COUNT"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-if [ "$SUCCESS_COUNT" -eq 0 ]; then
-  echo "❌ All backup operations failed"
+if [[ "$SUCCESS_COUNT" -eq 0 ]]; then
+  echo "❌ All backup operations failed" >&2
   exit 1
-elif [ "$FAIL_COUNT" -gt 0 ]; then
+elif [[ "$FAIL_COUNT" -gt 0 ]]; then
   echo "⚠️  Backup completed with warnings (some files could not be copied)"
   exit 0
 else

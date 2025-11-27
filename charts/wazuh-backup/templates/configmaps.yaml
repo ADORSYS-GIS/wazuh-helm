@@ -21,7 +21,7 @@ data:
 immutable: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
 {{- end }}
 {{ with .binaryData }}
-binaryData: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2}}
+binaryData: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
 {{- end }}
 {{- end }}
 {{- end }}
