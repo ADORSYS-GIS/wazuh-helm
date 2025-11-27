@@ -122,14 +122,28 @@ check_pod_status() {
 get_wazuh_status() {
   echo "🔍 Getting Wazuh service status..."
 
-  # Try to get status (may fail if services are stopped)
-  if kubectl exec "${POD_NAME}" -n "${NAMESPACE}" -c "${CONTAINER_NAME}" -- \
-    ${WAZUH_CONTROL_PATH} status 2>/dev/null; then
-    return 0
-  else
-    echo "⚠️  Could not get service status (services may be stopped)"
+  # Capture status output (don't rely on exit code - it fails if ANY service is not running)
+  STATUS_OUTPUT=$(kubectl exec "${POD_NAME}" -n "${NAMESPACE}" -c "${CONTAINER_NAME}" -- \
+    ${WAZUH_CONTROL_PATH} status 2>&1) || true
+
+  # Check if we got any output at all
+  if [ -z "$STATUS_OUTPUT" ]; then
+    echo "⚠️  Could not get service status (no output)"
     return 1
   fi
+
+  # Display the status
+  echo "$STATUS_OUTPUT"
+
+  # Count running vs not-running services
+  RUNNING_COUNT=$(echo "$STATUS_OUTPUT" | grep -c "is running" || echo "0")
+  NOT_RUNNING_COUNT=$(echo "$STATUS_OUTPUT" | grep -c "not running" || echo "0")
+
+  echo ""
+  echo "📊 Status Summary: ${RUNNING_COUNT} running, ${NOT_RUNNING_COUNT} not running"
+
+  # If we got output, the status check succeeded (even if services aren't running)
+  return 0
 }
 
 # Function to stop Wazuh services
@@ -257,8 +271,21 @@ show_status() {
   echo "📊 Current Wazuh Status:"
   echo "======================="
 
-  kubectl exec "${POD_NAME}" -n "${NAMESPACE}" -c "${CONTAINER_NAME}" -- \
-    ${WAZUH_CONTROL_PATH} status 2>&1 || echo "Cannot retrieve status"
+  # Capture status (ignore exit code since it fails if ANY service is not running)
+  STATUS_OUTPUT=$(kubectl exec "${POD_NAME}" -n "${NAMESPACE}" -c "${CONTAINER_NAME}" -- \
+    ${WAZUH_CONTROL_PATH} status 2>&1) || true
+
+  if [ -n "$STATUS_OUTPUT" ]; then
+    echo "$STATUS_OUTPUT"
+
+    # Show summary
+    RUNNING_COUNT=$(echo "$STATUS_OUTPUT" | grep -c "is running" || echo "0")
+    NOT_RUNNING_COUNT=$(echo "$STATUS_OUTPUT" | grep -c "not running" || echo "0")
+    echo ""
+    echo "Summary: ${RUNNING_COUNT} services running, ${NOT_RUNNING_COUNT} not running"
+  else
+    echo "Cannot retrieve status"
+  fi
 
   echo ""
   echo "📊 Pod Status:"
