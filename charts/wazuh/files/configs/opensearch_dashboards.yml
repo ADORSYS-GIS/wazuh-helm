@@ -12,8 +12,6 @@ server.ssl.certificate: "/usr/share/wazuh-dashboard/certs/dashboard.pem"
 opensearch.ssl.certificateAuthorities: ["/usr/share/wazuh-dashboard/certs/root-ca.pem"]
 uiSettings.overrides.defaultRoute: /app/wz-home?security_tenant=global
 
-opensearch_security.auth.unauthenticated_routes: ['/api/status']
-
 # Session expiration settings
 opensearch_security.cookie.ttl: 900000
 opensearch_security.session.ttl: 900000
@@ -35,8 +33,36 @@ opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.rend
 
 {{- end -}}
 {{- end }}
-  
-{{ with $.Values.dashboard.branding -}}
+
+{{- with $.Values.opensearchDashboards.branding }}
+{{- if .enabled }}
 opensearchDashboards.branding:
-  {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+  applicationTitle: "{{ .applicationTitle }}"
+  faviconUrl: "{{ .faviconUrl }}"
+  useExpandedHeader: {{ .useExpandedHeader }}
+  
+  {{- with .logo }}
+  logo:
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
+    {{- end }}
+  {{- end }}
+  
+  {{- with .loadingLogo }}
+  loadingLogo:
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
+    {{- end }}
+  {{- end }}
+  
+  {{- with .mark }}
+  mark:
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
+    {{- end }}
+  {{- end }}
+{{- end }}
 {{- end }}
