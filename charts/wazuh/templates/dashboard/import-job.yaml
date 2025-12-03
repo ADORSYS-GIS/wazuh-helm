@@ -1,4 +1,5 @@
-{{- if .Values.dashboard.importSavedObjects.enabled }}
+{{- with $.Values.dashboard }}
+{{- if .importSavedObjects.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -21,10 +22,6 @@ spec:
         app: {{ include "common.names.fullname" $ }}-import-saved-objects
     spec:
       restartPolicy: OnFailure
-      volumes:
-        - name: export-data
-          configMap:
-            name: {{ include "common.names.fullname" $ }}-dashboard-export
       initContainers:
         - name: wait-for-dashboard
           image: curlimages/curl:8.17.0
@@ -75,45 +72,43 @@ spec:
               #!/bin/bash
               set -e
               
-              # Copy all export files to a writable location
+              # Create temporary directory for downloaded files
               mkdir -p /tmp/wazuh-import
               
-              # Import each export file
-              for export_file in /tmp/export-files/*.ndjson; do
-                if [ -f "$export_file" ]; then
-                  filename=$(basename "$export_file")
-                  echo "Processing export file: $filename"
-                  
-                  # Copy to writable location
-                  cp "$export_file" "/tmp/wazuh-import/$filename"
-                  chmod 644 "/tmp/wazuh-import/$filename"
-                  
-                  # Import saved objects with better error handling
-                  echo "Importing saved objects from $filename..."
-                  response=$(curl -k -u "${DASHBOARD_USERNAME}:${DASHBOARD_PASSWORD}" \
-                    -H "osd-xsrf: true" \
-                    -F file=@"/tmp/wazuh-import/$filename" \
-                    -X POST "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/saved_objects/_import?createNewCopies=true" \
-                    -w "%{http_code}" -o "/tmp/import-response-$filename.txt")
-                  
-                  echo "Import response status for $filename: $response"
-                  echo "Import response body for $filename:"
-                  cat "/tmp/import-response-$filename.txt"
-                  
-                  if [ "$response" -eq 200 ] || [ "$response" -eq 409 ]; then
-                    echo "Import of $filename completed successfully or objects already exist"
-                  else
-                    echo "Import of $filename failed with status $response"
-                    cat "/tmp/import-response-$filename.txt"
-                    exit 1
-                  fi
-                fi
-              done
+              # Download and import each export file from S3 URLs
+              {{- range $k, $v := .exports }}
+              export_file="{{ $k }}"
+              export_url="{{ $v }}"
+              
+              echo "Downloading export file: $export_file from $export_url"
+              
+              # Download the export file
+              if ! curl -s -L -o "/tmp/wazuh-import/$export_file" "$export_url"; then
+                echo "Failed to download $export_file from $export_url"
+                exit 1
+              fi
+              
+              echo "Importing saved objects from $export_file..."
+              response=$(curl -k -u "${DASHBOARD_USERNAME}:${DASHBOARD_PASSWORD}" \
+                -H "osd-xsrf: true" \
+                -F file=@"/tmp/wazuh-import/$export_file" \
+                -X POST "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/saved_objects/_import?createNewCopies=true" \
+                -w "%{http_code}" -o "/tmp/import-response-$export_file.txt")
+              
+              echo "Import response status for $export_file: $response"
+              echo "Import response body for $export_file:"
+              cat "/tmp/import-response-$export_file.txt"
+              
+              if [ "$response" -eq 200 ] || [ "$response" -eq 409 ]; then
+                echo "Import of $export_file completed successfully or objects already exist"
+              else
+                echo "Import of $export_file failed with status $response"
+                cat "/tmp/import-response-$export_file.txt"
+                exit 1
+              fi
+              {{- end }}
               
               echo "All export files processed"
-          volumeMounts:
-            - name: export-data
-              mountPath: /tmp/export-files
           env:
             - name: DASHBOARD_USERNAME
               valueFrom:
@@ -126,3 +121,4 @@ spec:
                   name: '{{ include "secret.dashboard-auth" $ }}'
                   key: DASHBOARD_PASSWORD
 {{- end }}
+{{ end }}
