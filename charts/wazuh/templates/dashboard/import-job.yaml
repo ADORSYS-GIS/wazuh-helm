@@ -1,0 +1,94 @@
+{{- if .Values.dashboard.importSavedObjects.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-import-saved-objects
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    app: {{ include "common.names.fullname" $ }}-import-saved-objects
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      annotations:
+        {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 8 }}
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-import-saved-objects
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+      - name: export-data
+        configMap:
+          name: {{ include "common.names.fullname" $ }}-dashboard-export
+      containers:
+      - name: import-saved-objects
+        image: curlimages/curl:8.17.0
+        imagePullPolicy: IfNotPresent
+        command:
+          - sh
+          - -c
+          - |
+            #!/bin/bash
+            set -e
+            
+            # Copy the export file to a writable location
+            mkdir -p /tmp/wazuh-import
+            cp /tmp/export.ndjson /tmp/wazuh-import/export.ndjson
+            chmod 644 /tmp/wazuh-import/export.ndjson
+            
+            # Wait for dashboard to be ready with better error handling
+            echo "Waiting for Wazuh Dashboard to be ready..."
+            retries=60
+            until curl -k -u "${DASHBOARD_USERNAME}:${DASHBOARD_PASSWORD}" \
+              "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/status" >/dev/null 2>&1; do
+              echo "Still waiting for Wazuh Dashboard to be ready..."
+              sleep 10
+              retries=$((retries - 1))
+              if [ $retries -le 0 ]; then
+                echo "Timeout waiting for dashboard to be ready"
+                exit 1
+              fi
+            done
+            
+            # Give it a bit more time to fully initialize
+            sleep 10
+            
+            # Import saved objects with better error handling
+            echo "Importing saved objects..."
+            response=$(curl -k -u "${DASHBOARD_USERNAME}:${DASHBOARD_PASSWORD}" \
+              -H "osd-xsrf: true" \
+              -F file=@/tmp/wazuh-import/export.ndjson \
+              -X POST "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/saved_objects/_import?createNewCopies=true" \
+              -w "%{http_code}" -o /tmp/import-response.txt)
+            
+            echo "Import response status: $response"
+            echo "Import response body:"
+            cat /tmp/import-response.txt
+            
+            if [ "$response" -eq 200 ] || [ "$response" -eq 409 ]; then
+              echo "Import completed successfully or objects already exist"
+            else
+              echo "Import failed with status $response"
+              exit 1
+            fi
+        volumeMounts:
+          - name: export-data
+            mountPath: /tmp/export.ndjson
+            subPath: export.ndjson
+        env:
+          - name: DASHBOARD_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: '{{ include "secret.dashboard-auth" $ }}'
+                key: DASHBOARD_USERNAME
+          - name: DASHBOARD_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: '{{ include "secret.dashboard-auth" $ }}'
+                key: DASHBOARD_PASSWORD
+{{- end }}
