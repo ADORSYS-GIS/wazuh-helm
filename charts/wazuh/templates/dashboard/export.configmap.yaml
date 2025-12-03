@@ -12,8 +12,9 @@ data:
   "export.ndjson": |
     {{ $.Files.Get "files/configs/export.ndjson" | nindent 4 }}
   {{- range $k, $v := .exports }}
+    {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
   {{ printf "%s" $k | quote | nindent 2 }}: |
-    {{ $v | nindent 4 }}
+    {{ include "common.tplvalues.render" (dict "value" $f "context" $) | nindent 4 }}
   {{- end }}
 {{ end }}
 {{ end }}
