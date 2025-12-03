@@ -1,3 +1,5 @@
+{{ with .Values.dashboard }}
+{{ if .importSavedObjects.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,3 +11,9 @@ metadata:
 data:
   "export.ndjson": |
     {{ $.Files.Get "files/configs/export.ndjson" | nindent 4 }}
+  {{- range $k, $v := .exports }}
+  {{ printf "%s" $k | quote | nindent 2 }}: |
+    {{ $v | nindent 4 }}
+  {{- end }}
+{{ end }}
+{{ end }}

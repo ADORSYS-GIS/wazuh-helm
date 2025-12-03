@@ -750,8 +750,16 @@ dashboard:
   additionalLabels: { }
   resources: ~
 
+  ##
+  ##
   importSavedObjects:
+    ##
+    ##
     enabled: false
+    
+  ##
+  ##
+  exports: { }
 
   ##
   ##
