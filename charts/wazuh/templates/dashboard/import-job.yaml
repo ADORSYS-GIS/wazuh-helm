@@ -92,7 +92,7 @@ spec:
               response=$(curl -k -u "${DASHBOARD_USERNAME}:${DASHBOARD_PASSWORD}" \
                 -H "osd-xsrf: true" \
                 -F file=@"/tmp/wazuh-import/$export_file" \
-                -X POST "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/saved_objects/_import?createNewCopies=true" \
+                -X POST "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/saved_objects/_import?overwrite=true" \
                 -w "%{http_code}" -o "/tmp/import-response-$export_file.txt")
               
               echo "Import response status for $export_file: $response"
