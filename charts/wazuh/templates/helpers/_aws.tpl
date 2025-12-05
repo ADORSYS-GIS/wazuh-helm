@@ -1,7 +1,7 @@
 {{- define "integration.aws.exists" -}}
 {{- $aws := .Values.integration.aws -}}
 {{- if $aws -}}
-{{- if or (and $aws.cloudtrail $aws.cloudtrail.enabled) (and $aws.config $aws.config.enabled) (and $aws.securityHub $aws.securityHub.enabled) -}}
+{{- if or (and $aws.cloudtrail $aws.cloudtrail.enabled) (and $aws.config $aws.config.enabled) (and $aws.securityHub $aws.securityHub.enabled) (and $aws.guardduty $aws.guardduty.enabled) -}}
 true
 {{- else -}}
 false
@@ -14,7 +14,7 @@ false
 {{- define "integration.aws.conf" -}}
 {{- $aws := .Values.integration.aws -}}
 {{- if $aws -}}
-{{- if or (and $aws.cloudtrail $aws.cloudtrail.enabled) (and $aws.config $aws.config.enabled) (and $aws.securityHub $aws.securityHub.enabled) -}}
+{{- if or (and $aws.cloudtrail $aws.cloudtrail.enabled) (and $aws.config $aws.config.enabled) (and $aws.securityHub $aws.securityHub.enabled) (and $aws.guardduty $aws.guardduty.enabled) -}}
 <wodle name="aws-s3">
   <disabled>no</disabled>
 {{- $interval := (default "1m" (or (and $aws.cloudtrail $aws.cloudtrail.interval) (and $aws.securityHub $aws.securityHub.interval))) }}
@@ -65,6 +65,18 @@ false
     <iam_role_arn>{{ include "common.tplvalues.render" (dict "value" $securityHubRole "context" $) }}</iam_role_arn>
 {{- end }}
   </subscriber>
+{{- end }}
+{{- if and $aws.guardduty $aws.guardduty.enabled }}
+  <bucket type="guardduty">
+    <name>{{ include "common.tplvalues.render" (dict "value" $aws.guardduty.bucketName "context" $) }}</name>
+{{- $guarddutyProfile := default "default" (default $aws.profile $aws.guardduty.profile) }}
+{{- if and $guarddutyProfile (ne $guarddutyProfile "~") }}
+    <aws_profile>{{ include "common.tplvalues.render" (dict "value" $guarddutyProfile "context" $) }}</aws_profile>
+{{- end }}
+{{- if $aws.roleArn }}
+    <iam_role_arn>{{ include "common.tplvalues.render" (dict "value" $aws.roleArn "context" $) }}</iam_role_arn>
+{{- end }}
+  </bucket>
 {{- end }}
 </wodle>
 {{- end -}}
