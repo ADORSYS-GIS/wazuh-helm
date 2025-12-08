@@ -1,16 +1,16 @@
-{{- with $.Values.dashboard }}
-{{- if .importSavedObjects.enabled }}
+{{- with $.Values.dashboard.importCustomDashboards }}
+{{- if .enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "common.names.fullname" $ }}-import-saved-objects
+  name: {{ include "common.names.fullname" $ }}-import-custom-dashboards
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation
     {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
   labels:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
-    app: {{ include "common.names.fullname" $ }}-import-saved-objects
+    app: {{ include "common.names.fullname" $ }}-import-custom-dashboards
 spec:
   backoffLimit: 3
   template:
@@ -19,7 +19,7 @@ spec:
         {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 8 }}
       labels:
         {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 8 }}
-        app: {{ include "common.names.fullname" $ }}-import-saved-objects
+        app: {{ include "common.names.fullname" $ }}-import-custom-dashboards
     spec:
       restartPolicy: OnFailure
       initContainers:
@@ -62,7 +62,7 @@ spec:
                   name: '{{ include "secret.dashboard-auth" $ }}'
                   key: DASHBOARD_PASSWORD
       containers:
-        - name: import-saved-objects
+        - name: import-custom-dashboards
           image: curlimages/curl:8.17.0
           imagePullPolicy: IfNotPresent
           command:
@@ -76,7 +76,7 @@ spec:
               mkdir -p /tmp/wazuh-import
               
               # Download and import each export file from S3 URLs
-              {{- range $k, $v := .exports }}
+              {{- range $k, $v := .dashboards }}
               export_file="{{ $k }}"
               export_url="{{ $v }}"
               
