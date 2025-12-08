@@ -17,7 +17,7 @@ type: application
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
 # Fixed securityContext to use hard-coded values like rc.19 instead of templating
 
-version: 0.6.1-rc.9
+version: 0.6.1-rc.10
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to

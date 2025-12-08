@@ -25,8 +25,13 @@ false
         <tenantdomain>{{ include "common.tplvalues.render" (dict "value" $azure.tenantDomain "context" $) }}</tenantdomain>
 {{- end }}
 {{- if $azure.logAnalytics.queries }}
-{{- range $query := $azure.logAnalytics.queries }}
+{{- range $index, $query := $azure.logAnalytics.queries }}
         <request>
+{{- if $query.tag }}
+            <tag>{{ $query.tag }}</tag>
+{{- else }}
+            <tag>{{ printf "log-analytics-%d" $index }}</tag>
+{{- end }}
             <query>{{ $query.query }}</query>
             <workspace>{{ default $azure.logAnalytics.workspace $query.workspace }}</workspace>
 {{- if $query.timeOffset }}
@@ -38,6 +43,7 @@ false
 {{- end }}
 {{- else }}
         <request>
+            <tag>AzureActivity</tag>
             <query>AzureActivity</query>
             <workspace>{{ include "common.tplvalues.render" (dict "value" $azure.logAnalytics.workspace "context" $) }}</workspace>
             <time_offset>1d</time_offset>
@@ -52,8 +58,13 @@ false
         <tenantdomain>{{ include "common.tplvalues.render" (dict "value" $azure.tenantDomain "context" $) }}</tenantdomain>
 {{- end }}
 {{- if $azure.graph.queries }}
-{{- range $query := $azure.graph.queries }}
+{{- range $index, $query := $azure.graph.queries }}
         <request>
+{{- if $query.tag }}
+            <tag>{{ $query.tag }}</tag>
+{{- else }}
+            <tag>{{ printf "graph-%d" $index }}</tag>
+{{- end }}
             <query>{{ $query.query }}</query>
 {{- if $query.timeOffset }}
             <time_offset>{{ $query.timeOffset }}</time_offset>
@@ -64,6 +75,7 @@ false
 {{- end }}
 {{- else }}
         <request>
+            <tag>directoryAudits</tag>
             <query>auditLogs/directoryAudits</query>
             <time_offset>1d</time_offset>
         </request>
