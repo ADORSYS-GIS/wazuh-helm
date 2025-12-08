@@ -145,7 +145,9 @@ while IFS= read -r path; do
   POD_SOURCE="${POD_NAMESPACE}/${POD_NAME}:${path}"
 
   # Get the parent directory to preserve structure
-  parent_dir=$(dirname "$path")
+  # Remove leading slash from path to avoid double slashes
+  path_relative="${path#/}"
+  parent_dir=$(dirname "$path_relative")
   dest_parent="$DEST_DIR/$parent_dir"
 
   # Create parent directory structure if needed
@@ -159,7 +161,7 @@ while IFS= read -r path; do
   fi
 
   # Execute kubectl cp - capture output and check exit code
-  OUTPUT=$(kubectl cp $CONTAINER_ARG "$POD_SOURCE" "$DEST_DIR/$path" 2>&1)
+  OUTPUT=$(kubectl cp $CONTAINER_ARG "$POD_SOURCE" "$DEST_DIR/$path_relative" 2>&1)
   EXIT_CODE=$?
 
   if [[ $EXIT_CODE -eq 0 ]]; then
