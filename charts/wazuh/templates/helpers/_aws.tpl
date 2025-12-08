@@ -76,6 +76,9 @@ false
 {{- if $aws.roleArn }}
     <iam_role_arn>{{ include "common.tplvalues.render" (dict "value" $aws.roleArn "context" $) }}</iam_role_arn>
 {{- end }}
+{{- if $aws.guardduty.awsAccountIds }}
+    <aws_account_id>{{ include "common.tplvalues.render" (dict "value" $aws.guardduty.awsAccountIds "context" $) }}</aws_account_id>
+{{- end }}
   </bucket>
 {{- end }}
 </wodle>
