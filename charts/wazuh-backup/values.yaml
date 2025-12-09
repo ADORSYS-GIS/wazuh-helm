@@ -1,0 +1,1029 @@
+# values.yaml - Fully Templated Configuration
+# Follows Bitnami common chart patterns with array-based resource definitions
+
+# ------------------------------------------------------------------------------
+# Standard Helm chart metadata
+# ------------------------------------------------------------------------------
+kubeVersion: ""
+nameOverride: ""
+fullnameOverride: ""
+
+# Common labels and annotations for all resources
+commonLabels: {}
+commonAnnotations: {}
+
+# ------------------------------------------------------------------------------
+# Global settings
+# ------------------------------------------------------------------------------
+global:
+  namespace: wazuh
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+# ------------------------------------------------------------------------------
+# Chart meta
+# ------------------------------------------------------------------------------
+chartVersion: "0.1.0"
+
+# ------------------------------------------------------------------------------
+# Feature Flags - Enable/disable major features
+# ------------------------------------------------------------------------------
+features:
+  eventListener:
+    enabled: true
+  cronjobs:
+    enabled: true
+  triggers:
+    enabled: true
+  debug:
+    enabled: true
+  gracefulShutdown:
+    enabled: true
+
+# ------------------------------------------------------------------------------
+# Backup Configuration
+# ------------------------------------------------------------------------------
+backup:
+  # Global backup settings
+  schedule: "0 2 * * *"  # Default schedule for all components
+
+  # S3 configuration
+  s3:
+    bucketName: "test-wazuh-backup-bucket"
+    endpointUrl: ""  # Leave empty for AWS S3
+    pathPrefix: "wazuh-backup"
+
+  # Graceful shutdown configuration
+  gracefulShutdown:
+    containerName: "wazuh-manager"
+    wazuhControlPath: "/var/ossec/bin/wazuh-control"
+
+  # Component-specific configurations (now as array)
+  components:
+    - name: master
+      enabled: true
+      statefulsetName: "wazuh-wazuh-helm-manager-master"
+      podName: "wazuh-wazuh-helm-manager-master-0"
+      pvcName: "wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0"
+      replicas: 1
+      backupSubdir: "master-backup"
+      schedule: "0 2 * * *"
+      additionalLabels: {}
+      additionalAnnotations: {}
+      # Backup path configuration
+      backupPaths:
+        include:
+          - "/var/ossec/etc/client.keys"
+          - "/var/ossec/etc/sslmanager.cert"
+          - "/var/ossec/etc/sslmanager.key"
+          - "/var/ossec/etc/*.pem"
+          - "/var/ossec/etc/authd.pass"
+          - "/var/ossec/etc/shared"
+          - "/var/ossec/etc/internal_options.conf"
+          - "/var/ossec/etc/local_internal_options.conf"
+          - "/var/ossec/etc/rules/local_rules.xml"
+          - "/var/ossec/etc/decoders/local_decoder.xml"
+          - "/var/ossec/queue/agents-timestamp"
+          - "/var/ossec/var/multigroups"
+          - "/var/ossec/queue/agentless"
+          - "/var/ossec/queue/fts"
+          - "/var/ossec/queue/rids"
+          - "/var/ossec/queue/db"
+          - "/var/ossec/logs"
+          - "/var/ossec/stats"
+          - "/var/ossec/api/configuration"
+          - "/etc/filebeat"
+        exclude:
+          - "*.tmp"
+          - "*.swp"
+          - ".cache/"
+          - "*/lost+found"
+
+    - name: indexer
+      enabled: false
+      statefulsetName: "wazuh-wazuh-helm-indexer"
+      podName: "wazuh-wazuh-helm-indexer-0"
+      pvcName: "wazuh-wazuh-helm-indexer-wazuh-wazuh-helm-indexer-0"
+      replicas: 1
+      backupSubdir: "indexer-backup"
+      schedule: "0 2 * * *"
+      additionalLabels: {}
+      additionalAnnotations: {}
+      backupPaths:
+        include:
+          - "nodes"
+          - "indices"
+          - "_state"
+        exclude:
+          - "*.lock"
+          - "write.lock"
+
+    - name: worker
+      enabled: false
+      statefulsetName: "wazuh-wazuh-helm-manager-worker"
+      podName: "wazuh-wazuh-helm-manager-worker-0"
+      pvcName: "wazuh-wazuh-helm-manager-worker-wazuh-wazuh-helm-manager-worker-0"
+      replicas: 1
+      backupSubdir: "worker-backup"
+      schedule: "0 2 * * *"
+      additionalLabels: {}
+      additionalAnnotations: {}
+      backupPaths:
+        include:
+          - "wazuh/var/ossec/logs"
+          - "wazuh/var/ossec/queue"
+        exclude:
+          - "*.tmp"
+
+# ------------------------------------------------------------------------------
+# Tekton Resources (Array-based)
+# ------------------------------------------------------------------------------
+tekton:
+  # Pipelines
+  pipelines:
+  #   - name: '{{ include "common.names.fullname" $ }}-component-backup'
+  #     enabled: true
+  #     additionalLabels: {}
+  #     additionalAnnotations: {}
+  #     spec:
+  #       description: |
+  #         Back up a Wazuh component with comprehensive error handling
+  #       params:
+  #         - name: componentName
+  #           type: string
+  #         - name: statefulsetName
+  #           type: string
+  #         - name: statefulsetNamespace
+  #           type: string
+  #           default: '{{ .Values.global.namespace }}'
+  #         - name: replicas
+  #           type: string
+  #         - name: podName
+  #           type: string
+  #         - name: containerName
+  #           type: string
+  #           default: ""
+  #         - name: sourcePvcName
+  #           type: string
+  #         - name: sourcePvcPath
+  #           type: string
+  #           default: ""
+  #         - name: includePaths
+  #           type: string
+  #           default: ""
+  #         - name: excludePatterns
+  #           type: string
+  #           default: ""
+  #         - name: backupSubdir
+  #           type: string
+  #         - name: s3BucketName
+  #           type: string
+  #         - name: s3EndpointUrl
+  #           type: string
+  #           default: ""
+  #       finally:
+  #         - name: emergency-scale-up
+  #           taskRef:
+  #             name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+  #           params:
+  #             - name: statefulsetName
+  #               value: "$(params.statefulsetName)"
+  #             - name: namespace
+  #               value: "$(params.statefulsetNamespace)"
+  #             - name: replicas
+  #               value: "$(params.replicas)"
+  #             - name: mode
+  #               value: "emergency"
+  #             - name: componentName
+  #               value: "$(params.componentName)"
+  #             - name: pipelineStatus
+  #               value: "$(tasks.status)"
+  #       tasks:
+  #         - name: clean-staging
+  #           taskRef:
+  #             name: '{{ include "common.names.fullname" $ }}-cleanup-pvc'
+  #           params:
+  #             - name: directoryPath
+  #               value: "$(params.backupSubdir)"
+  #         - name: scale-down
+  #           taskRef:
+  #             name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+  #           params:
+  #             - name: statefulsetName
+  #               value: "$(params.statefulsetName)"
+  #             - name: namespace
+  #               value: "$(params.statefulsetNamespace)"
+  #             - name: replicas
+  #               value: "0"
+  #             - name: mode
+  #               value: "normal"
+  #             - name: componentName
+  #               value: "$(params.componentName)"
+  #             - name: pipelineStatus
+  #               value: ""
+  #           runAfter:
+  #             - clean-staging
+  #         - name: copy-data
+  #           taskRef:
+  #             name: '{{ include "common.names.fullname" $ }}-kubectl-cp'
+  #           params:
+  #             - name: podName
+  #               value: "$(params.podName)"
+  #             - name: podNamespace
+  #               value: "$(params.statefulsetNamespace)"
+  #             - name: containerName
+  #               value: "$(params.containerName)"
+  #             - name: sourcePath
+  #               value: "$(params.sourcePvcPath)"
+  #             - name: includePaths
+  #               value: "$(params.includePaths)"
+  #             - name: excludePatterns
+  #               value: "$(params.excludePatterns)"
+  #             - name: destinationPath
+  #               value: "$(params.backupSubdir)"
+  #           runAfter:
+  #             - scale-down
+  #         - name: scale-up
+  #           taskRef:
+  #             name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+  #           params:
+  #             - name: statefulsetName
+  #               value: "$(params.statefulsetName)"
+  #             - name: namespace
+  #               value: "$(params.statefulsetNamespace)"
+  #             - name: replicas
+  #               value: "$(params.replicas)"
+  #             - name: mode
+  #               value: "normal"
+  #             - name: componentName
+  #               value: "$(params.componentName)"
+  #             - name: pipelineStatus
+  #               value: ""
+  #           runAfter:
+  #             - copy-data
+  #         - name: upload-s3
+  #           taskRef:
+  #             name: '{{ include "common.names.fullname" $ }}-s3-upload'
+  #           params:
+  #             - name: componentName
+  #               value: "$(params.componentName)"
+  #             - name: backupSubdir
+  #               value: "$(params.backupSubdir)"
+  #             - name: s3BucketName
+  #               value: "$(params.s3BucketName)"
+  #             - name: s3EndpointUrl
+  #               value: "$(params.s3EndpointUrl)"
+  #           runAfter:
+  #             - copy-data
+  #         - name: final-cleanup
+  #           taskRef:
+  #             name: '{{ include "common.names.fullname" $ }}-cleanup-pvc'
+  #           params:
+  #             - name: directoryPath
+  #               value: "$(params.backupSubdir)"
+  #           runAfter:
+  #             - scale-up
+  #             - upload-s3
+
+    # Graceful shutdown pipeline
+    - name: '{{ include "common.names.fullname" $ }}-component-backup-graceful'
+      enabled: '{{ .Values.features.gracefulShutdown.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations: {}
+      spec:
+        description: |
+          Back up a Wazuh component using graceful shutdown (wazuh-control)
+        params:
+          - name: componentName
+            type: string
+          - name: podName
+            type: string
+          - name: podNamespace
+            type: string
+            default: '{{ .Values.global.namespace }}'
+          - name: containerName
+            type: string
+            default: '{{ .Values.backup.gracefulShutdown.containerName }}'
+          - name: wazuhControlPath
+            type: string
+            default: '{{ .Values.backup.gracefulShutdown.wazuhControlPath }}'
+          - name: includePaths
+            type: string
+            description: Comma-separated list of paths to backup
+          - name: backupSubdir
+            type: string
+          - name: s3BucketName
+            type: string
+          - name: s3EndpointUrl
+            type: string
+            default: ""
+        finally:
+          - name: emergency-start
+            when:
+              - input: "$(tasks.status)"
+                operator: notin
+                values: ["Succeeded"]
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+            params:
+              - name: podName
+                value: "$(params.podName)"
+              - name: namespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: wazuhControlPath
+                value: "$(params.wazuhControlPath)"
+              - name: action
+                value: "start"
+              - name: mode
+                value: "emergency"
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: pipelineStatus
+                value: "$(tasks.status)"
+        tasks:
+          - name: clean-staging
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-cleanup-pvc'
+            params:
+              - name: directoryPath
+                value: "$(params.backupSubdir)"
+          - name: stop-wazuh
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+            params:
+              - name: podName
+                value: "$(params.podName)"
+              - name: namespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: wazuhControlPath
+                value: "$(params.wazuhControlPath)"
+              - name: action
+                value: "stop"
+              - name: mode
+                value: "normal"
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: pipelineStatus
+                value: ""
+            runAfter:
+              - clean-staging
+          - name: copy-data
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-kubectl-cp'
+            params:
+              - name: podName
+                value: "$(params.podName)"
+              - name: podNamespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: includePaths
+                value: "$(params.includePaths)"
+              - name: destinationPath
+                value: "$(params.backupSubdir)"
+            runAfter:
+              - stop-wazuh
+          - name: start-wazuh
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+            params:
+              - name: podName
+                value: "$(params.podName)"
+              - name: namespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: wazuhControlPath
+                value: "$(params.wazuhControlPath)"
+              - name: action
+                value: "start"
+              - name: mode
+                value: "normal"
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: pipelineStatus
+                value: ""
+            runAfter:
+              - copy-data
+          - name: upload-s3
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-s3-upload'
+            params:
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: backupSubdir
+                value: "$(params.backupSubdir)"
+              - name: s3BucketName
+                value: "$(params.s3BucketName)"
+              - name: s3EndpointUrl
+                value: "$(params.s3EndpointUrl)"
+            runAfter:
+              - copy-data
+          - name: final-cleanup
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-cleanup-pvc'
+            params:
+              - name: directoryPath
+                value: "$(params.backupSubdir)"
+            runAfter:
+              - start-wazuh
+              - upload-s3
+
+  # Tasks
+  tasks:
+    - name: '{{ include "common.names.fullname" $ }}-cleanup-pvc'
+      enabled: true
+      additionalLabels: {}
+      additionalAnnotations:
+        tekton.dev/displayName: "Clean Directory in PVC"
+      spec:
+        description: |
+          Cleans the contents of a specified subdirectory within the staging PVC.
+        params:
+          - name: directoryPath
+            type: string
+            description: Subdirectory under the staging PVC root to clean
+        steps:
+          - name: clean
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.cleanupPvc "global" .Values.global ) }}'
+            script: |
+              cp /scripts/cleanup-pvc-directory.sh /tmp/cleanup-pvc-directory.sh
+              chmod +x /tmp/cleanup-pvc-directory.sh
+              bash /tmp/cleanup-pvc-directory.sh
+            env:
+              - name: DIRECTORY_PATH
+                value: "$(params.directoryPath)"
+            volumeMounts:
+              - name: staging-volume
+                mountPath: /backup
+              - name: scripts-volume
+                mountPath: /scripts
+        volumes:
+          - name: staging-volume
+            persistentVolumeClaim:
+              claimName: '{{ include "wazuh-backup.stagingPvcName" $ }}'
+          - name: scripts-volume
+            configMap:
+              name: '{{ include "common.names.fullname" $ }}-scripts'
+              defaultMode: 0755
+
+    - name: '{{ include "common.names.fullname" $ }}-scale-statefulset'
+      enabled: true
+      additionalLabels: {}
+      additionalAnnotations:
+        tekton.dev/displayName: "Scale StatefulSet"
+      spec:
+        description: |
+          Scales a StatefulSet to a specified number of replicas.
+          Supports normal (fails on error) and emergency (never fails) modes.
+        params:
+          - name: statefulsetName
+            type: string
+          - name: namespace
+            type: string
+          - name: replicas
+            type: string
+          - name: mode
+            type: string
+            default: "normal"
+          - name: componentName
+            type: string
+            default: "unknown"
+          - name: pipelineStatus
+            type: string
+            default: ""
+        steps:
+          - name: scale
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.scaleStatefulset "global" .Values.global ) }}'
+            script: |
+              cp /scripts/scale-statefulset.sh /tmp/scale-statefulset.sh
+              chmod +x /tmp/scale-statefulset.sh
+              bash /tmp/scale-statefulset.sh
+            env:
+              - name: STATEFULSET_NAME
+                value: "$(params.statefulsetName)"
+              - name: NAMESPACE
+                value: "$(params.namespace)"
+              - name: REPLICAS
+                value: "$(params.replicas)"
+              - name: MODE
+                value: "$(params.mode)"
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+              - name: PIPELINE_STATUS
+                value: "$(params.pipelineStatus)"
+            volumeMounts:
+              - name: scripts-volume
+                mountPath: /scripts
+        volumes:
+          - name: scripts-volume
+            configMap:
+              name: '{{ include "common.names.fullname" $ }}-scripts'
+              defaultMode: 0755
+
+    - name: '{{ include "common.names.fullname" $ }}-rsync'
+      enabled: true
+      additionalLabels: {}
+      additionalAnnotations:
+        tekton.dev/displayName: "Rsync PVC to PVC"
+      spec:
+        description: |
+          Uses rsync to copy from source PVC to staging PVC.
+          Supports simple and advanced modes.
+        params:
+          - name: sourcePvcName
+            type: string
+          - name: sourcePath
+            type: string
+            default: ""
+          - name: includePaths
+            type: string
+            default: ""
+          - name: excludePatterns
+            type: string
+            default: ""
+          - name: destinationPath
+            type: string
+            default: ""
+        steps:
+          - name: rsync
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.rsync "global" .Values.global ) }}'
+            script: |
+              cp /scripts/rsync-pvc-to-pvc.sh /tmp/rsync-pvc-to-pvc.sh
+              chmod +x /tmp/rsync-pvc-to-pvc.sh
+              sh /tmp/rsync-pvc-to-pvc.sh
+            env:
+              - name: SOURCE_PATH
+                value: "$(params.sourcePath)"
+              - name: INCLUDE_PATHS
+                value: "$(params.includePaths)"
+              - name: EXCLUDE_PATTERNS
+                value: "$(params.excludePatterns)"
+              - name: DESTINATION_PATH
+                value: "$(params.destinationPath)"
+            volumeMounts:
+              - name: source-volume
+                mountPath: /source
+              - name: destination-volume
+                mountPath: /backup
+              - name: scripts-volume
+                mountPath: /scripts
+        volumes:
+          - name: source-volume
+            persistentVolumeClaim:
+              claimName: "$(params.sourcePvcName)"
+          - name: destination-volume
+            persistentVolumeClaim:
+              claimName: '{{ include "wazuh-backup.stagingPvcName" $ }}'
+          - name: scripts-volume
+            configMap:
+              name: '{{ include "common.names.fullname" $ }}-scripts'
+              defaultMode: 0755
+
+    - name: '{{ include "common.names.fullname" $ }}-kubectl-cp'
+      enabled: true
+      additionalLabels: {}
+      additionalAnnotations:
+        tekton.dev/displayName: "Kubectl CP PVC to PVC"
+      spec:
+        description: |
+          Uses kubectl cp to copy specified paths from source pod to staging PVC.
+          Requires the source pod to be running.
+        params:
+          - name: podName
+            type: string
+          - name: podNamespace
+            type: string
+          - name: containerName
+            type: string
+            default: ""
+          - name: includePaths
+            type: string
+            description: Comma-separated list of paths to backup
+          - name: destinationPath
+            type: string
+        steps:
+          - name: kubectl-cp
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.kubectlCp "global" .Values.global ) }}'
+            script: |
+              cp /scripts/kubectl-cp-pvc-to-pvc.sh /tmp/kubectl-cp-pvc-to-pvc.sh
+              chmod +x /tmp/kubectl-cp-pvc-to-pvc.sh
+              sh /tmp/kubectl-cp-pvc-to-pvc.sh
+            env:
+              - name: POD_NAME
+                value: "$(params.podName)"
+              - name: POD_NAMESPACE
+                value: "$(params.podNamespace)"
+              - name: CONTAINER_NAME
+                value: "$(params.containerName)"
+              - name: INCLUDE_PATHS
+                value: "$(params.includePaths)"
+              - name: DESTINATION_PATH
+                value: "$(params.destinationPath)"
+            volumeMounts:
+              - name: destination-volume
+                mountPath: /backup
+              - name: scripts-volume
+                mountPath: /scripts
+        volumes:
+          - name: destination-volume
+            persistentVolumeClaim:
+              claimName: '{{ include "wazuh-backup.stagingPvcName" $ }}'
+          - name: scripts-volume
+            configMap:
+              name: '{{ include "common.names.fullname" $ }}-scripts'
+              defaultMode: 0755
+
+    - name: '{{ include "common.names.fullname" $ }}-s3-upload'
+      enabled: true
+      additionalLabels: {}
+      additionalAnnotations:
+        tekton.dev/displayName: "Upload to S3"
+      spec:
+        description: |
+          Creates a tarball of the backup directory and uploads to S3.
+        params:
+          - name: componentName
+            type: string
+          - name: backupSubdir
+            type: string
+          - name: s3BucketName
+            type: string
+          - name: s3EndpointUrl
+            type: string
+            default: ""
+        steps:
+          - name: make-tar
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.cleanupPvc "global" .Values.global ) }}'
+            script: |
+              cp /scripts/make-tar.sh /tmp/make-tar.sh
+              chmod +x /tmp/make-tar.sh
+              bash /tmp/make-tar.sh
+            env:
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+              - name: SOURCE_DIRECTORY_PATH
+                value: "$(params.backupSubdir)"
+            volumeMounts:
+              - name: staging-volume
+                mountPath: /backup
+              - name: scripts-volume
+                mountPath: /scripts
+          - name: upload
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.s3Upload "global" .Values.global ) }}'
+            script: |
+              cp /scripts/s3-upload.sh /tmp/s3-upload.sh
+              chmod +x /tmp/s3-upload.sh
+              bash /tmp/s3-upload.sh
+            env:
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+              - name: BACKUP_SUBDIR
+                value: "$(params.backupSubdir)"
+              - name: S3_BUCKET_NAME
+                value: "$(params.s3BucketName)"
+              - name: S3_ENDPOINT_URL
+                value: "$(params.s3EndpointUrl)"
+              - name: AWS_REGION
+                value: '{{ .Values.aws.region }}'
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ .Values.aws.secretName }}'
+                    key: accessKeyId
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ .Values.aws.secretName }}'
+                    key: secretAccessKey
+              - name: AWS_SESSION_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ .Values.aws.secretName }}'
+                    key: sessionToken
+            volumeMounts:
+              - name: staging-volume
+                mountPath: /backup
+              - name: scripts-volume
+                mountPath: /scripts
+        volumes:
+          - name: staging-volume
+            persistentVolumeClaim:
+              claimName: '{{ include "wazuh-backup.stagingPvcName" $ }}'
+          - name: scripts-volume
+            configMap:
+              name: '{{ include "common.names.fullname" $ }}-scripts'
+              defaultMode: 0755
+
+    - name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+      enabled: '{{ .Values.features.gracefulShutdown.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations:
+        tekton.dev/displayName: "Wazuh Control"
+      spec:
+        description: |
+          Executes wazuh-control start/stop commands in a pod.
+        params:
+          - name: podName
+            type: string
+          - name: namespace
+            type: string
+          - name: containerName
+            type: string
+          - name: wazuhControlPath
+            type: string
+          - name: action
+            type: string
+          - name: mode
+            type: string
+            default: "normal"
+          - name: componentName
+            type: string
+            default: "unknown"
+          - name: pipelineStatus
+            type: string
+            default: ""
+        steps:
+          - name: wazuh-control
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.scaleStatefulset "global" .Values.global ) }}'
+            script: |
+              cp /scripts/wazuh-control.sh /tmp/wazuh-control.sh
+              chmod +x /tmp/wazuh-control.sh
+              bash /tmp/wazuh-control.sh
+            env:
+              - name: POD_NAME
+                value: "$(params.podName)"
+              - name: NAMESPACE
+                value: "$(params.namespace)"
+              - name: CONTAINER_NAME
+                value: "$(params.containerName)"
+              - name: WAZUH_CONTROL_PATH
+                value: "$(params.wazuhControlPath)"
+              - name: OPERATION
+                value: "$(params.action)"
+              - name: MODE
+                value: "$(params.mode)"
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+              - name: PIPELINE_STATUS
+                value: "$(params.pipelineStatus)"
+            volumeMounts:
+              - name: scripts-volume
+                mountPath: /scripts
+        volumes:
+          - name: scripts-volume
+            configMap:
+              name: '{{ include "common.names.fullname" $ }}-scripts'
+              defaultMode: 0755
+
+  # Task image configurations
+  taskImages:
+    cleanupPvc:
+      registry: docker.io
+      repository: bash
+      tag: "5.2"
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+    scaleStatefulset:
+      registry: docker.io
+      repository: bitnami/kubectl
+      tag: "latest"
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+    rsync:
+      registry: docker.io
+      repository: eeacms/rsync
+      tag: "latest"
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+    kubectlCp:
+      registry: docker.io
+      repository: bitnami/kubectl
+      tag: "latest"
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+    s3Upload:
+      registry: docker.io
+      repository: amazon/aws-cli
+      tag: "2.13.0"
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+
+# ------------------------------------------------------------------------------
+# ConfigMaps (Array-based)
+# ------------------------------------------------------------------------------
+configmaps:
+  - name: '{{ include "common.names.fullname" $ }}-scripts'
+    enabled: true
+    additionalLabels: {}
+    additionalAnnotations: {}
+    data:
+      "cleanup-pvc-directory.sh": '{{- $.Files.Get "scripts/cleanup-pvc-directory.sh" }}'
+      "scale-statefulset.sh": '{{- $.Files.Get "scripts/scale-statefulset.sh" }}'
+      "make-tar.sh": '{{- $.Files.Get "scripts/make-tar.sh" }}'
+      "s3-upload.sh": '{{- $.Files.Get "scripts/s3-upload.sh" }}'
+      "rsync-pvc-to-pvc.sh": '{{- $.Files.Get "scripts/rsync-pvc-to-pvc.sh" }}'
+      "kubectl-cp-pvc-to-pvc.sh": '{{- $.Files.Get "scripts/kubectl-cp-pvc-to-pvc.sh" }}'
+      "wazuh-control.sh": '{{- $.Files.Get "scripts/wazuh-control.sh" }}'
+
+# ------------------------------------------------------------------------------
+# Secrets (Array-based)
+# ------------------------------------------------------------------------------
+secrets:
+  - name: '{{ .Values.aws.secretName }}'
+    enabled: true
+    additionalLabels: {}
+    additionalAnnotations: {}
+    type: Opaque
+    data:
+      accessKeyId: '{{ .Values.aws.accessKeyId | b64enc }}'
+      secretAccessKey: '{{ .Values.aws.secretAccessKey | b64enc }}'
+      sessionToken: '{{ .Values.aws.sessionToken | b64enc }}'
+
+# ------------------------------------------------------------------------------
+# PVCs (Array-based)
+# ------------------------------------------------------------------------------
+pvcs:
+  - name: '{{ include "wazuh-backup.stagingPvcName" $ }}'
+    enabled: true
+    additionalLabels: {}
+    additionalAnnotations: {}
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: '{{ .Values.pvc.staging.storageClass }}'
+      resources:
+        requests:
+          storage: '{{ .Values.pvc.staging.size }}'
+
+# ------------------------------------------------------------------------------
+# Service Accounts (Array-based)
+# ------------------------------------------------------------------------------
+serviceaccounts:
+  - name: '{{ include "common.names.fullname" $ }}-sa'
+    enabled: true
+    additionalLabels: {}
+    additionalAnnotations: {}
+
+# ------------------------------------------------------------------------------
+# RBAC (Array-based)
+# ------------------------------------------------------------------------------
+rbac:
+  create: true
+
+  roles:
+    - name: '{{ include "common.names.fullname" $ }}-sa-role'
+      enabled: true
+      additionalLabels: {}
+      additionalAnnotations: {}
+      rules:
+        - apiGroups: ["apps"]
+          resources: ["statefulsets"]
+          verbs: ["get", "list", "patch", "update"]
+        - apiGroups: [""]
+          resources: ["persistentvolumeclaims"]
+          verbs: ["get", "list"]
+        - apiGroups: [""]
+          resources: ["pods"]
+          verbs: ["get", "list"]
+        - apiGroups: [""]
+          resources: ["pods/exec"]
+          verbs: ["create"]
+        - apiGroups: [""]
+          resources: ["secrets"]
+          verbs: ["get", "list"]
+
+    - name: '{{ include "common.names.fullname" $ }}-eventlistener-role'
+      enabled: '{{ .Values.features.eventListener.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations: {}
+      rules:
+        - apiGroups: ["tekton.dev"]
+          resources: ["pipelineruns"]
+          verbs: ["create", "get", "list", "watch"]
+        - apiGroups: ["triggers.tekton.dev"]
+          resources: ["triggerbindings", "triggertemplates", "triggers", "eventlisteners", "interceptors"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["apps"]
+          resources: ["deployments"]
+          verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+        - apiGroups: [""]
+          resources: ["services"]
+          verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+        - apiGroups: [""]
+          resources: ["pods"]
+          verbs: ["get", "list", "watch"]
+
+  clusterroles:
+    - name: '{{ include "common.names.fullname" $ }}-eventlistener-cluster-role'
+      enabled: '{{ .Values.features.eventListener.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations: {}
+      rules:
+        - apiGroups: ["triggers.tekton.dev"]
+          resources: ["clusterinterceptors", "clustertriggerbindings"]
+          verbs: ["get", "list", "watch"]
+
+  rolebindings:
+    - name: '{{ include "common.names.fullname" $ }}-sa-binding'
+      enabled: true
+      additionalLabels: {}
+      additionalAnnotations: {}
+      subjects:
+        - kind: ServiceAccount
+          name: '{{ include "common.names.fullname" $ }}-sa'
+          namespace: '{{ include "common.names.namespace" $ }}'
+      roleRef:
+        kind: Role
+        name: '{{ include "common.names.fullname" $ }}-sa-role'
+        apiGroup: rbac.authorization.k8s.io
+
+    - name: '{{ include "common.names.fullname" $ }}-eventlistener-binding'
+      enabled: '{{ .Values.features.eventListener.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations: {}
+      subjects:
+        - kind: ServiceAccount
+          name: '{{ include "common.names.fullname" $ }}-sa'
+          namespace: '{{ include "common.names.namespace" $ }}'
+      roleRef:
+        kind: Role
+        name: '{{ include "common.names.fullname" $ }}-eventlistener-role'
+        apiGroup: rbac.authorization.k8s.io
+
+  clusterrolebindings:
+    - name: '{{ include "common.names.fullname" $ }}-eventlistener-cluster-binding'
+      enabled: '{{ .Values.features.eventListener.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations: {}
+      subjects:
+        - kind: ServiceAccount
+          name: '{{ include "common.names.fullname" $ }}-sa'
+          namespace: '{{ include "common.names.namespace" $ }}'
+      roleRef:
+        kind: ClusterRole
+        name: '{{ include "common.names.fullname" $ }}-eventlistener-cluster-role'
+        apiGroup: rbac.authorization.k8s.io
+
+# ------------------------------------------------------------------------------
+# AWS Configuration
+# ------------------------------------------------------------------------------
+aws:
+  region: eu-central-1
+  secretName: aws-creds
+  accessKeyId: ""
+  secretAccessKey: ""
+  sessionToken: ""
+
+# ------------------------------------------------------------------------------
+# PVC Configuration (legacy structure for backward compatibility)
+# ------------------------------------------------------------------------------
+pvc:
+  staging:
+    name: "backup-staging-pvc"
+    externalName: ""
+    size: "20Gi"
+    storageClass: "" 
+
+# ------------------------------------------------------------------------------
+# Debug Configuration
+# ------------------------------------------------------------------------------
+debug:
+  # Debug pod configuration
+  pod:
+    enabled: false  # Set to true to deploy debug pod
+    name: '{{ include "common.names.fullname" $ }}-debug'
+    additionalLabels: {}
+    additionalAnnotations: {}
+    # Source PVC to mount (from master component)
+    sourcePvc:
+      name: "wazuh-wazuh-helm-manager-master-wazuh-wazuh-helm-manager-master-0"
+      mountPath: "/source"
+    # Staging PVC to mount
+    stagingPvc:
+      mountPath: "/backup"
+    # Resources for debug pod
+    resources:
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+
+  image:
+    registry: docker.io
+    repository: bash
+    tag: "5.2"
+    digest: ""
+    pullPolicy: IfNotPresent
+    pullSecrets: []

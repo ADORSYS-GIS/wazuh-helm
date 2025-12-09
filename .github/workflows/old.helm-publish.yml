@@ -21,6 +21,7 @@ jobs:
           - wazuh-helm
           - owasp-zap
           - wazuh-monitoring
+          - wazuh-backup
         include:
           - chart: wazuh-helm
             path: charts/wazuh
@@ -28,6 +29,8 @@ jobs:
             path: charts/owasp-zap
           - chart: wazuh-monitoring
             path: charts/monitoring
+          - chart: wazuh-backup
+            path: charts/wazuh-backup
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -56,7 +59,9 @@ jobs:
       - name: Install Helm push plugin
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-candidate/')
         run: |
-          helm plugin install https://github.com/chartmuseum/helm-push
+          helm plugin install https://github.com/chartmuseum/helm-push || true
+          helm plugin list
+          helm cm-push --help
 
       - name: Fetch existing charts
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-candidate/')

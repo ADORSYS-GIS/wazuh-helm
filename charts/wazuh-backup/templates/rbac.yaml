@@ -1,0 +1,88 @@
+# templates/rbac.yaml
+# Dynamic RBAC resources (Roles, RoleBindings, ClusterRoles, ClusterRoleBindings)
+
+{{- if .Values.rbac.create }}
+
+{{/* Render Roles */}}
+{{- range .Values.rbac.roles }}
+{{- if .enabled | default true }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
+rules:
+{{ include "common.tplvalues.render" (dict "value" .rules "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/* Render ClusterRoles */}}
+{{- range .Values.rbac.clusterroles }}
+{{- if .enabled | default true }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
+rules:
+{{ include "common.tplvalues.render" (dict "value" .rules "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/* Render RoleBindings */}}
+{{- range .Values.rbac.rolebindings }}
+{{- if .enabled | default true }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
+subjects:
+{{ include "common.tplvalues.render" (dict "value" .subjects "context" $) | nindent 2 }}
+roleRef:
+{{ include "common.tplvalues.render" (dict "value" .roleRef "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/* Render ClusterRoleBindings */}}
+{{- range .Values.rbac.clusterrolebindings }}
+{{- if .enabled | default true }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "common.tplvalues.render" (dict "value" .name "context" $) }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+  {{- with .additionalAnnotations }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" . "context" $ ) | nindent 4 }}
+  {{- end }}
+subjects:
+{{ include "common.tplvalues.render" (dict "value" .subjects "context" $) | nindent 2 }}
+roleRef:
+{{ include "common.tplvalues.render" (dict "value" .roleRef "context" $) | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{- end }}
