@@ -6,3 +6,11 @@
     <description>Ignore false positives for Cursor/IntelliJ IDEA temp files in /tmp</description>
   </rule>
 </group>
+
+<group name="yara,">
+  <rule id="100501" level="0">
+    <if_group>yara</if_group>
+    <match>^/tmp/\.tmp[^/]+/(apply_patch|codex-linux-sandbox)</match>
+    <description>Ignore false positives for temporary files apply_patch and codex-linux-sandbox</description>
+  </rule>
+</group>
