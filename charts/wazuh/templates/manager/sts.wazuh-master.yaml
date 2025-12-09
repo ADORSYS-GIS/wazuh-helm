@@ -260,6 +260,11 @@ spec:
               subPath: 7009-fim-windows.xml
               readOnly: true      
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7010-lotl-rules.xml
+              subPath: 7010-lotl-rules.xml
+              readOnly: true
+
             {{ range $k, $v := $.Values.cluster.decoders }}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
             {{- $n_k := printf "0003-%s" $k -}}

@@ -1,0 +1,31 @@
+<group name="santa_exec, ">
+    <rule id="102000" level="8">
+        <decoded_as>santa</decoded_as>
+        <regex type="pcre2">action=EXEC.*decision=ALLOW</regex>
+        <description>Execution detected by Santa</description>
+    </rule>
+</group>
+
+<group name="sysmon,exfiltration,lolbins">
+    
+   <rule id="100510" level="12">
+    <if_sid>102000</if_sid>
+    <field name="path" type="pcre2">\/usr\/bin\/(curl|wget|scp|rsync|nc|netcat|ftp|sftp|telnet)</field>
+    <field name="args" type="pcre2">(upload|POST|PUT|-T|-F|--data|--form|-d)</field>
+    <description>Potential data exfiltration detected using LOTL binary: $(path)</description>
+    <mitre>
+      <id>T1048</id>
+      <id>T1567</id>
+    </mitre>
+  </rule>
+  
+  <rule id="100511" level="12">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.originalFileName" type="pcre2">(?i)powershell\.exe|pwsh\.exe</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(Invoke-WebRequest|iwr)</field>
+    <description>Possible Data Exfiltration: PowerShell used to connect to external site.</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+  </rule>
+</group>
