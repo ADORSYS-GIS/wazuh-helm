@@ -418,13 +418,13 @@
     
     <rule id="700075" level="0">
         <if_matched_sid>700073</if_matched_sid>
-        <match>ansible|puppet|chef</match>
+        <match>ansible|puppet|chef|snap</match>
         <description>Ignore group changes from trusted automation tools</description>
     </rule>
     
     <rule id="700076" level="12">
         <if_matched_sid>700073</if_matched_sid>
-        <match>!ansible|!puppet|!chef</match>
+        <match>!ansible|!puppet|!chef|!snap</match>
         <description>Unexpected user group modification detected</description>
     </rule>
     
