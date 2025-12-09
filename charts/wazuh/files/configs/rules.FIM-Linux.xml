@@ -506,11 +506,11 @@
     </rule>
     -->
     
-    <rule id="700089" level="0">
+    <!-- <rule id="700089" level="0">
         <if_matched_sid>700088</if_matched_sid>
         <match>port 80|port 443</match>
         <description>Ignore inbound connections to allowed services</description>
-    </rule>
+    </rule> -->
     
     <!-- Detection of Privilege Escalation Commands -->
     <rule id="700090" level="12">
