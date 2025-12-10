@@ -3,7 +3,7 @@ name: Old Helm Publish
 on:
   push:
     branches:
-      - '**'  # Matches all branches
+      - main
     tags:
       - 'v*'
     paths:
