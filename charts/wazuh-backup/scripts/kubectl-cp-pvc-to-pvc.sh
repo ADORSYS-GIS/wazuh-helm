@@ -16,6 +16,15 @@ echo "  INCLUDE_PATHS: ${INCLUDE_PATHS}"
 echo "  DESTINATION_PATH: ${DESTINATION_PATH}"
 echo ""
 
+echo "🔧 Debug info:"
+id
+echo "ls -ld /backup:"
+ls -ld /backup || echo "failed to stat /backup"
+echo "ls -l /:"
+ls -l / | sed -n '1,20p'
+echo ""
+
+
 # Validate required parameters
 if [[ -z "$POD_NAME" ]]; then
   echo "❌ POD_NAME environment variable must be set" >&2
@@ -152,7 +161,7 @@ while IFS= read -r path; do
 
   # Create parent directory structure if needed
   if [[ ! -d "$dest_parent" ]]; then
-    mkdir -p "$dest_parent" 2>/dev/null || {
+    mkdir -p "$dest_parent" || {
       echo "   ⚠️  Warning: Failed to create directory $dest_parent" >&2
       FAIL_COUNT=$((FAIL_COUNT + 1))
       echo ""
