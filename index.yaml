@@ -20,6 +20,24 @@ entries:
   wazuh-backup:
   - apiVersion: v2
     appVersion: "1.0"
+    created: "2025-12-10T01:05:37.61304996Z"
+    dependencies:
+    - name: common
+      repository: https://charts.bitnami.com/bitnami
+      tags:
+      - common
+      - bitnami-common
+      version: '*'
+    description: A Helm chart to deploy a Tekton pipeline for backing up Wazuh core
+      components to S3
+    digest: 9ea6a09f8618b8fe2357c0f6a40d9f4ba3a3df1b371ef239589a2b87fc158b2a
+    name: wazuh-backup
+    type: application
+    urls:
+    - https://github.com/ADORSYS-GIS/wazuh-helm/releases/download/wazuh-backup-0.1.2-rc.11/wazuh-backup-0.1.2-rc.11.tgz
+    version: 0.1.2-rc.11
+  - apiVersion: v2
+    appVersion: "1.0"
     created: "2025-12-08T14:20:18.167131213Z"
     dependencies:
     - name: common
@@ -422,4 +440,4 @@ entries:
     urls:
     - https://github.com/ADORSYS-GIS/wazuh-helm/releases/download/wazuh-monitoring-0.1.0/wazuh-monitoring-0.1.0.tgz
     version: 0.1.0
-generated: "2025-12-09T18:26:46.193490755Z"
+generated: "2025-12-10T01:05:37.613144796Z"
