@@ -1,6 +1,3 @@
-# templates/triggers/triggertemplates.yaml
-# Dynamic trigger templates for all enabled components
-
 {{- if .Values.features.triggers.enabled }}
 {{- range .Values.backup.components }}
 {{- if .enabled }}
@@ -41,6 +38,9 @@ spec:
           backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
       spec:
         serviceAccountName: {{ include "common.names.fullname" $ }}-sa
+        podTemplate:
+          securityContext:
+            fsGroup: 0
         {{- if $.Values.features.gracefulShutdown.enabled }}
         pipelineRef:
           name: {{ include "common.names.fullname" $ }}-component-backup-graceful
