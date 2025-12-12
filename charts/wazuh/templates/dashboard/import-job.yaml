@@ -1,4 +1,4 @@
-{{- with $.Values.dashboard.importCustomDashboards }}
+{{- with $.Values.dashboard.customDashboards }}
 {{- if .enabled }}
 apiVersion: batch/v1
 kind: Job

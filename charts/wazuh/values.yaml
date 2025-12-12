@@ -752,7 +752,7 @@ dashboard:
 
   ##
   ##
-  importCustomDashboards:
+  customDashboards:
     ##
     ##
     enabled: false
