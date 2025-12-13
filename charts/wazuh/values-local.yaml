@@ -13,8 +13,8 @@ worker_integration:
 indexer: 
   replicas: 1
   resources: ~
-  keycloak: 
-    enabled: false
+  
+oidc: ~
     
 cluster:
   rootCaSecretName: "wazuh-root-ca"
