@@ -78,6 +78,27 @@ apiCred:
     ##
     ##
     password: "9Y0m^%^Cx4zx@6=X"
+    
+  
+  
+##
+##
+oidc:
+  ##
+  ##
+  openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
+  ##
+  ##
+  client_id: ~
+  ##
+  ##
+  client_secret: ~
+  ##
+  ##
+  scope: ~
+  ##
+  ##
+  base_redirect_url: ~
 
 secretjob:
   enabled: true
@@ -194,43 +215,6 @@ indexer:
     ##
     ##
     password: "rU40Fm%0GnK£iqQN"
-  
-  ##
-  ##
-  keycloak:
-    ##
-    ##
-    enabled: true
-    ##
-    ##
-    roles_key: wazuh_roles
-    ##
-    ##
-    subject_key: preferred_username
-    ##
-    ##
-    openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
-    ##
-    ##
-    client_id: ~
-    ##
-    ##
-    client_secret: ~
-    ##
-    ##
-    scope: ~
-    ##
-    ##
-    base_redirect_url: ~
-    ##
-    ##
-    roles_mapping: ~
-    ##
-    ##
-    roles: ~
-    ##
-    ##
-    tenants: ~
 
   ##
   ##
@@ -282,10 +266,10 @@ indexer:
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   ##
   ##
-  volumes: [ ]
+  volumes: { }
   ##
   ##
-  volumeMounts: [ ]
+  volumeMounts: { }
   ##
   ##
   resources: ~

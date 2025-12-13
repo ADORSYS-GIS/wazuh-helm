@@ -1,0 +1,153 @@
+indexer:
+  volumeMounts:
+    '/etc/wazuh-indexer/opensearch-security/custom_roles.yml':
+      name: security-configurations
+      subPath: custom_roles.yml
+      readOnly: true
+    '/etc/wazuh-indexer/opensearch-security/custom_roles_mapping.yml':
+      name: security-configurations
+      subPath: custom_roles_mapping.yml
+      readOnly: true
+    '/etc/wazuh-indexer/opensearch-security/custom_tenants.yml':
+      name: security-configurations
+      subPath: custom_tenants.yml
+      readOnly: true
+    '/etc/wazuh-indexer/opensearch-security/custom_config.yml':
+      name: security-configurations
+      subPath: custom_config.yml
+      readOnly: true
+  
+  volumes:
+    security-configurations:
+      configMap:
+        name: '{{ include "common.names.fullname" $ }}-sec-conf'
+  
+initJobs:
+  '{{ include "common.names.fullname" $ }}-security-admin':
+    additionalLabels: ~
+    additionalAnnotations:
+      "helm.sh/hook": post-install,post-upgrade
+      "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    image:
+      registry: docker.io
+      repository: wazuh/wazuh-indexer
+      tag: '{{ .Values.global.version }}'
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: [ ]
+    restartPolicy: OnFailure
+    resources: ~
+    command: [ "/bin/bash","-lc" ]
+    args:
+      - |
+        #!/bin/bash
+          
+        set -ex
+        
+        #        /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
+        #          -cd /etc/wazuh-indexer/opensearch-security/custom_configs \
+        #          -icl -nhnv \
+        #          -cacert /usr/share/wazuh-indexer/certs/root-ca.pem \
+        #          -cert /usr/share/wazuh-indexer/certs/admin.pem \
+        #          -key /usr/share/wazuh-indexer/certs/admin-key.pem \
+        #          -h $INDEXER_API_HOSTNAME \
+        #          -p 9200
+        
+        export JAVA_HOME=/usr/share/wazuh-indexer/jdk/
+        
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -cd /etc/wazuh-indexer/opensearch-security/custom_configs -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem \
+          -cert /usr/share/wazuh-indexer/certs/admin.pem \
+          -cacert /usr/share/wazuh-indexer/certs/root-ca.pem \
+          -nhnv \
+          -h $INDEXER_API_HOSTNAME \
+          -p 9200
+    
+    
+    volumeMounts:
+      '/etc/wazuh-indexer/opensearch-security/custom_configs':
+        name: security-configurations
+        readOnly: true
+      
+      '/usr/share/wazuh-indexer/certs/admin.pem':
+        name: root-certs
+        subPath: admin.pem
+        readOnly: true
+      '/usr/share/wazuh-indexer/certs/admin-key.pem':
+        name: root-certs
+        subPath: admin-key.pem
+        readOnly: true
+      '/usr/share/wazuh-indexer/certs/root-ca.pem':
+        name: root-certs
+        subPath: root-ca.pem
+        readOnly: true
+
+    env:
+      INDEXER_API_HOSTNAME:
+        value: '{{ include "common.names.fullname" $ }}-indexer-api'
+        
+    envFrom: ~
+
+    volumes:
+      security-configurations:
+        configMap:
+          name: '{{ include "common.names.fullname" $ }}-sec-conf'
+      root-certs:
+        secret:
+          secretName: '{{ include "wazuh.cert_root_name" $ }}'
+          
+    initContainers: ~
+
+configmaps:
+  '{{ include "common.names.fullname" $ }}-sec-conf':
+    data:
+      custom_roles.yml:
+        _meta:
+          type: "roles"
+          config_version: 2
+      
+      custom_roles_mapping.yml:
+        _meta:
+          type: "rolesmapping"
+          config_version: 2
+      
+      custom_tenants.yml:
+        _meta:
+          type: "tenants"
+          config_version: 2
+      
+      custom_config.yml: |
+        _meta:
+          type: "config"
+          config_version: 2
+        
+        config:
+          dynamic:
+            authc:
+              basic_internal_auth_domain:
+                http_enabled: true
+                transport_enabled: true
+                order: 0
+                http_authenticator:
+                  type: basic
+                  challenge: false
+                authentication_backend:
+                  type: internal
+              
+              {{ with $.Values.oidc }}
+              openid_auth_domain:
+                http_enabled: true
+                transport_enabled: true
+                order: 1
+                http_authenticator:
+                  type: openid
+                  challenge: false
+                  config:
+                    subject_key: 'preferred_username'
+                    roles_key: 'wazuh_roles'
+                    
+                    openid_connect_url: {{ include "common.tplvalues.render" (dict "value" .openid_connect_url "context" $) }}
+                authentication_backend:
+                  type: noop
+              {{ end }}
+        
+        
