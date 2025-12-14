@@ -41,39 +41,39 @@ initJobs:
     args:
       - |
         #!/bin/bash
-          
+        
         set -ex
         
-        #        /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
-        #          -cd /etc/wazuh-indexer/opensearch-security/custom_configs \
-        #          -icl -nhnv \
-        #          -cacert /usr/share/wazuh-indexer/certs/root-ca.pem \
-        #          -cert /usr/share/wazuh-indexer/certs/admin.pem \
-        #          -key /usr/share/wazuh-indexer/certs/admin-key.pem \
-        #          -h $INDEXER_API_HOSTNAME \
-        #          -p 9200
-        
-        export JAVA_HOME=/usr/share/wazuh-indexer/jdk/
-        
-        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -cd /etc/wazuh-indexer/opensearch-security/custom_configs -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem \
-          -cert /usr/share/wazuh-indexer/certs/admin.pem \
-          -cacert /usr/share/wazuh-indexer/certs/root-ca.pem \
-          -nhnv \
-          -h $INDEXER_API_HOSTNAME \
-          -p 9200
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/config.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/roles.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/roles_mapping.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/tenants.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
     
     
     volumeMounts:
-      '/etc/wazuh-indexer/opensearch-security/custom_configs':
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/config.yml':
         name: security-configurations
+        subPath: custom_config.yml
+        readOnly: true
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/roles.yml':
+        name: security-configurations
+        subPath: custom_roles.yml
+        readOnly: true
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/roles_mapping.yml':
+        name: security-configurations
+        subPath: custom_roles_mapping.yml
+        readOnly: true
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/tenants.yml':
+        name: security-configurations
+        subPath: custom_tenants.yml
         readOnly: true
       
       '/usr/share/wazuh-indexer/certs/admin.pem':
-        name: root-certs
+        name: certs
         subPath: admin.pem
         readOnly: true
       '/usr/share/wazuh-indexer/certs/admin-key.pem':
-        name: root-certs
+        name: certs
         subPath: admin-key.pem
         readOnly: true
       '/usr/share/wazuh-indexer/certs/root-ca.pem':
@@ -84,6 +84,8 @@ initJobs:
     env:
       INDEXER_API_HOSTNAME:
         value: '{{ include "common.names.fullname" $ }}-indexer-api'
+      JAVA_HOME:
+        value: '/usr/share/wazuh-indexer/jdk'
         
     envFrom: ~
 
@@ -94,60 +96,18 @@ initJobs:
       root-certs:
         secret:
           secretName: '{{ include "wazuh.cert_root_name" $ }}'
+      certs:
+        secret:
+          secretName: '{{ include "wazuh.cert_secret_name" $ }}'
           
     initContainers: ~
 
 configmaps:
   '{{ include "common.names.fullname" $ }}-sec-conf':
     data:
-      custom_roles.yml:
-        _meta:
-          type: "roles"
-          config_version: 2
-      
-      custom_roles_mapping.yml:
-        _meta:
-          type: "rolesmapping"
-          config_version: 2
-      
-      custom_tenants.yml:
-        _meta:
-          type: "tenants"
-          config_version: 2
-      
-      custom_config.yml: |
-        _meta:
-          type: "config"
-          config_version: 2
-        
-        config:
-          dynamic:
-            authc:
-              basic_internal_auth_domain:
-                http_enabled: true
-                transport_enabled: true
-                order: 0
-                http_authenticator:
-                  type: basic
-                  challenge: false
-                authentication_backend:
-                  type: internal
-              
-              {{ with $.Values.oidc }}
-              openid_auth_domain:
-                http_enabled: true
-                transport_enabled: true
-                order: 1
-                http_authenticator:
-                  type: openid
-                  challenge: false
-                  config:
-                    subject_key: 'preferred_username'
-                    roles_key: 'wazuh_roles'
-                    
-                    openid_connect_url: {{ include "common.tplvalues.render" (dict "value" .openid_connect_url "context" $) }}
-                authentication_backend:
-                  type: noop
-              {{ end }}
+      custom_roles.yml: '{{- $.Files.Get "files/configs/indexers/custom_roles.yml" }}'
+      custom_roles_mapping.yml: '{{- $.Files.Get "files/configs/indexers/custom_roles_mapping.yml" }}'
+      custom_tenants.yml: '{{- $.Files.Get "files/configs/indexers/custom_tenants.yml" }}'
+      custom_config.yml: '{{- $.Files.Get "files/configs/indexers/custom_config.yml" }}'
         
         
