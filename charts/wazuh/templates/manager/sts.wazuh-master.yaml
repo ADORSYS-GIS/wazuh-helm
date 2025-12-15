@@ -93,8 +93,13 @@ spec:
             - -c
             - |
               set -ex
+
               # Copy template
               cp /workdir/template.config.xml /processed/ossec.conf
+              # Set agent enrollment password 
+              if [ -n "$WAZUH_ENROLLMENT_PASSWORD" ]; then
+                echo "$WAZUH_ENROLLMENT_PASSWORD" > /processed/authd.pass
+              fi
               # Replace AWS_CONFIGS if set
               if [ ! -z "$AWS_CONFIGS" ]; then
                 # Write AWS config to temp file with proper indentation (4 spaces)
@@ -129,11 +134,23 @@ spec:
               fi
               # Replace other variables with envsubst
               envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
+
           ##
           ##
           env:
             - name: NODE_TYPE
               value: "master"
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: WAZUH_ENROLLMENT_PASSWORD
+              {{- if $.Values.master.auth.enrollment.passwordSecret.enabled }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.master.auth.enrollment.passwordSecret.name }}
+                  key: {{ $.Values.master.auth.enrollment.passwordSecret.key }}
+              {{- else }}
+              value: {{ $.Values.master.auth.enrollment.password | quote }}
+              {{- end }}
+            {{- end }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -216,6 +233,12 @@ spec:
               mountPath: /wazuh-config-mount/etc/ossec.conf
               subPath: ossec.conf
               readOnly: true
+            {{- if eq $.Values.master.auth.enrollment.method "password" }}
+            - name: wazuh-config-temp
+              mountPath: /var/ossec/etc/authd.pass
+              subPath: authd.pass
+              readOnly: true
+            {{- end }}
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
