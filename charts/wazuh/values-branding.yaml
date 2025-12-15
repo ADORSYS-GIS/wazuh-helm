@@ -1,0 +1,22 @@
+opensearchDashboards:
+  branding:
+    enabled: true
+    healthCheckLogo: https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png
+    reportLogo: https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png
+    reports:
+      footer: 'Généré par Wazuh SIEM - BVMAC'
+      header: |
+        Rapport de sécurité - Wazuh SIEM
+        Confidentiel - Usage interne
+    logo:
+      defaultUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
+      # darkModeUrl: "https://example.com/dark-mode-sample.svg"
+    mark:
+      defaultUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
+      # darkModeUrl: ""
+    loadingLogo:
+      defaultUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
+      # darkModeUrl: ""
+    faviconUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
+    applicationTitle: 'Wazuh | BVMAC'
+    useExpandedHeader: false
