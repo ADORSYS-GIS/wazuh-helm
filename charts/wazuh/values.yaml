@@ -736,6 +736,18 @@ dashboard:
 
   ##
   ##
+  customDashboards:
+    ##
+    ##
+    enabled: false
+    dashboards:
+      "export1.ndjson": https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/dashboards/export1.ndjson
+    
+  ##
+  ##
+
+  ##
+  ##
   authSecret: ~
   ##
   ##

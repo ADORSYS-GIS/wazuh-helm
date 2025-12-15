@@ -1,0 +1,124 @@
+{{- with $.Values.dashboard.customDashboards }}
+{{- if .enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-import-custom-dashboards
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    app: {{ include "common.names.fullname" $ }}-import-custom-dashboards
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      annotations:
+        {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 8 }}
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-import-custom-dashboards
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-dashboard
+          image: curlimages/curl:8.17.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              #!/bin/bash
+              set -e
+              
+              # Wait for dashboard to be ready with better error handling
+              echo "Waiting for Wazuh Dashboard to be ready..."
+              retries=60
+              until curl -k -u "${DASHBOARD_USERNAME}:${DASHBOARD_PASSWORD}" \
+                "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/status" >/dev/null 2>&1; do
+                echo "Still waiting for Wazuh Dashboard to be ready..."
+                sleep 10
+                retries=$((retries - 1))
+                if [ $retries -le 0 ]; then
+                  echo "Timeout waiting for dashboard to be ready"
+                  exit 1
+                fi
+              done
+              
+              # Give it a bit more time to fully initialize
+              sleep 10
+              echo "Wazuh Dashboard is ready!"
+          env:
+            - name: DASHBOARD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ include "secret.dashboard-auth" $ }}'
+                  key: DASHBOARD_USERNAME
+            - name: DASHBOARD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ include "secret.dashboard-auth" $ }}'
+                  key: DASHBOARD_PASSWORD
+      containers:
+        - name: import-custom-dashboards
+          image: curlimages/curl:8.17.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              #!/bin/bash
+              set -e
+              
+              # Create temporary directory for downloaded files
+              mkdir -p /tmp/wazuh-import
+              
+              # Download and import each export file from S3 URLs
+              {{- range $k, $v := .dashboards }}
+              export_file="{{ $k }}"
+              export_url="{{ $v }}"
+              
+              echo "Downloading export file: $export_file from $export_url"
+              
+              # Download the export file
+              if ! curl -s -L -o "/tmp/wazuh-import/$export_file" "$export_url"; then
+                echo "Failed to download $export_file from $export_url"
+                exit 1
+              fi
+              
+              echo "Importing saved objects from $export_file..."
+              response=$(curl -k -u "${DASHBOARD_USERNAME}:${DASHBOARD_PASSWORD}" \
+                -H "osd-xsrf: true" \
+                -F file=@"/tmp/wazuh-import/$export_file" \
+                -X POST "https://{{ include "common.names.fullname" $ }}-dashboard:5601/api/saved_objects/_import?overwrite=true" \
+                -w "%{http_code}" -o "/tmp/import-response-$export_file.txt")
+              
+              echo "Import response status for $export_file: $response"
+              echo "Import response body for $export_file:"
+              cat "/tmp/import-response-$export_file.txt"
+              
+              if [ "$response" -eq 200 ] || [ "$response" -eq 409 ]; then
+                echo "Import of $export_file completed successfully or objects already exist"
+              else
+                echo "Import of $export_file failed with status $response"
+                cat "/tmp/import-response-$export_file.txt"
+                exit 1
+              fi
+              {{- end }}
+              
+              echo "All export files processed"
+          env:
+            - name: DASHBOARD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ include "secret.dashboard-auth" $ }}'
+                  key: DASHBOARD_USERNAME
+            - name: DASHBOARD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: '{{ include "secret.dashboard-auth" $ }}'
+                  key: DASHBOARD_PASSWORD
+{{- end }}
+{{ end }}
