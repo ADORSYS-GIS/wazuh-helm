@@ -13,7 +13,7 @@ spec:
   replicas: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
   {{- end }}
   {{ with .updateStrategy -}}
-  updateStrategy: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  updateStrategy: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
   {{- end }}
   selector:
     matchLabels:
@@ -25,9 +25,6 @@ spec:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/indexer/configmap.yaml") $ | sha256sum }}
-        {{ with .keycloak -}}
-        checksum/secret-kc: {{ include (print $.Template.BasePath "/indexer/keycloak.secret.yaml") $ | sha256sum }}
-        {{- end }}
         {{ with .auth -}}
         checksum/secret: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
         {{- end }}
@@ -41,7 +38,7 @@ spec:
     spec:
       {{ with .affinity -}}
       affinity:
-      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
       {{- end }}
       securityContext:
         fsGroup: 1000
@@ -59,23 +56,20 @@ spec:
           configMap:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
             
-        {{ with .keycloak }}
-        {{- if .enabled -}}
-        - name: wazuh-keycloak-config
-          secret:
-            secretName: '{{ include "common.names.fullname" $ }}-keycloak-conf'
-        {{- end -}}
-        {{ end }}
-        
         {{ with .volumes -}}
-        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
-        {{- end }}
+        {{ range $k, $v := . }}
+        {{ if $v }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10 }}
+        {{ end }}
+        {{ end }}
+        {{ end }}
       {{ with .initContainers }}
       initContainers:
       {{ range $k, $v := . }}
       {{ if $v }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
-          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10 }}
       {{ end }}
       {{ end }}
       {{ end }}
@@ -151,45 +145,21 @@ spec:
               mountPath: /usr/share/wazuh-indexer/opensearch-security/internal_users.yml
               subPath: internal_users.yml
               readOnly: true
-
-            {{ with .keycloak -}}
-            {{- if .enabled -}}
-            - name: wazuh-keycloak-config
-              mountPath: /usr/share/wazuh-indexer/opensearch-security/config.yml
-              subPath: config.yml
-              readOnly: true
-              
-              {{ if .roles_mapping }}
-            - name: wazuh-keycloak-config
-              mountPath: /etc/wazuh-indexer/opensearch-security/custom_roles_mapping.yml
-              subPath: custom_roles_mapping.yml
-              readOnly: true
-              {{- end }}
-
-              {{ if .roles }}
-            - name: wazuh-keycloak-config
-              mountPath: /etc/wazuh-indexer/opensearch-security/custom_roles.yml
-              subPath: custom_roles.yml
-              readOnly: true
-              {{- end }}
-
-              {{ if .tenants }}
-            - name: wazuh-keycloak-config
-              mountPath: /etc/wazuh-indexer/opensearch-security/custom_tenants.yml
-              subPath: custom_tenants.yml
-              readOnly: true
-              {{- end }}
-              
-            {{- end -}}
-            {{- end }}
               
           {{ with .volumeMounts }}
-          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{ range $k, $v := . }}
+          {{ if $v }}
+            - mountPath: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+              {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 14 }}
+          {{ end }}
           {{- end }}
+          {{- end }}
+          
           {{ with .envFrom }}
           envFrom:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
+          
           ports:
             - containerPort: 9200
               name: indexer-rest

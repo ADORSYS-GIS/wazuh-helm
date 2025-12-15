@@ -78,6 +78,27 @@ apiCred:
     ##
     ##
     password: "9Y0m^%^Cx4zx@6=X"
+    
+  
+  
+##
+##
+oidc:
+  ##
+  ##
+  openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
+  ##
+  ##
+  client_id: ~
+  ##
+  ##
+  client_secret: ~
+  ##
+  ##
+  scope: ~
+  ##
+  ##
+  base_redirect_url: ~
 
 secretjob:
   enabled: true
@@ -194,43 +215,6 @@ indexer:
     ##
     ##
     password: "rU40Fm%0GnK£iqQN"
-  
-  ##
-  ##
-  keycloak:
-    ##
-    ##
-    enabled: true
-    ##
-    ##
-    roles_key: wazuh_roles
-    ##
-    ##
-    subject_key: preferred_username
-    ##
-    ##
-    openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
-    ##
-    ##
-    client_id: ~
-    ##
-    ##
-    client_secret: ~
-    ##
-    ##
-    scope: ~
-    ##
-    ##
-    base_redirect_url: ~
-    ##
-    ##
-    roles_mapping: ~
-    ##
-    ##
-    roles: ~
-    ##
-    ##
-    tenants: ~
 
   ##
   ##
@@ -282,10 +266,10 @@ indexer:
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   ##
   ##
-  volumes: [ ]
+  volumes: { }
   ##
   ##
-  volumeMounts: [ ]
+  volumeMounts: { }
   ##
   ##
   resources: ~
@@ -454,6 +438,108 @@ worker:
     capabilities:
       add: [ "SYS_CHROOT" ]
     privileged: true
+
+##
+##
+worker_integration:
+  ##
+  ##
+  enabled: false
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
+  ##
+  ##
+  replicaCount: 1
+  ##
+  ##
+  updateStrategy:
+    type: RollingUpdate
+  ##
+  ##
+  nameOverride: ""
+  ##
+  ##
+  image:
+    ##
+    ##
+    registry: docker.io
+    ##
+    ##
+    repository: wazuh/wazuh-manager
+    ##
+    ##
+    tag: '{{ .Values.global.version }}'
+    ##
+    ##
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+
+  ##
+  ##
+  volumeMounts: [ ]
+
+  ##
+  ##
+  initContainers: { }
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+  ##
+  ##
+  podManagementPolicy: Parallel
+
+  ##
+  ##
+  persistence:
+    ##
+    ##
+    size: 200Mi
+    ##
+    ##
+    storageClassName: ~
+    ##
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+  resources: ~
+
+  ##
+  ##
+  affinity: ~
+  
+  ##
+  ##
+  securityContext:
+    capabilities:
+      add: [ "SYS_CHROOT" ]
+    privileged: true
+
 
 master:
   replicaCount: 1
@@ -1017,44 +1103,62 @@ notification:
 ##
 integration:
   ##
-  ## https://documentation.wazuh.com/current/cloud-security/azure/platform-and-services.html#getting-access-credentials-for-microsoft-azure-storage
+  ## Azure integrations for Log Analytics, Graph API, and Storage
+  ## https://documentation.wazuh.com/current/cloud-security/azure/index.html
   azure:
-    ##
-    ##
-    workspace: ~
-    ##
-    ##
-    domain: gisudm.onmicrosoft.com
-    ##
-    ##
-    auth:
-      ##
-      ##
-      log:
-        ##
-        ##
-        application_id: ~
-        ##
-        ##
-        application_key: ~
-      ##
-      ##
-      graph:
-        ##
-        ##
-        application_id: ~
-        ##
-        ##
-        application_key: ~
-      ##
-      ##
-      storage:
-        ##
-        ##
-        account_name: ~
-        ##
-        ##
-        account_key: ~
+    ## Azure tenant domain (e.g., company.onmicrosoft.com)
+    tenantDomain: ~
+
+    ## Credentials stored in Kubernetes secrets
+    ## Create secret with:
+    ##   kubectl create secret generic wazuh-azure-secrets \
+    ##     --from-literal=log_analytics_credentials='{"application_id":"xxx","application_key":"yyy"}' \
+    ##     --from-literal=graph_credentials='{"application_id":"xxx","application_key":"yyy"}' \
+    ##     --from-literal=storage_credentials='{"account_name":"xxx","account_key":"yyy"}' \
+    ##     -n <namespace>
+    secrets:
+      create: false
+      existingSecret: ~  # Name of existing secret (e.g., "wazuh-azure-secrets")
+
+    ## Azure Log Analytics integration
+    logAnalytics:
+      enabled: false
+      workspace: ~  # Default workspace ID (optional, can be overridden per query)
+      ## Multiple queries support
+      ## queries:
+      ##   - query: "AzureActivity"
+      ##     workspace: "workspace-id-1"  # Optional, defaults to top-level workspace
+      ##     timeOffset: "1d"              # Optional, defaults to "1d"
+      ##   - query: "SecurityEvent"
+      ##     workspace: "workspace-id-2"
+      ##     timeOffset: "12h"
+      queries: []
+
+    ## Azure Graph API integration (Microsoft Entra ID / Azure AD)
+    graph:
+      enabled: false
+      ## Multiple queries support
+      ## queries:
+      ##   - query: "auditLogs/directoryAudits"
+      ##     timeOffset: "1d"
+      ##   - query: "auditLogs/signIns"
+      ##     timeOffset: "12h"
+      queries: []
+
+    ## Azure Storage integration
+    storage:
+      enabled: false
+      ## Multiple containers support
+      ## containers:
+      ##   - name: "insights-activity-logs"
+      ##     blobs: ".json"
+      ##     contentType: "json_inline"
+      ##     timeOffset: "24h"
+      ##   - name: "insights-logs-audit"
+      ##     blobs: ".json"
+      ##     contentType: "json_inline"
+      ##     timeOffset: "12h"
+      containers: []
 
 
   ##
@@ -1123,6 +1227,11 @@ integration:
     config:
       enabled: false
       bucketName: ~
+      ## Multi-account support: Comma-separated list of AWS account IDs
+      ## Example: "020980146275,564357927993,590183746717"
+      ## Wazuh will automatically look for Config data in the format:
+      ##   s3://bucketName/AWSLogs/{accountId}/Config/...
+      awsAccountIds: ~
     ## Security Hub via SQS
     securityHub:
       enabled: false

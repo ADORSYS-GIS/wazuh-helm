@@ -22,6 +22,16 @@ worker:
     limits:
       cpu: 500m
       memory: 512Mi
+
+worker_integration:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 indexer:
   resources:
     requests:

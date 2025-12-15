@@ -2,6 +2,37 @@
 
 [![Helm Publish](https://github.com/ADORSYS-GIS/wazuh-helm/actions/workflows/helm-publish.yml/badge.svg)](https://github.com/ADORSYS-GIS/wazuh-helm/actions/workflows/helm-publish.yml) [![Build Docker image](https://github.com/ADORSYS-GIS/wazuh-helm/actions/workflows/build-envsubst.yml/badge.svg)](https://github.com/ADORSYS-GIS/wazuh-helm/actions/workflows/build-envsubst.yml)
 
+## Cloud Integrations
+
+This Helm chart supports comprehensive cloud security monitoring:
+
+### AWS Integration
+- CloudTrail logs
+- AWS Config
+- Security Hub alerts
+- VPC Flow Logs
+- GuardDuty findings
+
+See [AWS integration guide](DEPLOY_AWS.md) for setup instructions.
+
+### Azure Integration
+- Azure Activity Logs
+- Azure AD Audit Logs
+- Microsoft Defender for Cloud alerts
+- Application Insights
+- AKS audit logs
+- Azure SQL audit logs
+- NSG flow logs
+
+See [Azure deployment guide](DEPLOY_AZURE.md) and [Azure data sources guide](AZURE_DATA_SOURCES.md) for detailed setup instructions.
+
+Use the interactive script to enable additional Azure data sources:
+```bash
+./enable-azure-datasources.sh
+```
+
+---
+
 To use this chart, you need to have first a root CA.
 To create one you can use the following commands:
 ```shell

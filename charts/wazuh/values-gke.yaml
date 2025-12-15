@@ -32,6 +32,21 @@ worker:
             labelSelector:
               matchLabels:
                 app-group: '{{ include "common.names.fullname" $ }}-manager'
+
+worker_integration:
+  replicaCount: 1
+  additionalAnnotations:
+    app-group: '{{ include "common.names.fullname" $ }}-manager'
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app-group: '{{ include "common.names.fullname" $ }}-manager'
+
 master:
   replicaCount: 1
   additionalAnnotations:
