@@ -31,8 +31,36 @@ opensearch_security.openid.scope: '{{ include "common.tplvalues.render" (dict "v
 opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.render" (dict "value" . "context" $) }}'
 {{- end }}
 {{- end }}
-  
-{{ with $.Values.dashboard.branding -}}
+
+{{- with $.Values.opensearchDashboards.branding }}
+{{- if .enabled }}
 opensearchDashboards.branding:
-  {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 2 }}
+  applicationTitle: "{{ .applicationTitle }}"
+  faviconUrl: "{{ .faviconUrl }}"
+  useExpandedHeader: {{ .useExpandedHeader }}
+  
+  {{- with .logo }}
+  logo:
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
+    {{- end }}
+  {{- end }}
+  
+  {{- with .loadingLogo }}
+  loadingLogo:
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
+    {{- end }}
+  {{- end }}
+  
+  {{- with .mark }}
+  mark:
+    defaultUrl: "{{ .defaultUrl }}"
+    {{- with .darkModeUrl }}
+    darkModeUrl: "{{ . }}"
+    {{- end }}
+  {{- end }}
+{{- end }}
 {{- end }}
