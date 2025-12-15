@@ -62,3 +62,21 @@ To create the namespace, use the following command:
 NAMESPACE="wazuh" # Modify this to your needs
 kubectl create namespace $NAMESPACE
 ```
+
+### Kubernetes Pod Security / Privileges
+
+If the **Wazuh Indexer pods are not being created**, this is often caused by Kubernetes **Pod Security admission** restrictions.
+Wazuh components require privileged permissions to function correctly.
+
+If you encounter this issue, label the namespace to allow privileged workloads:
+
+```bash
+kubectl label namespace wazuh \
+  pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/audit=privileged \
+  pod-security.kubernetes.io/warn=privileged
+```
+
+After applying the labels, redeploy or restart the Helm release and verify that the indexer pods are created successfully.
+
+⚠️ **Note**: Granting privileged permissions reduces isolation. Apply this only to trusted namespaces and clusters.
