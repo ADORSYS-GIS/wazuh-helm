@@ -49,7 +49,7 @@ backup:
 
   # S3 configuration
   s3:
-    bucketName: "test-wazuh-backup-bucket"
+    bucketName: "wazuh-dev-backup"
     endpointUrl: ""  # Leave empty for AWS S3
     pathPrefix: "wazuh-backup"
 
@@ -688,28 +688,14 @@ tekton:
                 value: "$(params.s3BucketName)"
               - name: S3_ENDPOINT_URL
                 value: "$(params.s3EndpointUrl)"
-              - name: AWS_REGION
-                value: '{{ .Values.aws.region }}'
-              - name: AWS_ACCESS_KEY_ID
-                valueFrom:
-                  secretKeyRef:
-                    name: '{{ .Values.aws.secretName }}'
-                    key: accessKeyId
-              - name: AWS_SECRET_ACCESS_KEY
-                valueFrom:
-                  secretKeyRef:
-                    name: '{{ .Values.aws.secretName }}'
-                    key: secretAccessKey
-              - name: AWS_SESSION_TOKEN
-                valueFrom:
-                  secretKeyRef:
-                    name: '{{ .Values.aws.secretName }}'
-                    key: sessionToken
             volumeMounts:
               - name: staging-volume
                 mountPath: /backup
               - name: scripts-volume
                 mountPath: /scripts
+              - name: aws-creds
+                mountPath: /root/.aws
+                readOnly: true
         volumes:
           - name: staging-volume
             persistentVolumeClaim:
@@ -718,6 +704,10 @@ tekton:
             configMap:
               name: '{{ include "common.names.fullname" $ }}-scripts'
               defaultMode: 0755
+          - name: aws-creds
+            secret:
+              secretName: '{{ .Values.aws.secretName }}'
+              defaultMode: 0400
 
     - name: '{{ include "common.names.fullname" $ }}-wazuh-control'
       enabled: '{{ .Values.features.gracefulShutdown.enabled }}'
@@ -838,16 +828,17 @@ configmaps:
 # ------------------------------------------------------------------------------
 # Secrets (Array-based)
 # ------------------------------------------------------------------------------
-secrets:
-  - name: '{{ .Values.aws.secretName }}'
-    enabled: true
-    additionalLabels: {}
-    additionalAnnotations: {}
-    type: Opaque
-    data:
-      accessKeyId: '{{ .Values.aws.accessKeyId | b64enc }}'
-      secretAccessKey: '{{ .Values.aws.secretAccessKey | b64enc }}'
-      sessionToken: '{{ .Values.aws.sessionToken | b64enc }}'
+# Note: aws-creds secret is created manually via kubectl, not managed by Helm
+# To enable Helm management, uncomment the secret below and set aws.createSecret=true
+secrets: []
+  # - name: '{{ .Values.aws.secretName }}'
+  #   enabled: true
+  #   additionalLabels: {}
+  #   additionalAnnotations: {}
+  #   type: Opaque
+  #   data:
+  #     # AWS credentials file mounted at ~/.aws/credentials
+  #     credentials: '{{ .Values.aws.credentialsFile | b64enc }}'
 
 # ------------------------------------------------------------------------------
 # PVCs (Array-based)
@@ -977,12 +968,26 @@ rbac:
 # ------------------------------------------------------------------------------
 # AWS Configuration
 # ------------------------------------------------------------------------------
+# Recommended: Create the secret externally with your credentials file
+# kubectl create secret generic aws-creds --from-file=credentials=./credentials
+#
+# Your credentials file should look like:
+# [default]
+# aws_access_key_id=AKIAxxxx
+# aws_secret_access_key=xxxx
+# region=eu-central-1
 aws:
-  region: eu-central-1
   secretName: aws-creds
-  accessKeyId: ""
-  secretAccessKey: ""
-  sessionToken: ""
+  # If createSecret is true, the chart will create the secret from credentialsFile below
+  # If false, you must create the secret externally (recommended for production)
+  createSecret: false
+  # Multi-line credentials file content (used only if createSecret=true)
+  # Format: standard AWS credentials file
+  credentialsFile: |
+    [default]
+    aws_access_key_id=
+    aws_secret_access_key=
+    region=eu-central-1
 
 # ------------------------------------------------------------------------------
 # PVC Configuration (legacy structure for backward compatibility)
@@ -992,7 +997,7 @@ pvc:
     name: "backup-staging-pvc"
     externalName: ""
     size: "20Gi"
-    storageClass: "" 
+    storageClass: ""  # K3s default storage class 
 
 # ------------------------------------------------------------------------------
 # Debug Configuration
