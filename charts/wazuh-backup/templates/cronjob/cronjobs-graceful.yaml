@@ -1,24 +1,29 @@
 # templates/cronjob/cronjobs-graceful.yaml
 # CronJobs that trigger graceful backups via EventListener
+# Supports multi-replica components by generating separate CronJobs for each replica
 
 {{- if and .Values.features.gracefulShutdown.enabled .Values.features.cronjobs.enabled }}
 {{- range .Values.backup.components }}
 {{- if .enabled }}
+  {{- $component := . }}
+  {{- $replicas := int (default 1 .replicas) }}
+  {{- range $index := until $replicas }}
 ---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "common.names.fullname" $ }}-{{ .name }}-graceful-cron
-  namespace: {{ .namespace | default (include "common.names.namespace" $) }}
+  name: {{ include "common.names.fullname" $ }}-{{ $component.name }}-{{ $index }}-graceful-cron
+  namespace: {{ $component.namespace | default (include "common.names.namespace" $) }}
   labels:
-    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
-    component: {{ .name }}
+    {{- include "common.labels.standard" ( dict "customLabels" (merge $component.additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+    component: {{ $component.name }}
+    replica-index: "{{ $index }}"
     backup-method: graceful
   annotations:
-    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge .additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
-    description: "Graceful backup using wazuh-control stop/start"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge $component.additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
+    description: "Graceful backup for {{ $component.name }}-{{ $index }} using wazuh-control"
 spec:
-  schedule: "{{ .schedule | default $.Values.backup.schedule }}"
+  schedule: "{{ $component.schedule | default $.Values.backup.schedule }}"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
@@ -37,14 +42,14 @@ spec:
                 - |
                   set -e
 
-                  echo "🕐 Scheduled graceful backup triggered for {{ .name }} at $(date)"
+                  echo "🕐 Scheduled graceful backup triggered for {{ $component.name }}-{{ $index }} at $(date)"
                   echo "📋 Method: wazuh-control stop/start (graceful shutdown)"
 
                   # Call the EventListener service with method=graceful
                   curl -X POST \
                     -H "Content-Type: application/json" \
                     -d '{
-                      "component": "{{ .name }}",
+                      "component": "{{ $component.name }}-{{ $index }}",
                       "method": "graceful",
                       "s3BucketName": "{{ $.Values.backup.s3.bucketName }}",
                       "s3EndpointUrl": "{{ $.Values.backup.s3.endpointUrl }}",
@@ -53,12 +58,13 @@ spec:
                     "http://{{ include "common.names.fullname" $ }}-listener-svc.{{ include "common.names.namespace" $ }}.svc.cluster.local:8080/"
 
                   if [ $? -eq 0 ]; then
-                    echo "✅ Graceful backup request sent successfully for {{ .name }}"
+                    echo "✅ Graceful backup request sent successfully for {{ $component.name }}-{{ $index }}"
                     echo "🔄 Pipeline will use wazuh-control to gracefully stop/start services"
                   else
-                    echo "❌ Failed to send graceful backup request for {{ .name }}"
+                    echo "❌ Failed to send graceful backup request for {{ $component.name }}-{{ $index }}"
                     exit 1
                   fi
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

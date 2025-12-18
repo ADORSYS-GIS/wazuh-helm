@@ -119,10 +119,9 @@ backup:
           - "write.lock"
 
     - name: worker
-      enabled: false
+      enabled: true
       statefulsetName: "wazuh-wazuh-helm-manager-worker"
-      podName: "wazuh-wazuh-helm-manager-worker-0"
-      pvcName: "wazuh-wazuh-helm-manager-worker-wazuh-wazuh-helm-manager-worker-0"
+      # Pod and PVC names now computed dynamically based on replica index
       replicas: 1
       backupSubdir: "worker-backup"
       schedule: "0 2 * * *"
@@ -130,8 +129,8 @@ backup:
       additionalAnnotations: {}
       backupPaths:
         include:
-          - "wazuh/var/ossec/logs"
-          - "wazuh/var/ossec/queue"
+          - "/var/ossec/logs"
+          - "/var/ossec/queue"
         exclude:
           - "*.tmp"
 
@@ -997,7 +996,7 @@ pvc:
     name: "backup-staging-pvc"
     externalName: ""
     size: "20Gi"
-    storageClass: ""  # K3s default storage class 
+    storageClass: "local-path"  # K3s default storage class 
 
 # ------------------------------------------------------------------------------
 # Debug Configuration

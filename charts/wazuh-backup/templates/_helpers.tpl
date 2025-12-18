@@ -126,3 +126,42 @@ Returns "true" if at least one component is enabled, empty string otherwise
 true
 {{- end -}}
 {{- end -}}
+
+{{/*
+Generate pod name for a component replica with fallback to hardcoded value
+Usage: {{ include "wazuh-backup.podName" (dict "component" .component "index" $index "context" $) }}
+*/}}
+{{- define "wazuh-backup.podName" -}}
+{{- $component := .component -}}
+{{- $index := .index -}}
+{{- if $component.podName -}}
+  {{- $component.podName -}}
+{{- else -}}
+  {{- printf "%s-%d" $component.statefulsetName $index -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Generate PVC name for a component replica with fallback to hardcoded value
+StatefulSet PVC naming pattern: {volumeClaimTemplate}-{statefulsetName}-{ordinal}
+Usage: {{ include "wazuh-backup.pvcName" (dict "component" .component "index" $index "context" $) }}
+*/}}
+{{- define "wazuh-backup.pvcName" -}}
+{{- $component := .component -}}
+{{- $index := .index -}}
+{{- if $component.pvcName -}}
+  {{- $component.pvcName -}}
+{{- else -}}
+  {{- printf "%s-%s-%d" $component.statefulsetName $component.statefulsetName $index -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Generate replica-specific backup subdirectory
+Usage: {{ include "wazuh-backup.replicaSubdir" (dict "component" .component "index" $index "context" $) }}
+*/}}
+{{- define "wazuh-backup.replicaSubdir" -}}
+{{- $component := .component -}}
+{{- $index := .index -}}
+{{- printf "%s-%d" $component.backupSubdir $index -}}
+{{- end -}}

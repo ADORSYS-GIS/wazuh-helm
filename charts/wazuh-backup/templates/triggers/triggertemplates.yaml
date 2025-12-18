@@ -1,17 +1,21 @@
 {{- if .Values.features.triggers.enabled }}
 {{- range .Values.backup.components }}
 {{- if .enabled }}
+  {{- $component := . }}
+  {{- $replicas := int (default 1 .replicas) }}
+  {{- range $index := until $replicas }}
 ---
 apiVersion: triggers.tekton.dev/v1beta1
 kind: TriggerTemplate
 metadata:
-  name: {{ include "common.names.fullname" $ }}-{{ .name }}-template
+  name: {{ include "common.names.fullname" $ }}-{{ $component.name }}-{{ $index }}-template
   namespace: {{ include "common.names.namespace" $ }}
   labels:
-    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
-    component: {{ .name }}
+    {{- include "common.labels.standard" ( dict "customLabels" (merge $component.additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+    component: {{ $component.name }}
+    replica-index: "{{ $index }}"
   annotations:
-    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge .additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge $component.additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
 spec:
   params:
     - name: s3BucketName
@@ -27,14 +31,15 @@ spec:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
-        generateName: {{ include "common.names.fullname" $ }}-{{ .name }}-
+        generateName: {{ include "common.names.fullname" $ }}-{{ $component.name }}-{{ $index }}-
         namespace: {{ include "common.names.namespace" $ }}
         labels:
-          {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 10 }}
-          component: {{ .name }}
+          {{- include "common.labels.standard" ( dict "customLabels" (merge $component.additionalLabels $.Values.commonLabels) "context" $ ) | nindent 10 }}
+          component: {{ $component.name }}
+          replica-index: "{{ $index }}"
           triggered-by: "$(tt.params.triggeredBy)"
         annotations:
-          backup.wazuh.io/component: "{{ .name }}"
+          backup.wazuh.io/component: "{{ $component.name }}-{{ $index }}"
           backup.wazuh.io/triggered-by: "$(tt.params.triggeredBy)"
       spec:
         serviceAccountName: {{ include "common.names.fullname" $ }}-sa
@@ -46,25 +51,19 @@ spec:
           name: {{ include "common.names.fullname" $ }}-component-backup-graceful
         params:
           - name: componentName
-            value: "{{ .name }}"
+            value: "{{ $component.name }}-{{ $index }}"
           - name: podName
-            value: "{{ .podName }}"
+            value: {{ include "wazuh-backup.podName" (dict "component" $component "index" $index "context" $) | quote }}
           - name: podNamespace
             value: "{{ $.Values.global.namespace }}"
           - name: containerName
             value: "{{ $.Values.backup.gracefulShutdown.containerName }}"
           - name: wazuhControlPath
             value: "{{ $.Values.backup.gracefulShutdown.wazuhControlPath }}"
-          - name: sourcePvcName
-            value: "{{ .pvcName }}"
-          - name: sourcePvcPath
-            value: "{{ include "backup.sourcePath" . }}"
           - name: includePaths
-            value: "{{ include "backup.includePaths" . }}"
-          - name: excludePatterns
-            value: "{{ include "backup.excludePatterns" . }}"
+            value: "{{ include "backup.includePaths" $component }}"
           - name: backupSubdir
-            value: "{{ .backupSubdir }}"
+            value: {{ include "wazuh-backup.replicaSubdir" (dict "component" $component "index" $index "context" $) | quote }}
           - name: s3BucketName
             value: "$(tt.params.s3BucketName)"
           - name: s3EndpointUrl
@@ -74,28 +73,29 @@ spec:
           name: {{ include "common.names.fullname" $ }}-component-backup
         params:
           - name: componentName
-            value: "{{ .name }}"
+            value: "{{ $component.name }}-{{ $index }}"
           - name: statefulsetName
-            value: "{{ .statefulsetName }}"
+            value: "{{ $component.statefulsetName }}"
           - name: statefulsetNamespace
             value: "{{ $.Values.global.namespace }}"
           - name: replicas
-            value: "{{ .replicas }}"
+            value: "{{ $component.replicas }}"
           - name: sourcePvcName
-            value: "{{ .pvcName }}"
+            value: {{ include "wazuh-backup.pvcName" (dict "component" $component "index" $index "context" $) | quote }}
           - name: sourcePvcPath
-            value: "{{ include "backup.sourcePath" . }}"
+            value: "{{ include "backup.sourcePath" $component }}"
           - name: includePaths
-            value: "{{ include "backup.includePaths" . }}"
+            value: "{{ include "backup.includePaths" $component }}"
           - name: excludePatterns
-            value: "{{ include "backup.excludePatterns" . }}"
+            value: "{{ include "backup.excludePatterns" $component }}"
           - name: backupSubdir
-            value: "{{ .backupSubdir }}"
+            value: {{ include "wazuh-backup.replicaSubdir" (dict "component" $component "index" $index "context" $) | quote }}
           - name: s3BucketName
             value: "$(tt.params.s3BucketName)"
           - name: s3EndpointUrl
             value: "$(tt.params.s3EndpointUrl)"
         {{- end }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
