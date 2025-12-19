@@ -1,32 +1,38 @@
 # templates/triggers/triggers.yaml
 # Dynamic triggers for all enabled components
+# Supports multi-replica components by generating separate Triggers for each replica
 
 {{- if .Values.features.triggers.enabled }}
 {{- range .Values.backup.components }}
 {{- if .enabled }}
+  {{- $component := . }}
+  {{- $replicas := int (default 1 .replicas) }}
+  {{- range $index := until $replicas }}
 ---
 apiVersion: triggers.tekton.dev/v1beta1
 kind: Trigger
 metadata:
-  name: {{ include "common.names.fullname" $ }}-{{ .name }}-trigger
+  name: {{ include "common.names.fullname" $ }}-{{ $component.name }}-{{ $index }}-trigger
   namespace: {{ include "common.names.namespace" $ }}
   labels:
-    {{- include "common.labels.standard" ( dict "customLabels" (merge .additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
-    component: {{ .name }}
+    {{- include "common.labels.standard" ( dict "customLabels" (merge $component.additionalLabels $.Values.commonLabels) "context" $ ) | nindent 4 }}
+    component: {{ $component.name }}
+    replica-index: "{{ $index }}"
   annotations:
-    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge .additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (merge $component.additionalAnnotations $.Values.commonAnnotations) "context" $ ) | nindent 4 }}
 spec:
   bindings:
-    - ref: {{ include "common.names.fullname" $ }}-{{ .name }}-binding
+    - ref: {{ include "common.names.fullname" $ }}-{{ $component.name }}-binding
   template:
-    ref: {{ include "common.names.fullname" $ }}-{{ .name }}-template
+    ref: {{ include "common.names.fullname" $ }}-{{ $component.name }}-{{ $index }}-template
   interceptors:
     - name: "validate-component"
       ref:
         name: "cel"
       params:
         - name: "filter"
-          value: "body.component == '{{ .name }}'"
+          value: "body.component == '{{ $component.name }}-{{ $index }}'"
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

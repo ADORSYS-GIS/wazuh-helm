@@ -1,5 +1,6 @@
 # templates/triggers/event-listener.yaml
 # Dynamic EventListener that references all enabled component triggers
+# Supports multi-replica components by referencing per-replica triggers
 
 {{- if and .Values.features.eventListener.enabled (include "wazuh-backup.hasEnabledComponents" .) }}
 apiVersion: triggers.tekton.dev/v1beta1
@@ -20,8 +21,12 @@ spec:
   triggers:
 {{- range .Values.backup.components }}
 {{- if .enabled }}
-    - name: {{ .name }}-trigger-ref
-      triggerRef: {{ printf "%s-%s-trigger" (include "common.names.fullname" $) .name }}
+  {{- $component := . }}
+  {{- $replicas := int (default 1 .replicas) }}
+  {{- range $index := until $replicas }}
+    - name: {{ $component.name }}-{{ $index }}-trigger-ref
+      triggerRef: {{ printf "%s-%s-%d-trigger" (include "common.names.fullname" $) $component.name $index }}
+  {{- end }}
 {{- end }}
 {{- end }}
 
