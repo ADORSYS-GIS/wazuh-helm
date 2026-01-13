@@ -1,0 +1,24 @@
+master: 
+  replicaCount: 1
+  resources: ~
+  
+worker: 
+  replicaCount: 1
+  resources: ~
+
+worker_integration: 
+  enabled: false
+  resources: ~
+  
+indexer: 
+  replicas: 1
+  resources: ~
+  
+oidc: ~
+    
+cluster:
+  rootCaSecretName: "wazuh-root-ca"
+
+integration:
+  jira:
+    enabled: false

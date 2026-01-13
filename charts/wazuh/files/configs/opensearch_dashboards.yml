@@ -11,10 +11,15 @@ server.ssl.key: "/usr/share/wazuh-dashboard/certs/dashboard-key.pem"
 server.ssl.certificate: "/usr/share/wazuh-dashboard/certs/dashboard.pem"
 opensearch.ssl.certificateAuthorities: ["/usr/share/wazuh-dashboard/certs/root-ca.pem"]
 uiSettings.overrides.defaultRoute: /app/wz-home?security_tenant=global
-  
-{{ with $.Values.indexer.keycloak -}}
-{{- if .enabled -}}
 
+opensearch_security.auth.unauthenticated_routes: ['/api/status']
+
+# Session expiration settings
+opensearch_security.cookie.ttl: 900000
+opensearch_security.session.ttl: 900000
+opensearch_security.session.keepalive: true
+  
+{{ with $.Values.oidc -}}
 opensearch_security.auth.type: "openid"
 opensearch_security.openid.connect_url: '{{ include "common.tplvalues.render" (dict "value" .openid_connect_url "context" $) }}'
 opensearch_security.openid.client_id: '{{ include "common.tplvalues.render" (dict "value" .client_id "context" $) }}'
@@ -25,8 +30,6 @@ opensearch_security.openid.scope: '{{ include "common.tplvalues.render" (dict "v
 {{ with .base_redirect_url -}}
 opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.render" (dict "value" . "context" $) }}'
 {{- end }}
-
-{{- end -}}
 {{- end }}
   
 {{ with $.Values.dashboard.branding -}}

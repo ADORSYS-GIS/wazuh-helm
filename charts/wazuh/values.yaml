@@ -4,7 +4,7 @@ global:
   domain: wazuh.example.com
   ##
   ##
-  version: "4.12.0"
+  version: "4.13.1"
   ##
   ##
   imageRegistry: ""
@@ -78,6 +78,27 @@ apiCred:
     ##
     ##
     password: "9Y0m^%^Cx4zx@6=X"
+    
+  
+  
+##
+##
+oidc:
+  ##
+  ##
+  openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
+  ##
+  ##
+  client_id: ~
+  ##
+  ##
+  client_secret: ~
+  ##
+  ##
+  scope: ~
+  ##
+  ##
+  base_redirect_url: ~
 
 secretjob:
   enabled: true
@@ -194,43 +215,6 @@ indexer:
     ##
     ##
     password: "rU40Fm%0GnK£iqQN"
-  
-  ##
-  ##
-  keycloak:
-    ##
-    ##
-    enabled: true
-    ##
-    ##
-    roles_key: wazuh_roles
-    ##
-    ##
-    subject_key: preferred_username
-    ##
-    ##
-    openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
-    ##
-    ##
-    client_id: ~
-    ##
-    ##
-    client_secret: ~
-    ##
-    ##
-    scope: ~
-    ##
-    ##
-    base_redirect_url: ~
-    ##
-    ##
-    roles_mapping: ~
-    ##
-    ##
-    roles: ~
-    ##
-    ##
-    tenants: ~
 
   ##
   ##
@@ -282,24 +266,81 @@ indexer:
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   ##
   ##
-  volumes: [ ]
+  volumes: { }
   ##
   ##
-  volumeMounts: [ ]
+  volumeMounts: { }
   ##
   ##
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 1
-      memory: 2Gi
+  resources: ~
 
   ##
   ##
   affinity: ~
 
+  ##
+  ##
+  initContainers:
+    volume-mount-hack:
+      image: busybox
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 100m
+          memory: 256Mi
+      command:
+        - sh
+        - '-c'
+        - 'chown -R 1000:1000 /var/lib/wazuh-indexer'
+      volumeMounts:
+        - name: '{{ include "common.names.fullname" $ }}-indexer'
+          mountPath: /var/lib/wazuh-indexer
+    increase-the-vm-max-map-count:
+      image: busybox
+      command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+      securityContext:
+        privileged: true
+    config-init:
+      ##
+      image: ghcr.io/adorsys-gis/envsubt:main-7917c58
+      ##
+      imagePullPolicy: IfNotPresent
+      ##
+      ##
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          apk add --update --no-cache libintl gettext apache2-utils
+
+          export INDEXER_PASSWORD_BCRYPT=$(htpasswd -bnBC 12 "" $INDEXER_PASSWORD | tr -d ':\n')
+          export DASHBOARD_USERNAME_BCRYPT=$(htpasswd -bnBC 12 "" $DASHBOARD_PASSWORD | tr -d ':\n')
+          envsubst < /workdir/internal_users.yml > /processed/internal_users.yml
+
+      ##
+      ##
+      envFrom:
+        - secretRef:
+            name: '{{ include "secret.indexer-auth" $ }}'
+        - secretRef:
+            name: '{{ include "secret.dashboard-auth" $ }}'
+      ##
+      ##
+      volumeMounts:
+        - name: indexer-conf
+          mountPath: /workdir/internal_users.yml
+          subPath: internal_users.yml
+          readOnly: true
+        - name: wazuh-config-temp
+          mountPath: /processed
+
+    
 ##
 ##
 worker:
@@ -385,21 +426,120 @@ worker:
     accessModes:
       - ReadWriteOnce
 
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  resources: ~
 
   ##
   ##
   affinity: ~
+  
+  ##
+  ##
+  securityContext:
+    capabilities:
+      add: [ "SYS_CHROOT" ]
+    privileged: true
+
+##
+##
+worker_integration:
+  ##
+  ##
+  enabled: false
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
+  ##
+  ##
+  replicaCount: 1
+  ##
+  ##
+  updateStrategy:
+    type: RollingUpdate
+  ##
+  ##
+  nameOverride: ""
+  ##
+  ##
+  image:
+    ##
+    ##
+    registry: docker.io
+    ##
+    ##
+    repository: wazuh/wazuh-manager
+    ##
+    ##
+    tag: '{{ .Values.global.version }}'
+    ##
+    ##
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+
+  ##
+  ##
+  volumeMounts: [ ]
+
+  ##
+  ##
+  initContainers: { }
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+  ##
+  ##
+  podManagementPolicy: Parallel
+
+  ##
+  ##
+  persistence:
+    ##
+    ##
+    size: 200Mi
+    ##
+    ##
+    storageClassName: ~
+    ##
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+  resources: ~
 
   ##
   ##
   affinity: ~
+  
+  ##
+  ##
+  securityContext:
+    capabilities:
+      add: [ "SYS_CHROOT" ]
+    privileged: true
+
 
 master:
   replicaCount: 1
@@ -492,13 +632,7 @@ master:
     - name: owasp-zap-alerts
       mountPath: /var/log/owasp-zap/
 
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  resources: ~
 
   persistence:
     ##
@@ -515,6 +649,13 @@ master:
   ##
   ##
   affinity: ~
+  
+  ##
+  ##
+  securityContext:
+    capabilities:
+      add: [ "SYS_CHROOT" ]
+    privileged: true
 
 ##
 ##
@@ -591,13 +732,7 @@ dashboard:
   ##
   additionalAnnotations: { }
   additionalLabels: { }
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 400m
-      memory: 1Gi
+  resources: ~
 
   ##
   ##
@@ -620,6 +755,15 @@ dashboard:
     ##
     ##
     enabled: false
+    ##
+    ##
+    tls:
+      ##
+      ##
+      enabled: true
+      ##
+      ##
+      useSecret: false 
     ##
     ##
     name: "wazuh-dashboard"
@@ -648,15 +792,15 @@ dashboard:
   ## 
   branding:
     logo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
     mark:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #   darkModeUrl: ""
     loadingLogo:
-      defaultUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+      defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #   darkModeUrl: ""
-    faviconUrl: "https://adorsys.com/wp-content/themes/adorsys/favicons/favicon.svg"
+    faviconUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     applicationTitle: "Wazuh | Adorsys"
     useExpandedHeader: false
 
@@ -934,44 +1078,62 @@ notification:
 ##
 integration:
   ##
-  ## https://documentation.wazuh.com/current/cloud-security/azure/platform-and-services.html#getting-access-credentials-for-microsoft-azure-storage
+  ## Azure integrations for Log Analytics, Graph API, and Storage
+  ## https://documentation.wazuh.com/current/cloud-security/azure/index.html
   azure:
-    ##
-    ##
-    workspace: ~
-    ##
-    ##
-    domain: gisudm.onmicrosoft.com
-    ##
-    ##
-    auth:
-      ##
-      ##
-      log:
-        ##
-        ##
-        application_id: ~
-        ##
-        ##
-        application_key: ~
-      ##
-      ##
-      graph:
-        ##
-        ##
-        application_id: ~
-        ##
-        ##
-        application_key: ~
-      ##
-      ##
-      storage:
-        ##
-        ##
-        account_name: ~
-        ##
-        ##
-        account_key: ~
+    ## Azure tenant domain (e.g., company.onmicrosoft.com)
+    tenantDomain: ~
+
+    ## Credentials stored in Kubernetes secrets
+    ## Create secret with:
+    ##   kubectl create secret generic wazuh-azure-secrets \
+    ##     --from-literal=log_analytics_credentials='{"application_id":"xxx","application_key":"yyy"}' \
+    ##     --from-literal=graph_credentials='{"application_id":"xxx","application_key":"yyy"}' \
+    ##     --from-literal=storage_credentials='{"account_name":"xxx","account_key":"yyy"}' \
+    ##     -n <namespace>
+    secrets:
+      create: false
+      existingSecret: ~  # Name of existing secret (e.g., "wazuh-azure-secrets")
+
+    ## Azure Log Analytics integration
+    logAnalytics:
+      enabled: false
+      workspace: ~  # Default workspace ID (optional, can be overridden per query)
+      ## Multiple queries support
+      ## queries:
+      ##   - query: "AzureActivity"
+      ##     workspace: "workspace-id-1"  # Optional, defaults to top-level workspace
+      ##     timeOffset: "1d"              # Optional, defaults to "1d"
+      ##   - query: "SecurityEvent"
+      ##     workspace: "workspace-id-2"
+      ##     timeOffset: "12h"
+      queries: []
+
+    ## Azure Graph API integration (Microsoft Entra ID / Azure AD)
+    graph:
+      enabled: false
+      ## Multiple queries support
+      ## queries:
+      ##   - query: "auditLogs/directoryAudits"
+      ##     timeOffset: "1d"
+      ##   - query: "auditLogs/signIns"
+      ##     timeOffset: "12h"
+      queries: []
+
+    ## Azure Storage integration
+    storage:
+      enabled: false
+      ## Multiple containers support
+      ## containers:
+      ##   - name: "insights-activity-logs"
+      ##     blobs: ".json"
+      ##     contentType: "json_inline"
+      ##     timeOffset: "24h"
+      ##   - name: "insights-logs-audit"
+      ##     blobs: ".json"
+      ##     contentType: "json_inline"
+      ##     timeOffset: "12h"
+      containers: []
 
 
   ##
@@ -1003,3 +1165,50 @@ integration:
     ##
     ##
     externalSecret: ~
+
+  ##
+  ## AWS integrations for CloudTrail and Security Hub
+  aws:
+    enable: false
+    ## top-level defaults reused by both blocks
+    profile: ~
+    roleArn: ~
+    awsOrganizationId: ~
+    ## Optional k8s Secret to mount to /root/.aws containing credentials and/or config
+    secrets:
+      create: false
+      # name: "wazuh-aws"
+      existingSecret: "ext-wazuh-aws-secrets"
+      additionalAnnotations: {}
+      additionalLabels: {}
+      ## Inline contents if creating the secret:
+      ## credentials: |
+      ##   [default]
+      ##   aws_access_key_id=...
+      ##   aws_secret_access_key=...
+      credentials: ~
+      ## config: |
+      ##   [profile main]
+      ##   region=eu-central-1
+      ##   role_arn=arn:aws:iam::123456789012:role/Wazuh-IAM-Role
+      ##   source_profile=default
+      config: ~
+    ## CloudTrail from S3 bucket
+    cloudtrail:
+      enabled: false
+      bucketName: ~
+      interval: 1m
+    ## AWS Config from S3 bucket
+    config:
+      enabled: false
+      bucketName: ~
+      ## Multi-account support: Comma-separated list of AWS account IDs
+      ## Example: "020980146275,564357927993,590183746717"
+      ## Wazuh will automatically look for Config data in the format:
+      ##   s3://bucketName/AWSLogs/{accountId}/Config/...
+      awsAccountIds: ~
+    ## Security Hub via SQS
+    securityHub:
+      enabled: false
+      sqsName: ~
+      interval: 1h

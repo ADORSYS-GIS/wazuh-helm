@@ -26,6 +26,7 @@ plugins.security.nodes_dn:
   - CN=*.${RELEASE_FULLNAME}-indexer,O=Adorsys,L=Bayern,C=DE
   - CN=${RELEASE_FULLNAME}-indexer,O=Adorsys,L=Bayern,C=DE
 plugins.security.restapi.roles_enabled:
+  - "app_admin"
   - "all_access"
   - "security_rest_api_access"
 plugins.security.allow_default_init_securityindex: true

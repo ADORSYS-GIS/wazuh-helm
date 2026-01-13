@@ -60,9 +60,11 @@ spec:
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
+        {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
         - name: jira-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
+        {{- end }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -74,16 +76,47 @@ spec:
           imagePullPolicy: IfNotPresent
           ##
           ##
-          securityContext:
-            privileged: true
-          ##
-          ##
           command:
             - /bin/sh
             - -c
             - |
               set -ex
-              envsubst < /workdir/template.config.xml > /processed/ossec.conf
+              # Copy template
+              cp /workdir/template.config.xml /processed/ossec.conf
+              # Replace AWS_CONFIGS if set
+              if [ ! -z "$AWS_CONFIGS" ]; then
+                # Write AWS config to temp file with proper indentation (4 spaces)
+                echo "$AWS_CONFIGS" | sed 's/^/    /' > /tmp/aws.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${AWS_CONFIGS}/r /tmp/aws.xml' /processed/ossec.conf
+                sed -i '/\${AWS_CONFIGS}/d' /processed/ossec.conf
+              fi
+              # Replace AZURE_CONFIGS if set
+              if [ ! -z "$AZURE_CONFIGS" ]; then
+                # Write Azure config to temp file with proper indentation (4 spaces)
+                echo "$AZURE_CONFIGS" | sed 's/^/    /' > /tmp/azure.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${AZURE_CONFIGS}/r /tmp/azure.xml' /processed/ossec.conf
+                sed -i '/\${AZURE_CONFIGS}/d' /processed/ossec.conf
+              fi
+              # Replace SLACK_CONFIG if set
+              if [ ! -z "$SLACK_CONFIG" ]; then
+                # Write Slack config to temp file with proper indentation (4 spaces)
+                echo "$SLACK_CONFIG" | sed 's/^/    /' > /tmp/slack.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${SLACK_CONFIG}/r /tmp/slack.xml' /processed/ossec.conf
+                sed -i '/\${SLACK_CONFIG}/d' /processed/ossec.conf
+              fi
+              # Replace JIRA_CONFIG if set
+              if [ ! -z "$JIRA_CONFIG" ]; then
+                # Write Jira config to temp file with proper indentation (4 spaces)
+                echo "$JIRA_CONFIG" | sed 's/^/    /' > /tmp/jira.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${JIRA_CONFIG}/r /tmp/jira.xml' /processed/ossec.conf
+                sed -i '/\${JIRA_CONFIG}/d' /processed/ossec.conf
+              fi
+              # Replace other variables with envsubst
+              envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
           ##
           ##
           env:
@@ -93,8 +126,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-                
-            {{ with include "integration.github.conf" $ -}}
+            {{- with include "integration.github.conf" $ }}
             - name: GITHUB_CONFIGS
               value: |
                 {{ . | nindent 16 }}
@@ -109,7 +141,7 @@ spec:
             - secretRef:
                 name: '{{ include "secret.notification-slack" $ }}'
             {{- end }}
-            
+
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
@@ -124,11 +156,13 @@ spec:
             - name: wazuh-config-temp
               mountPath: /processed
         {{ range $k, $v := .initContainers }}
+        {{ if $v }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
           {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
+        {{ end }}   
         {{- end }}   
       securityContext:
-        rfsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -136,10 +170,9 @@ spec:
           {{ with .resources -}}
           resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
-          securityContext:
-            capabilities:
-              add: [ "SYS_CHROOT" ]
-            privileged: true
+          {{- with .securityContext }}
+          securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
@@ -193,22 +226,39 @@ spec:
               subPath: 0004-custom-decoder.xml
               readOnly: true
 
+            {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira
               subPath: custom-jira
             - name: jira-conf
               mountPath: /wazuh-config-mount/integrations/custom-jira.py
-              subPath: custom-jira.py    
+              subPath: custom-jira.py
+            {{- end }}    
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/0005-audit-mitre_rules.xml
-              subPath: 0005-audit-mitre_rules.xml
+              mountPath: /wazuh-config-mount/etc/rules/7005-audit-mitre_rules.xml
+              subPath: 7005-audit-mitre_rules.xml
               readOnly: true
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/0006-fim-macos.xml
-              subPath: 0006-fim-macos.xml
+              mountPath: /wazuh-config-mount/etc/rules/7006-fim-macos.xml
+              subPath: 7006-fim-macos.xml
               readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
+              subPath: 7007-fim-linux.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7008-custom-yara.xml
+              subPath: 7008-custom-yara.xml
+              readOnly: true  
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml
+              subPath: 7009-fim-windows.xml
+              readOnly: true        
 
               
             {{ range $k, $v := $.Values.cluster.decoders -}}

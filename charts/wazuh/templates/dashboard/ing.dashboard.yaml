@@ -24,8 +24,14 @@ spec:
                 name: {{ include "common.names.fullname" $ }}-dashboard
                 port:
                   number: {{ include "common.tplvalues.render" (dict "value" .port "context" $) }}
+                  
+  {{ if and .tls .tls.enabled }}
   tls:
     - hosts:
         - {{ include "common.tplvalues.render" (dict "value" .host "context" $) }}
+      {{ if .tls.useSecret  }}
+      secretName: {{ .name }}-tls
+      {{ end }}
+  {{ end }}
 {{- end }}
 {{- end }}
