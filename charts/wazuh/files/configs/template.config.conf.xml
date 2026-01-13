@@ -253,6 +253,12 @@
         <timeout_allowed>no</timeout_allowed>
     </command>
 
+    <command>
+        <name>pf</name>
+        <executable>pf</executable>
+        <timeout_allowed>yes</timeout_allowed>
+    </command>
+
     <!--
     <active-response>
       active-response options here
@@ -412,6 +418,14 @@
         <command>yara_powershell</command>
         <location>local</location>
         <rules_id>100302,100304</rules_id>
+    </active-response>
+
+    <active-response>
+        <disabled>no</disabled>
+        <command>pf</command>
+        <location>local</location>
+        <rules_id>5763</rules_id>
+        <timeout>240</timeout>
     </active-response>
 
     <!-- Wazuh - Owasp-ZAP configuration -->
