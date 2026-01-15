@@ -74,14 +74,10 @@ spec:
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
         {{- end }}
-        {{- with $.Values.integration.teams }}
-        {{ if .enable }}
-        {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+        {{- if and $.Values.integration $.Values.integration.teams $.Values.integration.teams.enabled }}
         - name: teams-conf
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-teams
-        {{- end }}
-        {{- end }}
         {{- end }}
         {{- if eq (include "integration.azure.exists" $) "true" }}
         - name: azure-auth
@@ -282,17 +278,13 @@ spec:
               subPath: custom-jira.py
             {{- end }}
 
-            {{- with $.Values.integration.teams }}
-            {{ if .enable }}
-            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+            {{- if and $.Values.integration $.Values.integration.teams $.Values.integration.teams.enabled }}
             - name: teams-conf
               mountPath: /wazuh-config-mount/integrations/custom-teams
               subPath: custom-teams
             - name: teams-conf
               mountPath: /wazuh-config-mount/integrations/custom-teams.py
               subPath: custom-teams.py
-            {{- end }}
-            {{- end }}
             {{- end }}           
 
             - name: config
