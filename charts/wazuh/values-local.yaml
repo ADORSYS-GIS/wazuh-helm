@@ -6,6 +6,10 @@ master:
       method: "password"
       password: "j60B6_e`jmQ_3z!z"
   
+  persistence:
+    enabled: true
+    size: 5Gi
+  
 worker: 
   replicaCount: 1
   resources: ~

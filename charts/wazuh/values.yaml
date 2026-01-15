@@ -727,6 +727,9 @@ dashboard:
     - name: OPENSEARCH_JAVA_OPTS
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   envFrom: [ ]
+  customCss:
+    enabled: true
+    filename: "wz_v7_theme_overwrite.css"
   ## @branding more at https://opensearch.org/docs/latest/dashboards/branding/
   ## 
 
@@ -734,6 +737,9 @@ dashboard:
 ##
 opensearchDashboards:
   branding:
+    loginTitle: "Welcome to Wazuh Dashboard"
+    loginSubtitle: "Securely monitor and manage your infrastructure"
+    brandimageUrl: "https://upload.wikimedia.org/wikipedia/fr/1/16/BVMAC_logo.png"
     logo:
       defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     #  darkModeUrl: "https://example.com/dark-mode-sample.svg"

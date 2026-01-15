@@ -104,6 +104,12 @@ spec:
             mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
             subPath: opensearch_dashboards.yml
             readOnly: false
+          {{- if .customCss.enabled }}
+          - name: config
+            mountPath: /usr/share/wazuh-dashboard/src/core/server/core_app/assets/wz_v7_theme_overwrite.css
+            subPath: wz_v7_theme_overwrite.css
+            readOnly: true
+          {{- end }}
           - name: branding-config
             mountPath: /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
             subPath: wazuh.yml

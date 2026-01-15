@@ -35,7 +35,12 @@ opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.rend
 {{- end }}
 
 {{- with $.Values.opensearchDashboards.branding }}
-{{- if .enabled }}
+
+opensearch_security.ui.basicauth.login.brandimage: {{ .brandimageUrl }}
+opensearch_security.ui.basicauth.login.showbrandimage: true
+opensearch_security.ui.basicauth.login.title: {{ .loginTitle }}
+opensearch_security.ui.basicauth.login.subtitle:  {{ .loginSubtitle }}
+
 opensearchDashboards.branding:
   applicationTitle: "{{ .applicationTitle }}"
   faviconUrl: "{{ .faviconUrl }}"
@@ -64,5 +69,4 @@ opensearchDashboards.branding:
     darkModeUrl: "{{ . }}"
     {{- end }}
   {{- end }}
-{{- end }}
 {{- end }}
