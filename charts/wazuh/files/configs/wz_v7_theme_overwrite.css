@@ -12,7 +12,7 @@
 }
 
 /* See https://github.com/wazuh/wazuh-dashboard-plugins/issues/7330#issuecomment-2715160164 */
- @media (min-width: 992px) {
+@media (min-width: 992px) {
     .dscCanvas>.dscCanvas_results>div:nth-child(2) {
         /*
       When the screen size is too narrow; you can't even view the table, so I added a minimum height.
@@ -30,7 +30,7 @@
 }
 
 /* See https://github.com/wazuh/wazuh-dashboard-plugins/issues/7330#issuecomment-2715160164 */
- @media (min-width: 1174px) {
+@media (min-width: 1174px) {
     .dscCanvas>.dscCanvas_results>div:nth-child(2) {
         /*
       Why is the max-height calculated this way?
@@ -76,4 +76,8 @@
     border-radius: 10px !important;
     border: none !important;
     height: 50px !important;
+}
+
+.euiListGroup.euiListGroup--gutterSmall.euiListGroup-maxWidthDefault.login-wrapper>.euiImage.euiImage--fullWidth>.euiImage__img {
+    width: 50%;
 }
