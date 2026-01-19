@@ -1,4 +1,4 @@
-name: Build EnvSubst Docker image
+name: Build Wazuh Manager Agentless Docker image
 
 on:
   push:
@@ -7,12 +7,12 @@ on:
     tags:
       - 'v*'
     paths:
-      - '.github/workflows/build-envsubst.yml'
-      - 'utils/packages/envsubt/**'
+      - '.github/workflows/build-wazuh-manager-agentless.yml'
+      - 'utils/packages/wazuh-manager-agentless/**'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: adorsys-gis/envsubt
+  IMAGE_NAME: adorsys-gis/wazuh-manager-agentless
 
 jobs:
   build:
@@ -85,7 +85,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new
-          context: ./utils/packages/envsubt
+          context: ./utils/packages/wazuh-manager-agentless
