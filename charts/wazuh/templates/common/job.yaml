@@ -1,6 +1,7 @@
 {{- range $k1, $v1 :=.Values.initJobs }}
 {{ $fname := include "common.tplvalues.render" (dict "value" $k1 "context" $) }}
 {{ with $v1 }}
+{{ if .enable }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -21,7 +22,7 @@ spec:
     spec:
       serviceAccountName: {{ $fname }}-job
       restartPolicy: {{ include "common.tplvalues.render" (dict "value" .restartPolicy "context" $) }}
-      
+
       {{ with .volumes -}}
       volumes:
       {{ range $k, $v := . }}
@@ -50,7 +51,7 @@ spec:
           resources:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
-          
+
           {{ with .env }}
           env:
           {{ range $k, $v := . }}
@@ -60,7 +61,7 @@ spec:
           {{ end }}
           {{ end }}
           {{- end }}
-          
+
           {{ with .command }}
           command:
           {{ range . }}
@@ -89,7 +90,8 @@ spec:
           envFrom:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
-          
+
 ---
+{{ end }}
 {{- end }}
 {{- end }}
