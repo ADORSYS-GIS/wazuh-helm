@@ -431,4 +431,10 @@
 
     <!-- Jira integration -->
     ${JIRA_CONFIG}
+
+    <!-- Agentless conf -->
+    ${AGENTLESS_CONFIG}
+
+    <!-- Extra conf -->
+    ${EXTRA_CONFIG}
 </ossec_config>

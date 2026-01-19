@@ -1212,3 +1212,34 @@ integration:
       enabled: false
       sqsName: ~
       interval: 1h
+
+initJobs:
+  '{{ include "common.names.fullname" $ }}-dummy':
+    enable: false
+    additionalLabels: ~
+    image:
+      registry: docker.io
+      repository: bash
+      tag: 'latest'
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: [ ]
+    restartPolicy: OnFailure
+    resources: ~
+    command: [ "/bin/bash","-lc" ]
+    args:
+      - |
+        #!/bin/bash
+        
+        echo "Dummy job task"
+    
+
+    volumeMounts: ~
+
+    env: ~
+
+    envFrom: ~
+
+    volumes: ~
+
+    initContainers: ~

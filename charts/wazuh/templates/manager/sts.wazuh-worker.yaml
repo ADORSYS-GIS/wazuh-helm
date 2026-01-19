@@ -145,7 +145,13 @@ spec:
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
-            {{- end }}  
+            {{- end }}
+
+            {{ with .wazuhInit }}
+            {{ with .envFrom -}}
+            {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+            {{- end }}
+            {{ end }}
           ##
           ##
           volumeMounts:
@@ -300,6 +306,10 @@ spec:
               name: agents-events
             - containerPort: 1516
               name: cluster
+
+            # We can keep this, even if it's not used. Check @values-syslog.yaml to see how to activate it.
+            - containerPort: 11514
+              name: syslog
           env:
             - name: FILEBEAT_SSL_VERIFICATION_MODE
               value: 'full'

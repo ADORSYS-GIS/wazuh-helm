@@ -1,0 +1,46 @@
+## Read https://documentation.wazuh.com/current/user-manual/capabilities/log-data-collection/syslog.html
+
+configmaps:
+  ##
+  ##
+  '{{ include "common.names.fullname" $ }}-syslog-conf-env':
+    ##
+    ##
+    data:
+      ##
+      ##
+      EXTRA_CONFIG: |
+        <remote>
+          <connection>syslog</connection>
+          <port>11514</port>
+          <protocol>tcp</protocol>
+          <allowed-ips>192.168.2.15/24</allowed-ips>
+          <local_ip>192.168.2.10</local_ip>
+        </remote>
+
+svcs:
+  ##
+  ##
+  '{{ include "common.names.fullname" $ }}-worker':
+    ##
+    ##
+    ports:
+      - name: agents-events
+        port: 1514
+        targetPort: agents-events
+        protocol: TCP
+
+      - name: syslog
+        port: 11514
+        targetPort: syslog
+        protocol: TCP
+
+worker:
+  ##
+  ##
+  wazuhInit:
+    ##
+    ##
+    envFrom:
+      - configMapRef:
+          name: '{{ include "common.names.fullname" $ }}-syslog-conf-env'
