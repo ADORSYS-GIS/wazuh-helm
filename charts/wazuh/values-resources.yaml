@@ -32,6 +32,15 @@ worker_integration:
       cpu: 500m
       memory: 512Mi
 
+worker_agentless:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 indexer:
   resources:
     requests:

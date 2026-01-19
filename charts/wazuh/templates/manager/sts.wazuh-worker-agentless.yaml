@@ -1,0 +1,386 @@
+{{ with .Values.worker_agentless }}
+{{- if and .enabled  -}}
+{{- $name := printf "%s-manager-worker-agentless" (include "common.names.fullname" $) -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+spec:
+  {{ with .replicaCount -}}
+  replicas: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  {{ with .updateStrategy -}}
+  updateStrategy: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 4}}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 6 }}
+      app: {{ include "common.names.fullname" $ }}-manager
+      node-type: worker
+  serviceName: {{ include "common.names.fullname" $ }}-cluster
+  {{ with .podManagementPolicy -}}
+  podManagementPolicy: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/manager/configmap.yaml") $ | sha256sum }}
+
+        {{ with $.Values.cluster -}}{{- if .secret.enabled -}}
+        checksum/secret: {{ include (print $.Template.BasePath "/manager/secret.manager-common.yaml") $ | sha256sum }}
+        {{- end -}}{{- end }}
+
+        {{ with $.Values.indexer.auth -}}
+        checksum/secret.indexer: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
+        {{- end }}
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-manager
+        node-type: worker
+      name: {{ $name }}
+    spec:
+      {{ with .affinity -}}
+      affinity:
+      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+      {{- end }}
+      volumes:
+        - name: wazuh-config-temp
+          emptyDir: { }
+        - name: config
+          configMap:
+            name: '{{ include "common.names.fullname" $ }}-wazuh-conf'
+        - name: certs
+          secret:
+            secretName: {{ include "wazuh.cert_secret_name" $ }}
+        - name: root-certs
+          secret:
+            secretName: {{ include "wazuh.cert_root_name" $ }}
+        {{ with .volumes -}}
+        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+        {{- end }}
+      initContainers:
+        - name: wazuh-init
+          ##
+          image: ghcr.io/adorsys-gis/envsubt:main-7917c58
+          ##
+          imagePullPolicy: IfNotPresent
+          ##
+          ##
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -ex
+              # Copy template
+              cp /workdir/template.config.xml /processed/ossec.conf
+              # Replace AWS_CONFIGS if set
+              if [ ! -z "$AWS_CONFIGS" ]; then
+                # Write AWS config to temp file with proper indentation (4 spaces)
+                echo "$AWS_CONFIGS" | sed 's/^/    /' > /tmp/aws.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${AWS_CONFIGS}/r /tmp/aws.xml' /processed/ossec.conf
+                sed -i '/\${AWS_CONFIGS}/d' /processed/ossec.conf
+              fi
+              # Replace AZURE_CONFIGS if set
+              if [ ! -z "$AZURE_CONFIGS" ]; then
+                # Write Azure config to temp file with proper indentation (4 spaces)
+                echo "$AZURE_CONFIGS" | sed 's/^/    /' > /tmp/azure.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${AZURE_CONFIGS}/r /tmp/azure.xml' /processed/ossec.conf
+                sed -i '/\${AZURE_CONFIGS}/d' /processed/ossec.conf
+              fi
+              # Replace SLACK_CONFIG if set
+              if [ ! -z "$SLACK_CONFIG" ]; then
+                # Write Slack config to temp file with proper indentation (4 spaces)
+                echo "$SLACK_CONFIG" | sed 's/^/    /' > /tmp/slack.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${SLACK_CONFIG}/r /tmp/slack.xml' /processed/ossec.conf
+                sed -i '/\${SLACK_CONFIG}/d' /processed/ossec.conf
+              fi
+              # Replace JIRA_CONFIG if set
+              if [ ! -z "$JIRA_CONFIG" ]; then
+                # Write Jira config to temp file with proper indentation (4 spaces)
+                echo "$JIRA_CONFIG" | sed 's/^/    /' > /tmp/jira.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${JIRA_CONFIG}/r /tmp/jira.xml' /processed/ossec.conf
+                sed -i '/\${JIRA_CONFIG}/d' /processed/ossec.conf
+              fi
+              # Replace other variables with envsubst
+              envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
+          ##
+          ##
+          env:
+            - name: NODE_TYPE
+              value: "worker"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- if eq (include "integration.azure.exists" $) "true" }}
+            - name: AZURE_CONFIGS
+              value: |
+                {{- include "integration.azure.conf" $ | nindent 16 }}
+            {{- end }}
+            {{- with include "integration.github.conf" $ }}
+            - name: GITHUB_CONFIGS
+              value: |
+                {{ . | nindent 16 }}
+            {{- end }}
+            {{- with include "integration.aws.conf" $ }}
+            - name: AWS_CONFIGS
+              value: |
+                {{ . | nindent 16 }}
+            {{- end }}
+          ##
+          ##
+          envFrom:
+            - secretRef:
+                name: '{{ include "secret.common" $ }}'
+
+            {{ if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.notification-slack" $ }}'
+            {{- end }}
+
+            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
+            - secretRef:
+                name: '{{ include "secret.integration-jira" $ }}'
+            {{- end }}  
+          ##
+          ##
+          volumeMounts:
+            - name: config
+              mountPath: /workdir/template.config.xml
+              subPath: template.config.xml
+              readOnly: true
+            - name: wazuh-config-temp
+              mountPath: /processed
+            {{- with $.Values.integration.aws }}
+            {{ if .enable }}
+            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+            - name: aws-credentials
+              mountPath: /root/.aws
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- end }}
+        {{ range $k, $v := .initContainers }}
+        {{ if $v }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10}}
+        {{ end }}   
+        {{- end }}   
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: wazuh-manager
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          {{ with .resources -}}
+          resources: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+          {{- with .securityContext }}
+          securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+          volumeMounts:
+            - name: {{ $name }}
+              mountPath: /var/ossec/api/configuration
+              subPath: wazuh/var/ossec/api/configuration
+            - name: {{ $name }}
+              mountPath: /var/ossec/etc
+              subPath: wazuh/var/ossec/etc
+            - name: {{ $name }}
+              mountPath: /var/ossec/logs
+              subPath: wazuh/var/ossec/logs
+            - name: {{ $name }}
+              mountPath: /var/ossec/queue
+              subPath: wazuh/var/ossec/queue
+            - name: {{ $name }}
+              mountPath: /var/ossec/var/multigroups
+              subPath: wazuh/var/ossec/var/multigroups
+            - name: {{ $name }}
+              mountPath: /var/ossec/integrations
+              subPath: wazuh/var/ossec/integrations
+            - name: {{ $name }}
+              mountPath: /var/ossec/active-response/bin
+              subPath: wazuh/var/ossec/active-response/bin
+            - name: {{ $name }}
+              mountPath: /var/ossec/agentless
+              subPath: wazuh/var/ossec/agentless
+            - name: {{ $name }}
+              mountPath: /var/ossec/wodles
+              subPath: wazuh/var/ossec/wodles
+            - name: {{ $name }}
+              mountPath: /etc/filebeat
+              subPath: filebeat/etc/filebeat
+            - name: {{ $name }}
+              mountPath: /var/lib/filebeat
+              subPath: filebeat/var/lib/filebeat
+
+            - name: manager-backup
+              mountPath: /var/ossec/backup
+              subPath: wazuh/var/ossec/backup
+
+            - name: wazuh-config-temp
+              mountPath: /wazuh-config-mount/etc/ossec.conf
+              subPath: ossec.conf
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
+              subPath: local_rules.xml
+              readOnly: true
+            - name: config
+              mountPath: /wazuh-config-mount/etc/decoders/0004-custom-decoder.xml
+              subPath: 0004-custom-decoder.xml
+              readOnly: true
+
+            {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
+            - name: jira-conf
+              mountPath: /wazuh-config-mount/integrations/custom-jira
+              subPath: custom-jira
+            - name: jira-conf
+              mountPath: /wazuh-config-mount/integrations/custom-jira.py
+              subPath: custom-jira.py
+            {{- end }}    
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7005-audit-mitre_rules.xml
+              subPath: 7005-audit-mitre_rules.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7006-fim-macos.xml
+              subPath: 7006-fim-macos.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
+              subPath: 7007-fim-linux.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7008-custom-yara.xml
+              subPath: 7008-custom-yara.xml
+              readOnly: true  
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml
+              subPath: 7009-fim-windows.xml
+              readOnly: true        
+
+              
+            {{ range $k, $v := $.Values.cluster.decoders -}}
+            {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+            {{- $n_k := printf "0003-%s" $k -}} 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/decoders/{{ $n_k }}
+              readOnly: true
+              subPath: {{ $n_k }}
+            {{- end }}
+
+            {{ range $k, $v := $.Values.cluster.rules -}}
+            {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
+            {{- $n_k := printf "0003-%s" $k -}} 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/{{ $n_k }}
+              readOnly: true
+              subPath: {{ $n_k }}
+            {{- end }}
+
+            - name: root-certs
+              mountPath: /etc/ssl/root-ca.pem
+              readOnly: true
+              subPath: root-ca.pem
+            - name: certs
+              mountPath: /etc/ssl/filebeat.pem
+              subPath: server.pem
+              readOnly: true
+            - name: certs
+              mountPath: /etc/ssl/filebeat.key
+              subPath: server-key.pem
+              readOnly: true
+
+            {{- with $.Values.integration.aws }}
+            {{- if .enable }}
+            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
+            - name: aws-credentials
+              mountPath: /root/.aws
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
+            {{- if eq (include "integration.azure.exists.log" $) "true" }}
+            - name: azure-auth
+              mountPath: /var/ossec/wodles/credentials/log_analytics_credentials
+              subPath: log_auth
+              readOnly: true
+            {{- end }}
+
+            {{- if eq (include "integration.azure.exists.graph" $) "true" }}
+            - name: azure-auth
+              mountPath: /var/ossec/wodles/credentials/graph_credentials
+              subPath: graph_auth
+              readOnly: true
+            {{- end }}
+
+            {{- if eq (include "integration.azure.exists.storage" $) "true" }}
+            - name: azure-auth
+              mountPath: /var/ossec/wodles/credentials/storage_credentials
+              subPath: storage_auth
+              readOnly: true
+            {{- end }}
+
+          {{ with .volumeMounts -}}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+          ports:
+            - containerPort: 1516
+              name: cluster
+          env:
+            - name: FILEBEAT_SSL_VERIFICATION_MODE
+              value: 'full'
+            - name: SSL_CERTIFICATE_AUTHORITIES
+              value: /etc/ssl/root-ca.pem
+            - name: SSL_CERTIFICATE
+              value: /etc/ssl/filebeat.pem
+            - name: SSL_KEY
+              value: /etc/ssl/filebeat.key
+          {{ with .env -}}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+          ##
+          ##
+          envFrom:
+            - secretRef:
+                name: '{{ include "secret.indexer-auth" $ }}'
+            - secretRef:
+                name: '{{ include "secret.common" $ }}'
+
+          {{ with .envFrom -}}
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+          {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ $name }}
+      spec:
+        {{ with .persistence.accessModes -}}
+        accessModes: {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10 }}
+        {{- end }}
+        {{ if .persistence.storageClassName -}}
+        storageClassName: {{ include "common.tplvalues.render" (dict "value" .persistence.storageClassName "context" $) }}
+        {{- else -}}
+        storageClassName: {{ include "wazuh.storageClassName" $ }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .persistence.size }}
+{{- end -}}
+{{- end -}}

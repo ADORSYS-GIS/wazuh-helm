@@ -55,7 +55,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=4.13.1,enable={{is_default_branch}}
             type=schedule,pattern={{date 'YYYYMMDD-hhmmss' tz='Europe/Berlin'}}
             type=semver,enable=true,priority=900,prefix=,suffix=,pattern=,value=
             type=semver,pattern={{version}}
@@ -65,7 +65,7 @@ jobs:
             type=sha,format=long
             type=sha,format=long,prefix={{branch}}
           flavor: |
-            latest=auto
+            4.13.1=auto
           images: "${{ env.REGISTRY }}/${{ steps.string.outputs.lowercase }}"
 
       - name: Cache Docker layers

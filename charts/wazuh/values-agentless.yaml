@@ -51,6 +51,7 @@ initJobs:
             fieldPath: metadata.namespace
 
 worker_agentless:
+  enabled: true
   ##
   ##
   volumes:
