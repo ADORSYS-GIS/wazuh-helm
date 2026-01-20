@@ -64,8 +64,6 @@ jobs:
             type=sha,prefix={{branch}}-
             type=sha,format=long
             type=sha,format=long,prefix={{branch}}
-          flavor: |
-            4.13.1=auto
           images: "${{ env.REGISTRY }}/${{ steps.string.outputs.lowercase }}"
 
       - name: Cache Docker layers
