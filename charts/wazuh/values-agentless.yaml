@@ -52,6 +52,13 @@ initJobs:
 
 worker_agentless:
   enabled: true
+  image:
+    ##
+    ##
+    repository: adorsys-gis/wazuh-manager-agentless
+    ##
+    ##
+    registry: ghcr.io
   ##
   ##
   volumes:

@@ -151,7 +151,13 @@ spec:
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
-            {{- end }}  
+            {{- end }}
+
+            {{ with .wazuhInit }}
+            {{ with .envFrom -}}
+            {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+            {{- end }}
+            {{ end }}
           ##
           ##
           volumeMounts:
