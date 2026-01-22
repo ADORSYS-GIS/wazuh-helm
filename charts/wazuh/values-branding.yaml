@@ -1,22 +1,21 @@
 opensearchDashboards:
   branding:
-    enabled: true
+    loginTitle: "BVMAC"
+    loginSubtitle: "Centre Opérationnel de Sécurité BVMAC. Tout accès non autorisé est strictement interdit."
+    brandimageUrl: "https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png"
     healthCheckLogo: https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png
     reportLogo: https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png
     reports:
-      footer: 'Généré par Wazuh SIEM - BVMAC'
+      footer: 'Généré par le Centre Opérationnel de Sécurité BVMAC'
       header: |
-        Rapport de sécurité - Wazuh SIEM
+        Rapport de sécurité - BVMAC SIEM
         Confidentiel - Usage interne
     logo:
-      defaultUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
-      # darkModeUrl: "https://example.com/dark-mode-sample.svg"
+      defaultUrl: https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png
     mark:
-      defaultUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
-      # darkModeUrl: ""
+      defaultUrl: https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png
     loadingLogo:
-      defaultUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
-      # darkModeUrl: ""
-    faviconUrl: 'https://www.bvm-ac.org/wp-content/uploads/2024/10/BVMAC_Logo-Version-vertical%E2%80%A2Drapeau-04.png'
-    applicationTitle: 'Wazuh | BVMAC'
+      defaultUrl: https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png
+    faviconUrl: https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png
+    applicationTitle: "BVMAC Security Center"
     useExpandedHeader: false
