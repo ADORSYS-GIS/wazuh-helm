@@ -1,5 +1,6 @@
 opensearchDashboards:
   branding:
+    enabled: true
     loginTitle: "BVMAC"
     loginSubtitle: "Centre Opérationnel de Sécurité BVMAC. Tout accès non autorisé est strictement interdit."
     brandimageUrl: "https://www.bvm-ac.org/wp-content/uploads/2019/08/BVMAC-New-R-Nov-2024-.png"
