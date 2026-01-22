@@ -35,7 +35,7 @@ opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.rend
 {{- end }}
 
 {{- with $.Values.opensearchDashboards.branding }}
-{{ - if .enabled }}
+{{- if .enabled -}}
 
 opensearch_security.ui.basicauth.login.brandimage: {{ .brandimageUrl }}
 opensearch_security.ui.basicauth.login.showbrandimage: true
