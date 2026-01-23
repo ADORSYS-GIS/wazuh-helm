@@ -2,22 +2,37 @@ _meta:
   type: "rolesmapping"
   config_version: 2
 
+all_access:
+  backend_roles:
+    - "admin"
+  users: [ ]
+
+security_rest_api_access:
+  backend_roles:
+    - "admin"
+  users: [ ]
+
+kibana_server:
+  users:
+    - "kibanaserver"
+  backend_roles: [ ]
+
 role_soc_analyst:
   backend_roles:
     - "SOC_ANALYST"
-  users: []
+  users: [ ]
 
 role_developer:
   backend_roles:
     - "DEVELOPERS"
-  users: []
+  users: [ ]
 
 role_sys_engineer:
   backend_roles:
     - "SYS_ENGINEER"
-  users: []
+  users: [ ]
 
 role_it_auditor:
   backend_roles:
     - "IT_AUDIT"
-  users: []
+  users: [ ]
