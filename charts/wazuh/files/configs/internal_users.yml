@@ -21,3 +21,31 @@ ${DASHBOARD_USERNAME}:
   hash: "${DASHBOARD_USERNAME_BCRYPT}"
   reserved: true
   description: "Demo kibanaserver user"
+
+soc_analyst:
+  hash: "${SOC_ANALYST_BCRYPT}"
+  reserved: false
+  backend_roles:
+    - "SOC_ANALYST"
+  description: "User de test - Analyste SOC"
+
+dev_user:
+  hash: "${DEV_USER_BCRYPT}"
+  reserved: false
+  backend_roles:
+    - "DEVELOPERS"
+  description: "User de test - Développeur"
+
+sys_engineer:
+  hash: "${SYS_ENGINEER_BCRYPT}"
+  reserved: false
+  backend_roles:
+    - "SYS_ENGINEER"
+  description: "User de test - Ingénieur Système"
+
+it_auditor:
+  hash: "${IT_AUDITOR_BCRYPT}"
+  reserved: false
+  backend_roles:
+    - "IT_AUDIT"
+  description: "User de test - Auditeur IT"

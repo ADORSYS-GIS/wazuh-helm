@@ -1,0 +1,43 @@
+_meta:
+  type: "actiongroups"
+  config_version: 2
+
+# Lecture large (Wazuh data)
+wz_read_all:
+  allowed_actions:
+    - "indices:data/read/*"
+    - "indices:admin/get"
+    - "indices:admin/mappings/get"
+    - "indices:admin/aliases/get"
+    - "indices:admin/validate/query"
+
+# Lecture limitée (DEV: uniquement indices de l'app)
+wz_read_limited:
+  allowed_actions:
+    - "indices:data/read/*"
+    - "indices:admin/get"
+    - "indices:admin/mappings/get"
+
+# Ecriture d'objets dashboards (visualizations, searches, dashboards, index patterns)
+dashboards_write_objects:
+  allowed_actions:
+    - "indices:data/write/*"
+    - "indices:admin/create"
+    - "indices:admin/mapping/put"
+
+# DevTools minimal (toujours à limiter)
+devtools_minimal:
+  allowed_actions:
+    - "cluster:monitor/*"
+    - "indices:admin/resolve/index"
+    - "indices:data/read/*"
+
+# Admin cluster/index limité (snapshots + templates)
+cluster_index_admin_limited:
+  allowed_actions:
+    - "cluster:monitor/*"
+    - "cluster:admin/snapshot/*"
+    - "indices:admin/template/*"
+    - "indices:admin/index_template/*"
+    - "indices:admin/aliases/*"
+    - "indices:admin/settings/update"

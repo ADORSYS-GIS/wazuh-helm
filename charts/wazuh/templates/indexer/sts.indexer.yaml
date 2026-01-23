@@ -58,7 +58,7 @@ spec:
         - name: indexer-conf
           configMap:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
-            
+
         {{ with .keycloak }}
         {{- if .enabled -}}
         - name: wazuh-keycloak-config
@@ -66,10 +66,15 @@ spec:
             secretName: '{{ include "common.names.fullname" $ }}-keycloak-conf'
         {{- end -}}
         {{ end }}
-        
+
         {{ with .volumes -}}
-        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
-        {{- end }}
+        {{ range $k, $v := . }}
+        {{ if $v }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10 }}
+        {{ end }}
+        {{ end }}
+        {{ end }}
       {{ with .initContainers }}
       initContainers:
       {{ range $k, $v := . }}
@@ -158,7 +163,7 @@ spec:
               mountPath: /usr/share/wazuh-indexer/opensearch-security/config.yml
               subPath: config.yml
               readOnly: true
-              
+
               {{ if .roles_mapping }}
             - name: wazuh-keycloak-config
               mountPath: /etc/wazuh-indexer/opensearch-security/custom_roles_mapping.yml
@@ -179,13 +184,20 @@ spec:
               subPath: custom_tenants.yml
               readOnly: true
               {{- end }}
-              
+
             {{- end -}}
             {{- end }}
-              
+
+
           {{ with .volumeMounts }}
-          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{ range $k, $v := . }}
+          {{ if $v }}
+            - mountPath: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+              {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 14 }}
+          {{ end }}
           {{- end }}
+          {{- end }}
+
           {{ with .envFrom }}
           envFrom:
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}

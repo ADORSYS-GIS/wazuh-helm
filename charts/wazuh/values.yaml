@@ -282,10 +282,10 @@ indexer:
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
   ##
   ##
-  volumes: [ ]
+  volumes: { }
   ##
   ##
-  volumeMounts: [ ]
+  volumeMounts: { }
   ##
   ##
   resources: ~

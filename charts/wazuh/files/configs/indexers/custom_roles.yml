@@ -1,0 +1,123 @@
+_meta:
+  type: "roles"
+  config_version: 2
+
+# -------------------------
+# Analyste SOC
+# - lecture complète sécurité
+# - création dashboards/filters (tenant SOC)
+# - pas de DevTools, pas d'admin cluster/index
+# -------------------------
+role_soc_analyst:
+  description: "Analyste SOC (lecture complète + dashboards SOC)"
+  cluster_permissions:
+    - "cluster:monitor/main"
+    - "cluster:monitor/health"
+  index_permissions:
+    - index_patterns:
+        - "wazuh-alerts-*"
+        - "wazuh-events-*"
+        - "wazuh-archives-*"
+        - "wazuh-monitoring-*"
+        - "wazuh-statistics-*"
+        - "wazuh-states-*"
+        - "wazuh-*"
+      allowed_actions:
+        - "wz_read_all"
+    - index_patterns:
+        - ".opensearch_dashboards*"
+        - ".kibana*"
+      allowed_actions:
+        - "read"
+        - "dashboards_write_objects"
+  tenant_permissions:
+    - tenant_patterns:
+        - "soc"
+      allowed_actions:
+        - "kibana_all_write"
+
+
+# -------------------------
+# Développeur
+# - lecture partielle (indices app uniquement)
+# - DevTools oui (minimal)
+# - dashboards (tenant DEV)
+# -------------------------
+role_developer:
+  description: "Développeur (lecture app + DevTools minimal + dashboards DEV)"
+  cluster_permissions:
+    - "cluster:monitor/main"
+    - "devtools_minimal"
+  index_permissions:
+    # ⚠️ Remplace ces patterns par vos indices applicatifs
+    - index_patterns:
+        - "app-logs-*"
+        - "app-security-*"
+      allowed_actions:
+        - "wz_read_limited"
+    - index_patterns:
+        - ".opensearch_dashboards*"
+        - ".kibana*"
+      allowed_actions:
+        - "read"
+        - "dashboards_write_objects"
+  tenant_permissions:
+    - tenant_patterns:
+        - "dev"
+      allowed_actions:
+        - "kibana_all_write"
+
+
+# -------------------------
+# Ingénieur Système
+# - lecture complète Wazuh
+# - un peu d'admin cluster/index limité
+# - dashboards (tenant SOC)
+# -------------------------
+role_sys_engineer:
+  description: "Ingénieur Système (lecture complète + cluster/index limité)"
+  cluster_permissions:
+    - "cluster_index_admin_limited"
+  index_permissions:
+    - index_patterns:
+        - "wazuh-alerts-*"
+        - "wazuh-events-*"
+        - "wazuh-archives-*"
+        - "wazuh-monitoring-*"
+        - "wazuh-statistics-*"
+        - "wazuh-states-*"
+        - "wazuh-*"
+      allowed_actions:
+        - "wz_read_all"
+    - index_patterns:
+        - ".opensearch_dashboards*"
+        - ".kibana*"
+      allowed_actions:
+        - "read"
+        - "dashboards_write_objects"
+  tenant_permissions:
+    - tenant_patterns:
+        - "soc"
+      allowed_actions:
+        - "kibana_all_write"
+
+
+# -------------------------
+# Contrôleur Interne IT (Audit)
+# - lecture seule audit/conformité
+# - dashboards lecture seule (tenant AUDIT)
+# -------------------------
+role_it_auditor:
+  description: "Contrôleur Interne IT (audit conformité lecture seule)"
+  cluster_permissions:
+    - "cluster:monitor/main"
+  index_permissions:
+    - index_patterns:
+        - "wazuh-*audit*"
+        - "wazuh-*cis*"
+        - "wazuh-*compliance*"
+        - "wazuh-states-*"
+        - "wazuh-alerts-*"
+      allowed_actions:
+        - "read"
+    - index_patterns:

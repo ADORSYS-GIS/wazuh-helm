@@ -1,0 +1,97 @@
+{{- range $k1, $v1 :=.Values.initJobs }}
+{{ $fname := include "common.tplvalues.render" (dict "value" $k1 "context" $) }}
+{{ with $v1 }}
+{{ if .enable }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $fname }}-job
+  namespace: {{ include "common.names.namespace" $ }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fname }}
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{ include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{ include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+spec:
+  template:
+    spec:
+      serviceAccountName: {{ $fname }}-job
+      restartPolicy: {{ include "common.tplvalues.render" (dict "value" .restartPolicy "context" $) }}
+
+      {{ with .volumes -}}
+      volumes:
+      {{ range $k, $v := . }}
+      {{ if $v }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10 }}
+      {{ end }}
+      {{ end }}
+      {{ end }}
+
+      {{ with .initContainers }}
+      initContainers:
+      {{ range $k, $v := . }}
+      {{ if $v }}
+        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10 }}
+      {{ end }}
+      {{ end }}
+      {{ end }}
+
+      containers:
+        - name: wazuh-indexer
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          {{ with .resources }}
+          resources:
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+
+          {{ with .env }}
+          env:
+          {{ range $k, $v := . }}
+          {{ if $v }}
+            - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+              {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 14 }}
+          {{ end }}
+          {{ end }}
+          {{- end }}
+
+          {{ with .command }}
+          command:
+          {{ range . }}
+            - {{ . | quote }}
+          {{ end }}
+          {{ end }}
+
+          {{ with .args }}
+          args:
+          {{ range . }}
+            - {{ . | quote }}
+          {{ end }}
+          {{ end }}
+
+          {{ with .volumeMounts }}
+          volumeMounts:
+          {{ range $k, $v := . }}
+          {{ if $v }}
+            - mountPath: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
+            {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 14 }}
+          {{ end }}
+          {{ end }}
+          {{ end }}
+
+          {{ with .envFrom }}
+          envFrom:
+          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+          {{- end }}
+
+---
+{{ end }}
+{{- end }}
+{{- end }}

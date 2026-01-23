@@ -1,0 +1,10 @@
+_meta:
+  type: "tenants"
+  config_version: 2
+
+soc:
+  description: "Tenant SOC (analystes et ingénieurs)"
+dev:
+  description: "Tenant DEV (dashboards app/projet)"
+audit:
+  description: "Tenant Audit (lecture seule conformité)"

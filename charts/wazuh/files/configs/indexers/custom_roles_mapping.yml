@@ -1,0 +1,23 @@
+_meta:
+  type: "rolesmapping"
+  config_version: 2
+
+role_soc_analyst:
+  backend_roles:
+    - "SOC_ANALYST"
+  users: []
+
+role_developer:
+  backend_roles:
+    - "DEVELOPERS"
+  users: []
+
+role_sys_engineer:
+  backend_roles:
+    - "SYS_ENGINEER"
+  users: []
+
+role_it_auditor:
+  backend_roles:
+    - "IT_AUDIT"
+  users: []
