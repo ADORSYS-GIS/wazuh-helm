@@ -1,0 +1,105 @@
+initJobs:
+  '{{ include "common.names.fullname" $ }}-setup-ssh':
+    enable: true
+    additionalLabels: ~
+    image:
+      registry: docker.io
+      repository: alpine
+      tag: 'latest'
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: [ ]
+    restartPolicy: OnFailure
+    resources: ~
+    command: [ "/bin/sh", "-c" ]
+    args:
+      - |
+        set -e
+
+        echo "Installing dependencies..."
+        apk add --no-cache openssh-client kubectl curl
+
+        echo "Checking if secret ${SECRET_NAME} exists in namespace ${NAMESPACE}..."
+        if kubectl -n "${NAMESPACE}" get secret "${SECRET_NAME}" >/dev/null 2>&1; then
+          echo "Secret ${SECRET_NAME} already exists. Skipping."
+          exit 0
+        fi
+
+        echo "Secret not found. Generating SSH keypair..."
+        workdir="$(mktemp -d)"
+        chmod 700 "${workdir}"
+
+        # Generate keypair (ed25519 recommended)
+        ssh-keygen -t ed25519 -N "" -C "${KEY_COMMENT}" -f "${workdir}/id_ed25519"
+
+        # (Optional) create a known_hosts entry (example for github.com)
+        # ssh-keyscan -t rsa,ecdsa,ed25519 github.com > "${workdir}/known_hosts" 2>/dev/null || true
+
+        echo "Creating secret ${SECRET_NAME}..."
+        kubectl -n "${NAMESPACE}" create secret generic "${SECRET_NAME}" \
+          --from-file=id_ed25519="${workdir}/id_ed25519" \
+          --from-file=id_ed25519.pub="${workdir}/id_ed25519.pub"
+          # --from-file=known_hosts="${workdir}/known_hosts"
+
+        echo "Done."
+
+    env:
+      KEY_COMMENT:
+        value: '{{ include "common.names.fullname" $ }}@{{ include "common.names.namespace" $ }}'
+      SECRET_NAME:
+        value: '{{ include "common.names.fullname" $ }}-ssh'
+      NAMESPACE:
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+
+worker_agentless:
+  enabled: true
+  image:
+    ##
+    ##
+    repository: adorsys-gis/wazuh-manager-agentless
+    ##
+    ##
+    registry: ghcr.io
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  ##
+  ##
+  volumes:
+    - name: ssh-secrets
+      secret:
+        secretName: '{{ include "common.names.fullname" $ }}-ssh'
+  volumeMounts:
+    - name: ssh-secrets
+      mountPath: /var/ossec/.ssh
+      readOnly: true
+  wazuhInit:
+    ##
+    ##
+    envFrom:
+      - configMapRef:
+          name: '{{ include "common.names.fullname" $ }}-agentless-env'
+
+configmaps:
+  ##
+  ##
+  '{{ include "common.names.fullname" $ }}-agentless-env':
+    ##
+    ##
+    data:
+      ##
+      ##
+      AGENTLESS_CONFIG: |
+        <agentless>
+          <type>ssh_integrity_check_linux</type>
+          <frequency>600</frequency>
+          <host>user@test.com</host>
+          <state>periodic</state>
+          <arguments>/bin /etc /sbin</arguments>
+        </agentless>
