@@ -92,6 +92,30 @@ spec:
           {{- end }}
 
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fname }}-job-secret-writer
+  namespace: {{ include "common.names.namespace" $ }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fname }}-job-secret-writer
+  namespace: {{ include "common.names.namespace" $ }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $fname }}-job
+    namespace: {{ include "common.names.namespace" $ }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $fname }}-job-secret-writer
+---
 {{ end }}
 {{- end }}
 {{- end }}
