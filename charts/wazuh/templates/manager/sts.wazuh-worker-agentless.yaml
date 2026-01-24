@@ -79,38 +79,7 @@ spec:
               set -ex
               # Copy template
               cp /workdir/template.config.xml /processed/ossec.conf
-              # Replace AWS_CONFIGS if set
-              if [ ! -z "$AWS_CONFIGS" ]; then
-                # Write AWS config to temp file with proper indentation (4 spaces)
-                echo "$AWS_CONFIGS" | sed 's/^/    /' > /tmp/aws.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${AWS_CONFIGS}/r /tmp/aws.xml' /processed/ossec.conf
-                sed -i '/\${AWS_CONFIGS}/d' /processed/ossec.conf
-              fi
-              # Replace AZURE_CONFIGS if set
-              if [ ! -z "$AZURE_CONFIGS" ]; then
-                # Write Azure config to temp file with proper indentation (4 spaces)
-                echo "$AZURE_CONFIGS" | sed 's/^/    /' > /tmp/azure.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${AZURE_CONFIGS}/r /tmp/azure.xml' /processed/ossec.conf
-                sed -i '/\${AZURE_CONFIGS}/d' /processed/ossec.conf
-              fi
-              # Replace SLACK_CONFIG if set
-              if [ ! -z "$SLACK_CONFIG" ]; then
-                # Write Slack config to temp file with proper indentation (4 spaces)
-                echo "$SLACK_CONFIG" | sed 's/^/    /' > /tmp/slack.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${SLACK_CONFIG}/r /tmp/slack.xml' /processed/ossec.conf
-                sed -i '/\${SLACK_CONFIG}/d' /processed/ossec.conf
-              fi
-              # Replace JIRA_CONFIG if set
-              if [ ! -z "$JIRA_CONFIG" ]; then
-                # Write Jira config to temp file with proper indentation (4 spaces)
-                echo "$JIRA_CONFIG" | sed 's/^/    /' > /tmp/jira.xml
-                # Use sed to replace placeholder with file content
-                sed -i '/\${JIRA_CONFIG}/r /tmp/jira.xml' /processed/ossec.conf
-                sed -i '/\${JIRA_CONFIG}/d' /processed/ossec.conf
-              fi
+
               # Replace other variables with envsubst
               envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
           ##
@@ -146,11 +115,6 @@ spec:
             {{ if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled -}}
             - secretRef:
                 name: '{{ include "secret.notification-slack" $ }}'
-            {{- end }}
-
-            {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
-            - secretRef:
-                name: '{{ include "secret.integration-jira" $ }}'
             {{- end }}
 
             {{ with .wazuhInit }}
@@ -244,15 +208,6 @@ spec:
               mountPath: /wazuh-config-mount/etc/decoders/0004-custom-decoder.xml
               subPath: 0004-custom-decoder.xml
               readOnly: true
-
-            {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
-            - name: jira-conf
-              mountPath: /wazuh-config-mount/integrations/custom-jira
-              subPath: custom-jira
-            - name: jira-conf
-              mountPath: /wazuh-config-mount/integrations/custom-jira.py
-              subPath: custom-jira.py
-            {{- end }}
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7005-audit-mitre_rules.xml
