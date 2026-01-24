@@ -29,16 +29,16 @@ initJobs:
         workdir="$(mktemp -d)"
         chmod 700 "${workdir}"
 
-        # Generate keypair (ed25519 recommended)
-        ssh-keygen -t ed25519 -N "" -C "${KEY_COMMENT}" -f "${workdir}/id_ed25519"
+        # Generate keypair (rsa recommended)
+        ssh-keygen -t rsa -b 2048 -N "" -C "${KEY_COMMENT}" -f "${workdir}/id_rsa"
 
         # (Optional) create a known_hosts entry (example for github.com)
-        # ssh-keyscan -t rsa,ecdsa,ed25519 github.com > "${workdir}/known_hosts" 2>/dev/null || true
+        # ssh-keyscan -t rsa,ecdsa,rsa github.com > "${workdir}/known_hosts" 2>/dev/null || true
 
         echo "Creating secret ${SECRET_NAME}..."
         kubectl -n "${NAMESPACE}" create secret generic "${SECRET_NAME}" \
-          --from-file=id_ed25519="${workdir}/id_ed25519" \
-          --from-file=id_ed25519.pub="${workdir}/id_ed25519.pub"
+          --from-file=id_rsa="${workdir}/id_rsa" \
+          --from-file=id_rsa.pub="${workdir}/id_rsa.pub"
           # --from-file=known_hosts="${workdir}/known_hosts"
 
         echo "Done."
