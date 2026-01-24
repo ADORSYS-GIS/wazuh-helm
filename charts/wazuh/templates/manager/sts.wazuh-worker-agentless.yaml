@@ -30,15 +30,6 @@ spec:
     metadata:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
-        checksum/config: {{ include (print $.Template.BasePath "/manager/configmap.yaml") $ | sha256sum }}
-
-        {{ with $.Values.cluster -}}{{- if .secret.enabled -}}
-        checksum/secret: {{ include (print $.Template.BasePath "/manager/secret.manager-common.yaml") $ | sha256sum }}
-        {{- end -}}{{- end }}
-
-        {{ with $.Values.indexer.auth -}}
-        checksum/secret.indexer: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
-        {{- end }}
       labels:
         {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
         app: {{ include "common.names.fullname" $ }}-manager
@@ -91,31 +82,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            {{- if eq (include "integration.azure.exists" $) "true" }}
-            - name: AZURE_CONFIGS
-              value: |
-                {{- include "integration.azure.conf" $ | nindent 16 }}
-            {{- end }}
-            {{- with include "integration.github.conf" $ }}
-            - name: GITHUB_CONFIGS
-              value: |
-                {{ . | nindent 16 }}
-            {{- end }}
-            {{- with include "integration.aws.conf" $ }}
-            - name: AWS_CONFIGS
-              value: |
-                {{ . | nindent 16 }}
-            {{- end }}
+
           ##
           ##
           envFrom:
             - secretRef:
                 name: '{{ include "secret.common" $ }}'
-
-            {{ if and $.Values.notification $.Values.notification.slack $.Values.notification.slack.enabled -}}
-            - secretRef:
-                name: '{{ include "secret.notification-slack" $ }}'
-            {{- end }}
 
             {{ with .wazuhInit }}
             {{ with .envFrom -}}
@@ -131,15 +103,6 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
-            {{- with $.Values.integration.aws }}
-            {{ if .enable }}
-            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-            - name: aws-credentials
-              mountPath: /root/.aws
-              readOnly: true
-            {{- end }}
-            {{- end }}
-            {{- end }}
         {{ range $k, $v := .initContainers }}
         {{ if $v }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
@@ -265,37 +228,6 @@ spec:
               mountPath: /etc/ssl/filebeat.key
               subPath: server-key.pem
               readOnly: true
-
-            {{- with $.Values.integration.aws }}
-            {{- if .enable }}
-            {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-            - name: aws-credentials
-              mountPath: /root/.aws
-              readOnly: true
-            {{- end }}
-            {{- end }}
-            {{- end }}
-
-            {{- if eq (include "integration.azure.exists.log" $) "true" }}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/log_analytics_credentials
-              subPath: log_auth
-              readOnly: true
-            {{- end }}
-
-            {{- if eq (include "integration.azure.exists.graph" $) "true" }}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/graph_credentials
-              subPath: graph_auth
-              readOnly: true
-            {{- end }}
-
-            {{- if eq (include "integration.azure.exists.storage" $) "true" }}
-            - name: azure-auth
-              mountPath: /var/ossec/wodles/credentials/storage_credentials
-              subPath: storage_auth
-              readOnly: true
-            {{- end }}
 
           {{ with .volumeMounts -}}
           {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
