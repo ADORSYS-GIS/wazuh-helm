@@ -21,7 +21,7 @@ spec:
     matchLabels:
       {{- include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 6 }}
       app: {{ include "common.names.fullname" $ }}-manager
-      node-type: worker
+      node-type: worker-agentless
   serviceName: {{ include "common.names.fullname" $ }}-cluster
   {{ with .podManagementPolicy -}}
   podManagementPolicy: {{ include "common.tplvalues.render" (dict "value" . "context" $) }}
@@ -42,7 +42,7 @@ spec:
       labels:
         {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
         app: {{ include "common.names.fullname" $ }}-manager
-        node-type: worker
+        node-type: worker-agentless
       name: {{ $name }}
     spec:
       {{ with .affinity -}}
