@@ -58,10 +58,10 @@ worker_agentless:
   image:
     ##
     ##
-    repository: wazuh/wazuh-manager
+    repository: adorsys-gis/wazuh-manager-agentless
     ##
     ##
-    registry: docker.io
+    registry: ghcr.io
   resources:
     requests:
       cpu: 100m

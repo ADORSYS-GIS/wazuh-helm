@@ -47,6 +47,21 @@ worker:
                     app: '{{ include "common.names.fullname" $ }}-manager'
                     node-type: worker
 
+worker_agentless:
+  replicaCount: 2
+  persistence:
+    size: 50Gi
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+                  matchLabels:
+                    app: '{{ include "common.names.fullname" $ }}-manager'
+                    node-type: worker-agentless
+
 master:
   persistence:
     size: 50Gi

@@ -9,17 +9,21 @@ master:
   persistence:
     enabled: true
     size: 5Gi
-  
-worker: 
+
+worker:
   replicaCount: 1
   resources: ~
-  
-indexer: 
+
+worker_agentless:
+  replicaCount: 1
+  resources: ~
+
+indexer:
   replicas: 1
   resources: ~
-  keycloak: 
+  keycloak:
     enabled: false
-    
+
 cluster:
   rootCaSecretName: "wazuh-root-ca"
 
