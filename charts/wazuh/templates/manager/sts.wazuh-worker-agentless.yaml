@@ -1,5 +1,5 @@
 {{ with .Values.worker_agentless }}
-{{- if and .enabled  -}}
+{{- if .enabled  -}}
 {{- $name := printf "%s-manager-worker-agentless" (include "common.names.fullname" $) -}}
 apiVersion: apps/v1
 kind: StatefulSet

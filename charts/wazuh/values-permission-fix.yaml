@@ -54,9 +54,9 @@ worker_agentless:
           chown -R root:wazuh /var/ossec/agentless
           chmod -R u=rwx,g=rx,o= /var/ossec/agentless
       volumeMounts:
-        - name: '{{ include "common.names.fullname" $ }}-manager-agentless'
+        - name: '{{ include "common.names.fullname" $ }}-manager-worker-agentless'
           mountPath: /var/lib/etc
-        - name: '{{ include "common.names.fullname" $ }}-manager-agentless'
+        - name: '{{ include "common.names.fullname" $ }}-manager-worker-agentless'
           mountPath: /var/ossec/agentless
           subPath: wazuh/var/ossec/agentless
 
