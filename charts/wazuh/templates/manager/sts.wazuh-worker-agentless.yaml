@@ -229,7 +229,9 @@ spec:
               mountPath: /var/lib/filebeat
               subPath: filebeat/var/lib/filebeat
 
-
+            - name: manager-backup
+              mountPath: /var/ossec/backup
+              subPath: wazuh/var/ossec/backup
 
             - name: wazuh-config-temp
               mountPath: /wazuh-config-mount/etc/ossec.conf
