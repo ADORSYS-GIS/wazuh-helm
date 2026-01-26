@@ -21,6 +21,12 @@ data:
   "7006-fim-macos.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-MacOS.xml" | nindent 6 }}
 
+  "7006-macos-syslog.xml":  |
+    {{ $.Files.Get "files/configs/rules.MacOS-Syslog.xml" | nindent 6 }}
+
+  "7006-macos-auth.xml":  |
+    {{ $.Files.Get "files/configs/rules.MacOS-Auth.xml" | nindent 6 }}
+
   "7007-fim-linux.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
 
