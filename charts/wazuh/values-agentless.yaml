@@ -2,6 +2,9 @@ initJobs:
   '{{ include "common.names.fullname" $ }}-setup-ssh':
     enable: true
     additionalLabels: ~
+    additionalAnnotations:
+      "helm.sh/hook": post-install,post-upgrade
+      "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
     image:
       registry: docker.io
       repository: alpine
