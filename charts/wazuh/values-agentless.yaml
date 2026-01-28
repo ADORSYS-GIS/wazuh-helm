@@ -65,6 +65,9 @@ worker_agentless:
     ##
     ##
     registry: ghcr.io
+    ##
+    ##
+    tag: bvmac-4.13.1-rc.3
   ##
   ##
   volumes:

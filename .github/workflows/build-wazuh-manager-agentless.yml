@@ -1,0 +1,89 @@
+name: Build Wazuh Manager Agentless Docker image
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+    paths:
+      - '.github/workflows/build-wazuh-manager-agentless.yml'
+      - 'utils/packages/wazuh-manager-agentless/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: adorsys-gis/wazuh-manager-agentless
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: "0"
+          submodules: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to the Docker registry
+        id: login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: string
+        name: Lowercase the name
+        uses: AsZc/change-string-case-action@v6
+        with:
+          string: ${{ env.IMAGE_NAME }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          tags: |
+            type=raw,value=bvmac-4.13.1-rc.3,enable={{is_default_branch}}
+            type=schedule,pattern={{date 'YYYYMMDD-hhmmss' tz='Europe/Berlin'}}
+            type=semver,enable=true,priority=900,prefix=,suffix=,pattern=,value=
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=sha,format=long
+            type=sha,format=long,prefix={{branch}}
+          images: "${{ env.REGISTRY }}/${{ steps.string.outputs.lowercase }}"
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        if: always()
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          push: "true"
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+          context: ./utils/packages/wazuh-manager-agentless

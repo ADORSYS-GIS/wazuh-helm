@@ -629,7 +629,7 @@ worker_agentless:
     repository: adorsys-gis/wazuh-manager-agentless
     ##
     ##
-    tag: '{{ .Values.global.version }}'
+    tag: 'bvmac-{{ .Values.global.version }}'
     ##
     ##
     digest: ""
