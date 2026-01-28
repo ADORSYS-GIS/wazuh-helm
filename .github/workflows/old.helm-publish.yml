@@ -30,7 +30,7 @@ jobs:
             path: charts/monitoring
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
