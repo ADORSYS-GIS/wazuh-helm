@@ -55,7 +55,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           tags: |
-            type=raw,value=bvmac-4.13.1-rc.3,enable={{is_default_branch}}
+            type=raw,value=bvmac-4.13.1-rc.3
             type=schedule,pattern={{date 'YYYYMMDD-hhmmss' tz='Europe/Berlin'}}
             type=semver,enable=true,priority=900,prefix=,suffix=,pattern=,value=
             type=semver,pattern={{version}}
