@@ -34,7 +34,10 @@ data:
     {{ $.Files.Get "files/configs/rules.custom-yara.xml" | nindent 6 }}  
 
   "7009-fim-windows.xml":  |
-    {{ $.Files.Get "files/configs/rules.custom-windows.xml" | nindent 6 }}    
+    {{ $.Files.Get "files/configs/rules.custom-windows.xml" | nindent 6 }}
+
+  "7010-custom-suricata.xml":  |
+    {{ $.Files.Get "files/configs/rules.suricata.xml" | nindent 6 }}      
 
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
