@@ -255,7 +255,7 @@
 
     <command>
       <name>windows-dlp</name>
-      <executable>test.cmd</executable>
+      <executable>dlp.cmd</executable>
     <timeout_allowed>no</timeout_allowed>
     </command>
 
