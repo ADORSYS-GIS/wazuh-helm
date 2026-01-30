@@ -299,6 +299,10 @@ spec:
               subPath: 7010-custom-suricata.xml
               readOnly: true        
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
+              subPath: 7011-lotl-detection.xml
+              readOnly: true
               
             {{ range $k, $v := $.Values.cluster.decoders -}}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
