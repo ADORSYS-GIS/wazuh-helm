@@ -11,6 +11,7 @@ This guide provides comprehensive instructions for restoring Wazuh data from Res
   - [Method 1: Temporary Pod Restore (Recommended)](#method-1-temporary-pod-restore-recommended)
   - [Method 2: Interactive Restore Script](#method-2-interactive-restore-script)
   - [Method 3: Direct Pod Restore (Advanced)](#method-3-direct-pod-restore-advanced)
+  - [Method 4: Tekton Pipeline Restore (Production)](#method-4-tekton-pipeline-restore-production)
 - [Common Restore Scenarios](#common-restore-scenarios)
 - [Verification Steps](#verification-steps)
 - [Quick Reference](#quick-reference)
@@ -282,6 +283,417 @@ kubectl exec -n wazuh wazuh-manager-master-0 -- /bin/sh -c '
 ```bash
 kubectl exec -n wazuh wazuh-manager-master-0 -- \
   /var/ossec/bin/wazuh-control start
+```
+
+---
+
+### Method 4: Tekton Pipeline Restore (Production)
+
+This is the recommended method for **production environments**. It provides automated, auditable, and repeatable restores using Tekton pipelines with the staging PVC.
+
+#### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        TEKTON RESTORE PIPELINE FLOW                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+     Trigger (Manual PipelineRun or EventListener)
+              │
+              ▼
+┌─────────────────────────────┐
+│  1. Restic Restore Task     │  ◄── Mounts staging PVC
+│     - restic-restore.sh     │      Restores to /backup/restore/
+│     - Downloads from S3     │
+└─────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│  2. Wazuh Control Task      │  ◄── Stop services gracefully
+│     - wazuh-control stop    │      Before modifying files
+└─────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│  3. Data Copy Task          │  ◄── Mounts BOTH PVCs:
+│     - rsync/tar from staging│      - Staging PVC (source)
+│       to target pod         │      - Target via kubectl exec
+└─────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│  4. Wazuh Control Task      │  ◄── Start services
+│     - wazuh-control start   │      After restore complete
+└─────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│  5. Cleanup Task            │  ◄── Remove staging data
+│     - Clear /backup/restore │      Free up PVC space
+└─────────────────────────────┘
+```
+
+#### Benefits of Tekton Pipeline Restore
+
+| Feature | Manual Methods | Tekton Pipeline |
+|---------|---------------|-----------------|
+| **Repeatability** | Prone to human error | Consistent every time |
+| **Audit Trail** | Manual logging | Full PipelineRun history |
+| **Automation** | Requires operator | Can be triggered automatically |
+| **Error Handling** | Manual recovery | Built-in `finally` tasks |
+| **Rollback** | Complex | Emergency start on failure |
+
+#### Step 1: Create the Restore Task
+
+Add this task to your `values.yaml` under `tekton.tasks`:
+
+```yaml
+- name: '{{ include "common.names.fullname" $ }}-restic-restore'
+  enabled: '{{ .Values.features.resticBackup.enabled }}'
+  additionalLabels: {}
+  additionalAnnotations:
+    tekton.dev/displayName: "Restic Restore from Backup"
+  spec:
+    description: |
+      Restores Wazuh component data from Restic backup to staging PVC.
+    params:
+      - name: componentName
+        type: string
+        description: Component to restore (master-0, worker-0, etc.)
+      - name: snapshotId
+        type: string
+        default: "latest"
+        description: Snapshot ID or 'latest'
+      - name: targetPath
+        type: string
+        default: "/backup/restore"
+    steps:
+      - name: restic-restore
+        image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.restic "global" .Values.global ) }}'
+        script: |
+          apk add --no-cache bash jq grep
+          cp /scripts/restic-restore.sh /tmp/restic-restore.sh
+          chmod +x /tmp/restic-restore.sh
+          bash /tmp/restic-restore.sh "$(params.componentName)" "$(params.targetPath)" "$(params.snapshotId)"
+        env:
+          - name: RESTIC_REPOSITORY
+            value: '{{ tpl .Values.backup.restic.repository $ }}'
+          - name: RESTIC_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: '{{ .Values.backup.restic.passwordSecretName }}'
+                key: '{{ .Values.backup.restic.passwordSecretKey }}'
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: '{{ .Values.aws.secretName }}'
+                key: aws_access_key_id
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: '{{ .Values.aws.secretName }}'
+                key: aws_secret_access_key
+        volumeMounts:
+          - name: staging-volume
+            mountPath: /backup
+          - name: scripts-volume
+            mountPath: /scripts
+    volumes:
+      - name: staging-volume
+        persistentVolumeClaim:
+          claimName: '{{ include "wazuh-backup.stagingPvcName" $ }}'
+      - name: scripts-volume
+        configMap:
+          name: '{{ include "common.names.fullname" $ }}-scripts'
+          defaultMode: 0755
+```
+
+#### Step 2: Create the Copy-to-Pod Task
+
+```yaml
+- name: '{{ include "common.names.fullname" $ }}-restore-copy'
+  enabled: '{{ .Values.features.resticBackup.enabled }}'
+  additionalLabels: {}
+  additionalAnnotations:
+    tekton.dev/displayName: "Copy Restored Data to Pod"
+  spec:
+    description: |
+      Copies restored data from staging PVC to target Wazuh pod.
+    params:
+      - name: podName
+        type: string
+      - name: podNamespace
+        type: string
+        default: "wazuh"
+      - name: sourcePath
+        type: string
+        default: "/backup/restore"
+      - name: targetPaths
+        type: string
+        description: "Comma-separated list of paths to restore (e.g., /var/ossec/etc,/var/ossec/logs)"
+        default: "/var/ossec/etc,/var/ossec/logs,/var/ossec/queue"
+    steps:
+      - name: copy-data
+        image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.scaleStatefulset "global" .Values.global ) }}'
+        script: |
+          #!/bin/bash
+          set -e
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📂 Copying restored data to pod"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 Source:      $(params.sourcePath)"
+          echo "🎯 Target pod:  $(params.podName)"
+          echo "📁 Paths:       $(params.targetPaths)"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Find the actual restore directory (handles nested paths)
+          RESTORE_ROOT=$(find $(params.sourcePath) -name "var" -type d | head -1 | sed 's|/var$||')
+
+          if [[ -z "$RESTORE_ROOT" ]]; then
+            echo "❌ ERROR: Could not find restored data in $(params.sourcePath)"
+            exit 1
+          fi
+
+          echo "📁 Found restore root: $RESTORE_ROOT"
+
+          # Copy each target path using tar pipe
+          IFS=',' read -ra PATHS <<< "$(params.targetPaths)"
+          for path in "${PATHS[@]}"; do
+            path=$(echo "$path" | xargs)  # trim whitespace
+            if [[ -d "$RESTORE_ROOT$path" ]]; then
+              echo "📤 Copying $path..."
+              tar cf - -C "$RESTORE_ROOT" ".${path}" | \
+                kubectl exec -i -n $(params.podNamespace) $(params.podName) -- tar xf - -C /
+              echo "✅ Copied $path"
+            else
+              echo "⚠️  Skipping $path (not found in backup)"
+            fi
+          done
+
+          echo ""
+          echo "✅ Data copy completed!"
+        volumeMounts:
+          - name: staging-volume
+            mountPath: /backup
+    volumes:
+      - name: staging-volume
+        persistentVolumeClaim:
+          claimName: '{{ include "wazuh-backup.stagingPvcName" $ }}'
+```
+
+#### Step 3: Create the Restore Pipeline
+
+```yaml
+- name: '{{ include "common.names.fullname" $ }}-component-restore'
+  enabled: '{{ .Values.features.resticBackup.enabled }}'
+  additionalLabels: {}
+  additionalAnnotations: {}
+  spec:
+    description: |
+      Restore a Wazuh component from Restic backup.
+      Restores data → Stops services → Copies to target → Starts services
+    params:
+      - name: componentName
+        type: string
+        description: "Component name (e.g., master-0, worker-0)"
+      - name: snapshotId
+        type: string
+        default: "latest"
+        description: "Snapshot ID to restore or 'latest'"
+      - name: podName
+        type: string
+        description: "Target pod name"
+      - name: podNamespace
+        type: string
+        default: "wazuh"
+      - name: containerName
+        type: string
+        default: "wazuh-manager"
+      - name: wazuhControlPath
+        type: string
+        default: "/var/ossec/bin/wazuh-control"
+    finally:
+      - name: emergency-start
+        when:
+          - input: "$(tasks.status)"
+            operator: notin
+            values: ["Succeeded"]
+        taskRef:
+          name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+        params:
+          - name: podName
+            value: "$(params.podName)"
+          - name: namespace
+            value: "$(params.podNamespace)"
+          - name: containerName
+            value: "$(params.containerName)"
+          - name: wazuhControlPath
+            value: "$(params.wazuhControlPath)"
+          - name: action
+            value: "start"
+          - name: mode
+            value: "emergency"
+          - name: componentName
+            value: "$(params.componentName)"
+          - name: pipelineStatus
+            value: "$(tasks.status)"
+      - name: final-cleanup
+        taskRef:
+          name: '{{ include "common.names.fullname" $ }}-cleanup-pvc'
+        params:
+          - name: directoryPath
+            value: "restore"
+    tasks:
+      - name: restore-to-staging
+        taskRef:
+          name: '{{ include "common.names.fullname" $ }}-restic-restore'
+        params:
+          - name: componentName
+            value: "$(params.componentName)"
+          - name: snapshotId
+            value: "$(params.snapshotId)"
+          - name: targetPath
+            value: "/backup/restore"
+
+      - name: stop-wazuh
+        taskRef:
+          name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+        params:
+          - name: podName
+            value: "$(params.podName)"
+          - name: namespace
+            value: "$(params.podNamespace)"
+          - name: containerName
+            value: "$(params.containerName)"
+          - name: wazuhControlPath
+            value: "$(params.wazuhControlPath)"
+          - name: action
+            value: "stop"
+          - name: mode
+            value: "normal"
+          - name: componentName
+            value: "$(params.componentName)"
+          - name: pipelineStatus
+            value: ""
+        runAfter:
+          - restore-to-staging
+
+      - name: copy-to-target
+        taskRef:
+          name: '{{ include "common.names.fullname" $ }}-restore-copy'
+        params:
+          - name: podName
+            value: "$(params.podName)"
+          - name: podNamespace
+            value: "$(params.podNamespace)"
+          - name: sourcePath
+            value: "/backup/restore"
+        runAfter:
+          - stop-wazuh
+
+      - name: start-wazuh
+        taskRef:
+          name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+        params:
+          - name: podName
+            value: "$(params.podName)"
+          - name: namespace
+            value: "$(params.podNamespace)"
+          - name: containerName
+            value: "$(params.containerName)"
+          - name: wazuhControlPath
+            value: "$(params.wazuhControlPath)"
+          - name: action
+            value: "start"
+          - name: mode
+            value: "normal"
+          - name: componentName
+            value: "$(params.componentName)"
+          - name: pipelineStatus
+            value: ""
+        runAfter:
+          - copy-to-target
+```
+
+#### Step 4: Trigger the Restore Pipeline
+
+After deploying the updated Helm chart, trigger a restore:
+
+```bash
+# Create a PipelineRun to restore master-0 from latest snapshot
+cat <<EOF | kubectl apply -f -
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: restore-master-
+  namespace: wazuh
+spec:
+  pipelineRef:
+    name: wazuh-backup-component-restore
+  params:
+    - name: componentName
+      value: "master-0"
+    - name: snapshotId
+      value: "latest"
+    - name: podName
+      value: "wazuh-wazuh-helm-manager-master-0"
+    - name: podNamespace
+      value: "wazuh"
+EOF
+```
+
+Or restore a specific snapshot:
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: restore-master-
+  namespace: wazuh
+spec:
+  pipelineRef:
+    name: wazuh-backup-component-restore
+  params:
+    - name: componentName
+      value: "master-0"
+    - name: snapshotId
+      value: "9909904b"  # Specific snapshot ID
+    - name: podName
+      value: "wazuh-wazuh-helm-manager-master-0"
+    - name: podNamespace
+      value: "wazuh"
+EOF
+```
+
+#### Step 5: Monitor the Restore
+
+```bash
+# Watch PipelineRun status
+kubectl get pipelinerun -n wazuh -w
+
+# View detailed logs
+tkn pipelinerun logs -n wazuh -f <pipelinerun-name>
+
+# Or using kubectl
+kubectl logs -n wazuh -l tekton.dev/pipelineRun=<pipelinerun-name> --all-containers -f
+```
+
+#### Error Handling
+
+The pipeline includes automatic error handling:
+
+- **`finally` block**: If any task fails, the `emergency-start` task ensures Wazuh services are restarted
+- **Cleanup**: The `final-cleanup` task always runs to clear the staging PVC
+- **Audit trail**: All PipelineRuns are retained for debugging
+
+```bash
+# Check failed PipelineRuns
+kubectl get pipelinerun -n wazuh --field-selector=status.conditions[0].status=False
+
+# View failure reason
+kubectl describe pipelinerun <pipelinerun-name> -n wazuh
 ```
 
 ---
