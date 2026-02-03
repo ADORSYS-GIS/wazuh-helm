@@ -1,0 +1,144 @@
+{{- if .Values.features.resticBackup.enabled }}
+{{- if .Values.backup.restic.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-restic-init
+  namespace: {{ include "common.names.namespace" $ }}
+  labels: {{- include "common.labels.standard" $ | nindent 4 }}
+    app.kubernetes.io/component: restic-init
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    {{- if .Values.commonAnnotations }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    {{- end }}
+spec:
+  ttlSecondsAfterFinished: 300  # Clean up after 5 minutes
+  backoffLimit: 3
+  template:
+    metadata:
+      labels: {{- include "common.labels.standard" $ | nindent 8 }}
+        app.kubernetes.io/component: restic-init
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "common.names.fullname" $ }}-sa
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: restic-init
+          image: {{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.restic "global" .Values.global ) }}
+          imagePullPolicy: {{ .Values.tekton.taskImages.restic.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "🔧 Restic Repository Initialization"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "🗄️  Repository: $RESTIC_REPOSITORY"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo ""
+
+              # Check if repository already exists
+              echo "🔍 Checking if repository exists..."
+              if restic snapshots > /dev/null 2>&1; then
+                echo "✅ Repository already initialized"
+                echo "   No action needed"
+                echo ""
+
+                # Show repository stats
+                echo "📊 Repository statistics:"
+                restic stats --mode raw-data --json 2>/dev/null | jq -r '
+                  "   Total size:  \(.total_size / 1024 / 1024 | floor)MB",
+                  "   Total files: \(.total_file_count)"
+                ' || echo "   (Statistics unavailable)"
+
+                echo ""
+                echo "📸 Snapshot count:"
+                SNAPSHOT_COUNT=$(restic snapshots --json 2>/dev/null | jq 'length' || echo "0")
+                echo "   Snapshots: $SNAPSHOT_COUNT"
+
+                if [[ "$SNAPSHOT_COUNT" -gt 0 ]]; then
+                  echo ""
+                  echo "📜 Recent snapshots:"
+                  restic snapshots --last 5 --compact || echo "   (Could not list snapshots)"
+                fi
+              else
+                echo "🔨 Initializing new repository..."
+                restic init
+                echo ""
+                echo "✅ Repository initialized successfully!"
+                echo ""
+                echo "📋 Repository configuration:"
+                restic cat config | jq '.' || echo "   (Configuration not available)"
+              fi
+
+              echo ""
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "✅ Restic initialization completed!"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          env:
+            - name: RESTIC_REPOSITORY
+              value: {{ tpl .Values.backup.restic.repository $ | quote }}
+            - name: RESTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backup.restic.passwordSecretName }}
+                  key: {{ .Values.backup.restic.passwordSecretKey }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: aws_access_key_id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: aws_secret_access_key
+                  optional: true
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.aws.secretName }}
+                  key: region
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            {{- if .Values.backup.restic.cache.enabled }}
+            - name: restic-cache
+              mountPath: /root/.cache/restic
+            {{- end }}
+            - name: aws-creds
+              mountPath: /root/.aws
+              readOnly: true
+      volumes:
+        {{- if .Values.backup.restic.cache.enabled }}
+        - name: restic-cache
+          emptyDir:
+            sizeLimit: {{ .Values.backup.restic.cache.size }}
+        {{- end }}
+        - name: aws-creds
+          secret:
+            secretName: {{ .Values.aws.secretName }}
+            defaultMode: 0400
+{{- end }}
+{{- end }}

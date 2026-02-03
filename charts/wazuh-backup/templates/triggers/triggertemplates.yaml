@@ -46,7 +46,25 @@ spec:
         podTemplate:
           securityContext:
             fsGroup: 0
-        {{- if $.Values.features.gracefulShutdown.enabled }}
+        {{- if and $.Values.features.resticBackup.enabled $.Values.backup.restic.enabled }}
+        # Restic incremental backup pipeline (simpler, no staging PVC)
+        pipelineRef:
+          name: {{ include "common.names.fullname" $ }}-component-backup-restic-graceful
+        params:
+          - name: componentName
+            value: "{{ $component.name }}-{{ $index }}"
+          - name: podName
+            value: {{ include "wazuh-backup.podName" (dict "component" $component "index" $index "context" $) | quote }}
+          - name: podNamespace
+            value: "{{ $.Values.global.namespace }}"
+          - name: containerName
+            value: "{{ $.Values.backup.gracefulShutdown.containerName }}"
+          - name: wazuhControlPath
+            value: "{{ $.Values.backup.gracefulShutdown.wazuhControlPath }}"
+          - name: includePaths
+            value: "{{ include "backup.includePaths" $component }}"
+        {{- else if $.Values.features.gracefulShutdown.enabled }}
+        # Legacy backup pipeline (full tar + S3 upload with staging PVC)
         pipelineRef:
           name: {{ include "common.names.fullname" $ }}-component-backup-graceful
         params:

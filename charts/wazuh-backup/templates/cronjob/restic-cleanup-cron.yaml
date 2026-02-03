@@ -1,0 +1,130 @@
+{{- if .Values.features.resticBackup.enabled }}
+{{- if .Values.backup.restic.enabled }}
+{{- if .Values.backup.restic.retention.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.names.fullname" $ }}-restic-cleanup
+  namespace: {{ include "common.names.namespace" $ }}
+  labels: {{- include "common.labels.standard" $ | nindent 4 }}
+    app.kubernetes.io/component: restic-cleanup
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.commonAnnotations }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    {{- end }}
+spec:
+  schedule: {{ .Values.backup.restic.cleanup.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    metadata:
+      labels: {{- include "common.labels.standard" $ | nindent 8 }}
+        app.kubernetes.io/component: restic-cleanup
+    spec:
+      ttlSecondsAfterFinished: 86400  # Clean up after 24 hours
+      backoffLimit: 2
+      template:
+        metadata:
+          labels: {{- include "common.labels.standard" $ | nindent 12 }}
+            app.kubernetes.io/component: restic-cleanup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "common.names.fullname" $ }}-sa
+          {{- if .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- range .Values.global.imagePullSecrets }}
+            - name: {{ . }}
+            {{- end }}
+          {{- end }}
+          containers:
+            - name: restic-cleanup
+              image: {{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.restic "global" .Values.global ) }}
+              imagePullPolicy: {{ .Values.tekton.taskImages.restic.pullPolicy }}
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  set -e
+
+                  # Install jq and bc for JSON parsing and calculations
+                  apk add --no-cache jq bc
+
+                  # Copy and run cleanup script
+                  cp /scripts/restic-forget.sh /tmp/restic-forget.sh
+                  chmod +x /tmp/restic-forget.sh
+                  bash /tmp/restic-forget.sh
+              env:
+                - name: RESTIC_REPOSITORY
+                  value: {{ tpl .Values.backup.restic.repository $ | quote }}
+                - name: RESTIC_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.backup.restic.passwordSecretName }}
+                      key: {{ .Values.backup.restic.passwordSecretKey }}
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.aws.secretName }}
+                      key: aws_access_key_id
+                      optional: true
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.aws.secretName }}
+                      key: aws_secret_access_key
+                      optional: true
+                - name: AWS_DEFAULT_REGION
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.aws.secretName }}
+                      key: region
+                      optional: true
+                # Retention policy environment variables
+                - name: KEEP_LAST
+                  value: {{ .Values.backup.restic.retention.keepLast | quote }}
+                - name: KEEP_DAILY
+                  value: {{ .Values.backup.restic.retention.keepDaily | quote }}
+                - name: KEEP_WEEKLY
+                  value: {{ .Values.backup.restic.retention.keepWeekly | quote }}
+                - name: KEEP_MONTHLY
+                  value: {{ .Values.backup.restic.retention.keepMonthly | quote }}
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              volumeMounts:
+                - name: scripts-volume
+                  mountPath: /scripts
+                - name: aws-creds
+                  mountPath: /root/.aws
+                  readOnly: true
+                {{- if .Values.backup.restic.cache.enabled }}
+                - name: restic-cache
+                  mountPath: /root/.cache/restic
+                {{- end }}
+          volumes:
+            - name: scripts-volume
+              configMap:
+                name: {{ include "common.names.fullname" $ }}-scripts
+                defaultMode: 0755
+            - name: aws-creds
+              secret:
+                secretName: {{ .Values.aws.secretName }}
+                defaultMode: 0400
+            {{- if .Values.backup.restic.cache.enabled }}
+            - name: restic-cache
+              emptyDir:
+                sizeLimit: {{ .Values.backup.restic.cache.size }}
+            {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

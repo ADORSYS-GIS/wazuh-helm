@@ -39,6 +39,12 @@ features:
     enabled: true
   gracefulShutdown:
     enabled: true
+  # Legacy backup system (tar + aws-cli) - can be disabled after Restic migration
+  legacyBackup:
+    enabled: true
+  # New Restic incremental backup system
+  resticBackup:
+    enabled: true  # Set to true to enable Restic-based backups
 
 # ------------------------------------------------------------------------------
 # Backup Configuration
@@ -52,6 +58,38 @@ backup:
     bucketName: "wazuh-dev-backup"
     endpointUrl: ""  # Leave empty for AWS S3
     pathPrefix: "wazuh-backup"
+
+  # Restic incremental backup configuration
+  restic:
+    enabled: true  # Feature flag for gradual rollout
+    repository: "s3:s3.amazonaws.com/{{ .Values.backup.s3.bucketName }}/restic-repo"
+    passwordSecretName: "restic-password"
+    passwordSecretKey: "password"
+
+    # Retention policy (auto-cleanup old snapshots)
+    retention:
+      enabled: true
+      keepLast: 7      # Keep last 7 snapshots
+      keepDaily: 30    # Keep daily snapshots for 30 days
+      keepWeekly: 12   # Keep weekly snapshots for 3 months
+      keepMonthly: 12  # Keep monthly snapshots for 1 year
+
+    # Performance tuning
+    cache:
+      enabled: true
+      size: "1Gi"  # Local cache size for index metadata
+
+    # Parallel upload optimization
+    packSize: "128"  # MB per pack file (default: 16MB)
+
+    # Verification (optional but recommended)
+    verification:
+      enabled: true
+      schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+
+    # Cleanup schedule (retention policy enforcement)
+    cleanup:
+      schedule: "0 3 * * *"  # Daily at 3 AM (after backups complete)
 
   # Graceful shutdown configuration
   gracefulShutdown:
@@ -432,6 +470,117 @@ tekton:
               - start-wazuh
               - upload-s3
 
+    # Restic-based pipeline (incremental backups)
+    - name: '{{ include "common.names.fullname" $ }}-component-backup-restic-graceful'
+      enabled: '{{ .Values.features.resticBackup.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations: {}
+      spec:
+        description: |
+          Back up a Wazuh component using Restic incremental backups with graceful shutdown.
+          Simpler pipeline: stop → backup → start (no staging PVC needed).
+        params:
+          - name: componentName
+            type: string
+          - name: podName
+            type: string
+          - name: podNamespace
+            type: string
+            default: '{{ .Values.global.namespace }}'
+          - name: containerName
+            type: string
+            default: '{{ .Values.backup.gracefulShutdown.containerName }}'
+          - name: wazuhControlPath
+            type: string
+            default: '{{ .Values.backup.gracefulShutdown.wazuhControlPath }}'
+          - name: includePaths
+            type: string
+            description: Comma-separated list of paths to backup
+        finally:
+          - name: emergency-start
+            when:
+              - input: "$(tasks.status)"
+                operator: notin
+                values: ["Succeeded"]
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+            params:
+              - name: podName
+                value: "$(params.podName)"
+              - name: namespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: wazuhControlPath
+                value: "$(params.wazuhControlPath)"
+              - name: action
+                value: "start"
+              - name: mode
+                value: "emergency"
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: pipelineStatus
+                value: "$(tasks.status)"
+        tasks:
+          - name: stop-wazuh
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+            params:
+              - name: podName
+                value: "$(params.podName)"
+              - name: namespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: wazuhControlPath
+                value: "$(params.wazuhControlPath)"
+              - name: action
+                value: "stop"
+              - name: mode
+                value: "normal"
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: pipelineStatus
+                value: ""
+          - name: restic-backup
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-restic-backup'
+            params:
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: podName
+                value: "$(params.podName)"
+              - name: podNamespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: includePaths
+                value: "$(params.includePaths)"
+            runAfter:
+              - stop-wazuh
+          - name: start-wazuh
+            taskRef:
+              name: '{{ include "common.names.fullname" $ }}-wazuh-control'
+            params:
+              - name: podName
+                value: "$(params.podName)"
+              - name: namespace
+                value: "$(params.podNamespace)"
+              - name: containerName
+                value: "$(params.containerName)"
+              - name: wazuhControlPath
+                value: "$(params.wazuhControlPath)"
+              - name: action
+                value: "start"
+              - name: mode
+                value: "normal"
+              - name: componentName
+                value: "$(params.componentName)"
+              - name: pipelineStatus
+                value: ""
+            runAfter:
+              - restic-backup
+
   # Tasks
   tasks:
     - name: '{{ include "common.names.fullname" $ }}-cleanup-pvc'
@@ -769,6 +918,92 @@ tekton:
               name: '{{ include "common.names.fullname" $ }}-scripts'
               defaultMode: 0755
 
+    - name: '{{ include "common.names.fullname" $ }}-restic-backup'
+      enabled: '{{ .Values.features.resticBackup.enabled }}'
+      additionalLabels: {}
+      additionalAnnotations:
+        tekton.dev/displayName: "Restic Incremental Backup"
+      spec:
+        description: |
+          Performs incremental backup using Restic directly from pod to S3.
+          No staging PVC required - backs up directly to S3 repository.
+        params:
+          - name: componentName
+            type: string
+          - name: podName
+            type: string
+          - name: podNamespace
+            type: string
+          - name: containerName
+            type: string
+            default: ""
+          - name: includePaths
+            type: string
+            description: Comma-separated list of paths to backup
+        steps:
+          - name: restic-backup
+            image: '{{ include "common.images.image" ( dict "imageRoot" .Values.tekton.taskImages.restic "global" .Values.global ) }}'
+            script: |
+              # Install required packages (bash, grep, kubectl, jq, bc)
+              # Note: 'grep' package provides GNU grep which supports -P (PCRE)
+              apk add --no-cache bash grep curl jq bc
+
+              # Install kubectl (needed to copy data from pods)
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
+
+              # Copy and run backup script
+              cp /scripts/restic-backup.sh /tmp/restic-backup.sh
+              chmod +x /tmp/restic-backup.sh
+              bash /tmp/restic-backup.sh "$(params.componentName)" "$(params.podName)" "$(params.podNamespace)" "$(params.includePaths)"
+            env:
+              - name: RESTIC_REPOSITORY
+                value: '{{ tpl .Values.backup.restic.repository $ }}'
+              - name: RESTIC_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ .Values.backup.restic.passwordSecretName }}'
+                    key: '{{ .Values.backup.restic.passwordSecretKey }}'
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ .Values.aws.secretName }}'
+                    key: aws_access_key_id
+                    optional: true
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ .Values.aws.secretName }}'
+                    key: aws_secret_access_key
+                    optional: true
+              - name: AWS_DEFAULT_REGION
+                valueFrom:
+                  secretKeyRef:
+                    name: '{{ .Values.aws.secretName }}'
+                    key: region
+                    optional: true
+            volumeMounts:
+              - name: scripts-volume
+                mountPath: /scripts
+              - name: aws-creds
+                mountPath: /root/.aws
+                readOnly: true
+              - name: restic-cache
+                mountPath: /root/.cache/restic
+        volumes:
+          - name: scripts-volume
+            configMap:
+              name: '{{ include "common.names.fullname" $ }}-scripts'
+              defaultMode: 0755
+          - name: aws-creds
+            secret:
+              secretName: '{{ .Values.aws.secretName }}'
+              defaultMode: 0400
+          - name: restic-cache
+            emptyDir:
+              sizeLimit: '{{ .Values.backup.restic.cache.size }}'
+
   # Task image configurations
   taskImages:
     cleanupPvc:
@@ -806,6 +1041,20 @@ tekton:
       digest: ""
       pullPolicy: IfNotPresent
       pullSecrets: []
+    restic:
+      registry: docker.io
+      repository: restic/restic
+      tag: "0.17.3"  # Latest stable as of Dec 2024
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+    awsCli:
+      registry: docker.io
+      repository: amazon/aws-cli
+      tag: "2.13.0"
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: []
 
 # ------------------------------------------------------------------------------
 # ConfigMaps (Array-based)
@@ -816,6 +1065,7 @@ configmaps:
     additionalLabels: {}
     additionalAnnotations: {}
     data:
+      # Legacy backup scripts
       "cleanup-pvc-directory.sh": '{{- $.Files.Get "scripts/cleanup-pvc-directory.sh" }}'
       "scale-statefulset.sh": '{{- $.Files.Get "scripts/scale-statefulset.sh" }}'
       "make-tar.sh": '{{- $.Files.Get "scripts/make-tar.sh" }}'
@@ -823,6 +1073,10 @@ configmaps:
       "rsync-pvc-to-pvc.sh": '{{- $.Files.Get "scripts/rsync-pvc-to-pvc.sh" }}'
       "kubectl-cp-pvc-to-pvc.sh": '{{- $.Files.Get "scripts/kubectl-cp-pvc-to-pvc.sh" }}'
       "wazuh-control.sh": '{{- $.Files.Get "scripts/wazuh-control.sh" }}'
+      # Restic incremental backup scripts
+      "restic-backup.sh": '{{- $.Files.Get "scripts/restic-backup.sh" }}'
+      "restic-restore.sh": '{{- $.Files.Get "scripts/restic-restore.sh" }}'
+      "restic-forget.sh": '{{- $.Files.Get "scripts/restic-forget.sh" }}'
 
 # ------------------------------------------------------------------------------
 # Secrets (Array-based)

@@ -1,8 +1,8 @@
 apiVersion: v2
 name: wazuh-backup
-description: A Helm chart to deploy a Tekton pipeline for backing up Wazuh core components to S3
+description: A Helm chart to deploy a Tekton pipeline for backing up Wazuh core components to S3 with incremental backup support via Restic
 type: application
-version: 0.1.2-rc.15
+version: 0.2.2
 appVersion: "1.0"
 
 dependencies:
