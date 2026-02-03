@@ -178,11 +178,6 @@ spec:
               readOnly: true
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/7006-fim-macos.xml
-              subPath: 7006-fim-macos.xml
-              readOnly: true
-
-            - name: config
               mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
               subPath: 7007-fim-linux.xml
               readOnly: true
