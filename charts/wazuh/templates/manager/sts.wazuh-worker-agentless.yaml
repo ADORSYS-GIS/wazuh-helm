@@ -290,6 +290,11 @@ spec:
               mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
               subPath: 7011-lotl-detection.xml
               readOnly: true
+
+            - name: config
+              mountPath: /var/ossec/etc/shared/dlp/agent.conf
+              subPath: dlp.xml
+              readOnly: true
               
             {{ range $k, $v := $.Values.cluster.decoders -}}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}

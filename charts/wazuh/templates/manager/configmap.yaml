@@ -43,6 +43,9 @@ data:
   "7011-lotl-detection.xml":  |
     {{ $.Files.Get "files/configs/lotl-detection.xml" | nindent 6 }}
 
+  "dlp.xml": |
+    {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}
+
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
   {{ printf "0003-%s" $k | quote | nindent 2 }}: |

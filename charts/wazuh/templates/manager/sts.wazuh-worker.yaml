@@ -286,6 +286,11 @@ spec:
               subPath: 7011-lotl-detection.xml
               readOnly: true
 
+            - name: config
+              mountPath: /var/ossec/etc/shared/dlp/agent.conf
+              subPath: dlp.xml
+              readOnly: true
+
             {{ range $k, $v := $.Values.cluster.decoders -}}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
             {{- $n_k := printf "0003-%s" $k -}} 
