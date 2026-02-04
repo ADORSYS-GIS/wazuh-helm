@@ -1,4 +1,4 @@
-FROM wazuh/wazuh-manager:4.13.1
+FROM wazuh/wazuh-manager:4.14.2
 
 RUN yum install -y expect openssh-clients \
  && yum clean all \
