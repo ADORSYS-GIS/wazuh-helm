@@ -14,12 +14,19 @@ data:
     {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoder.santa.xml" | nindent 6 }}
   
   "7005-audit-mitre_rules.xml":  |
     {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
 
   "7006-fim-macos.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-MacOS.xml" | nindent 6 }}
+
+  "7006-macos-syslog.xml":  |
+    {{ $.Files.Get "files/configs/rules.MacOS-Syslog.xml" | nindent 6 }}
+
+  "7006-macos-auth.xml":  |
+    {{ $.Files.Get "files/configs/rules.MacOS-Auth.xml" | nindent 6 }}
 
   "7007-fim-linux.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
@@ -28,7 +35,16 @@ data:
     {{ $.Files.Get "files/configs/rules.custom-yara.xml" | nindent 6 }}  
 
   "7009-fim-windows.xml":  |
-    {{ $.Files.Get "files/configs/rules.custom-windows.xml" | nindent 6 }}    
+    {{ $.Files.Get "files/configs/rules.custom-windows.xml" | nindent 6 }}
+
+  "7010-custom-suricata.xml":  |
+    {{ $.Files.Get "files/configs/rules.suricata.xml" | nindent 6 }}      
+
+  "7011-lotl-detection.xml":  |
+    {{ $.Files.Get "files/configs/lotl-detection.xml" | nindent 6 }}
+
+  "dlp.xml": |
+    {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}
 
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
