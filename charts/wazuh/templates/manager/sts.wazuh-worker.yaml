@@ -252,6 +252,16 @@ spec:
               readOnly: true
 
             - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7006-macos-syslog.xml
+              subPath: 7006-macos-syslog.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7006-macos-auth.xml
+              subPath: 7006-macos-auth.xml
+              readOnly: true
+
+            - name: config
               mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
               subPath: 7007-fim-linux.xml
               readOnly: true

@@ -1,0 +1,31 @@
+{{- range $k1, $v1 :=.Values.initJobs }}
+{{ $fname := include "common.tplvalues.render" (dict "value" $k1 "context" $) }}
+{{ with $v1 }}
+{{ if .enable }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fname }}-role
+  namespace: {{ include "common.names.namespace" $ }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fname }}-rolebinding
+  namespace: {{ include "common.names.namespace" $ }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $fname }}-job
+    namespace: {{ include "common.names.namespace" $ }}
+roleRef:
+  kind: Role
+  name: {{ $fname }}-role
+  apiGroup: rbac.authorization.k8s.io
+{{ end }}
+{{ end }}
+{{- end }}
