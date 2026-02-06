@@ -19,17 +19,14 @@ data:
   "7005-audit-mitre_rules.xml":  |
     {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
 
-  "7006-macos-system.xml":  |
+  "7006a-macos-system.xml":  |
     {{ $.Files.Get "files/configs/rules.MacOS-System.xml" | nindent 6 }}
 
-  "7006-fim-macos-1.xml":  |
+  "7006b-fim-macos-1.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-MacOS-part1.xml" | nindent 6 }}
 
-  "7006-fim-macos-2.xml":  |
+  "7006c-fim-macos-2.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-MacOS-part2.xml" | nindent 6 }}
-
-  "7006-macos-auth.xml":  |
-    {{ $.Files.Get "files/configs/rules.MacOS-Auth.xml" | nindent 6 }}
 
   "7007-fim-linux.xml":  |
     {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
