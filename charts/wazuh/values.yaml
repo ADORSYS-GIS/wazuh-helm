@@ -127,6 +127,17 @@ indexer:
         lookbackMinutes: 5
         throttleMinutes: 5
 
+  # --- Anomaly Detection ---
+  anomalyDetection:
+    enabled: true
+    detectors:
+      failedAuth:
+        enabled: true
+      fimChanges:
+        enabled: true
+      highSeverity:
+        enabled: true
+
   # --- Init Containers ---
   initContainers:
     volume-mount-hack:

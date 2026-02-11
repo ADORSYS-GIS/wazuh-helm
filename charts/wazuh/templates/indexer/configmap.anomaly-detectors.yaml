@@ -1,0 +1,100 @@
+{{- if .Values.indexer.anomalyDetection.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-anomaly-detectors
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  setup-anomaly-detectors.sh: |
+    #!/bin/bash
+    set -e
+
+    INDEXER_URL="https://{{ include "common.names.fullname" $ }}-indexer-api:9200"
+    INDEXER_USER="${INDEXER_USERNAME}"
+    INDEXER_PASS="${INDEXER_PASSWORD}"
+
+    echo "Waiting for indexer to be ready..."
+    until curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" "${INDEXER_URL}/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+      echo "Waiting for indexer..."
+      sleep 5
+    done
+    echo "Indexer is ready."
+
+    create_detector() {
+      local name=$1
+      local description=$2
+      local filter=$3
+      local feature_name=$4
+
+      echo "Checking detector: ${name}..."
+
+      # Check if detector exists
+      existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+        -H "Content-Type: application/json" \
+        -d "{\"query\":{\"term\":{\"name.keyword\":\"${name}\"}}}" | jq -r '.hits.total.value // 0')
+
+      if [ "$existing" -gt 0 ]; then
+        echo "Detector ${name} already exists, skipping..."
+        return
+      fi
+
+      echo "Creating detector: ${name}..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"name\": \"${name}\",
+          \"description\": \"${description}\",
+          \"time_field\": \"timestamp\",
+          \"indices\": [\"wazuh-alerts-*\"],
+          \"filter_query\": ${filter},
+          \"detection_interval\": {\"period\": {\"interval\": 5, \"unit\": \"Minutes\"}},
+          \"window_delay\": {\"period\": {\"interval\": 1, \"unit\": \"Minutes\"}},
+          \"feature_attributes\": [{
+            \"feature_name\": \"${feature_name}\",
+            \"feature_enabled\": true,
+            \"aggregation_query\": {\"${feature_name}\": {\"value_count\": {\"field\": \"_id\"}}}
+          }]
+        }")
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector ${name} (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    }
+
+    # Create anomaly detectors
+    {{- if .Values.indexer.anomalyDetection.detectors.failedAuth.enabled }}
+    create_detector \
+      "failed-auth-anomaly" \
+      "Detects unusual spikes in failed authentication attempts" \
+      '{"bool":{"must":[{"term":{"rule.groups":"authentication_failed"}}]}}' \
+      "failed_auth_count"
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.fimChanges.enabled }}
+    create_detector \
+      "fim-changes-anomaly" \
+      "Detects unusual spikes in file integrity monitoring events" \
+      '{"bool":{"must":[{"term":{"rule.groups":"syscheck"}}]}}' \
+      "fim_event_count"
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.highSeverity.enabled }}
+    create_detector \
+      "high-severity-anomaly" \
+      "Detects unusual spikes in high severity alerts (level >= 10)" \
+      '{"bool":{"must":[{"range":{"rule.level":{"gte":10}}}]}}' \
+      "high_severity_count"
+    {{- end }}
+
+    echo "Anomaly detector setup complete!"
+{{- end }}
