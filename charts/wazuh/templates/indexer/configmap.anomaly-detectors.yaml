@@ -27,6 +27,7 @@ data:
       local description=$2
       local filter=$3
       local feature_name=$4
+      local category_field=$5
 
       echo "Checking detector: ${name}..."
 
@@ -41,24 +42,45 @@ data:
         return
       fi
 
+      # Build detector JSON based on whether category field is provided
+      if [ -n "$category_field" ]; then
+        detector_json="{
+          \"name\": \"${name}\",
+          \"description\": \"${description}\",
+          \"time_field\": \"@timestamp\",
+          \"indices\": [\"wazuh-alerts-*\"],
+          \"filter_query\": ${filter},
+          \"detection_interval\": {\"period\": {\"interval\": 10, \"unit\": \"Minutes\"}},
+          \"window_delay\": {\"period\": {\"interval\": 2, \"unit\": \"Minutes\"}},
+          \"category_field\": [\"${category_field}\"],
+          \"feature_attributes\": [{
+            \"feature_name\": \"${feature_name}\",
+            \"feature_enabled\": true,
+            \"aggregation_query\": {\"${feature_name}\": {\"value_count\": {\"field\": \"rule.id\"}}}
+          }]
+        }"
+      else
+        detector_json="{
+          \"name\": \"${name}\",
+          \"description\": \"${description}\",
+          \"time_field\": \"@timestamp\",
+          \"indices\": [\"wazuh-alerts-*\"],
+          \"filter_query\": ${filter},
+          \"detection_interval\": {\"period\": {\"interval\": 10, \"unit\": \"Minutes\"}},
+          \"window_delay\": {\"period\": {\"interval\": 2, \"unit\": \"Minutes\"}},
+          \"feature_attributes\": [{
+            \"feature_name\": \"${feature_name}\",
+            \"feature_enabled\": true,
+            \"aggregation_query\": {\"${feature_name}\": {\"value_count\": {\"field\": \"rule.id\"}}}
+          }]
+        }"
+      fi
+
       echo "Creating detector: ${name}..."
       result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
         -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
         -H "Content-Type: application/json" \
-        -d "{
-          \"name\": \"${name}\",
-          \"description\": \"${description}\",
-          \"time_field\": \"timestamp\",
-          \"indices\": [\"wazuh-alerts-*\"],
-          \"filter_query\": ${filter},
-          \"detection_interval\": {\"period\": {\"interval\": 5, \"unit\": \"Minutes\"}},
-          \"window_delay\": {\"period\": {\"interval\": 1, \"unit\": \"Minutes\"}},
-          \"feature_attributes\": [{
-            \"feature_name\": \"${feature_name}\",
-            \"feature_enabled\": true,
-            \"aggregation_query\": {\"${feature_name}\": {\"value_count\": {\"field\": \"_id\"}}}
-          }]
-        }")
+        -d "$detector_json")
 
       detector_id=$(echo "$result" | jq -r '._id // empty')
       if [ -n "$detector_id" ]; then
@@ -74,30 +96,84 @@ data:
     # Create anomaly detectors
     {{- if .Values.indexer.anomalyDetection.detectors.failedAuth.enabled }}
     create_detector \
-      "failed-auth-anomaly" \
-      "Detects unusual spikes in failed authentication attempts" \
-      '{"bool":{"must":[{"term":{"rule.groups":"authentication_failed"}}]}}' \
-      "failed_auth_count"
+      "authentication-failures" \
+      "Detects spikes in authentication failures" \
+      '{"terms":{"rule.groups":["authentication_failed","authentication_failure","invalid_login"]}}' \
+      "auth_fail_count" \
+      ""
     {{- end }}
 
     {{- if .Values.indexer.anomalyDetection.detectors.fimChanges.enabled }}
     create_detector \
-      "fim-changes-anomaly" \
-      "Detects unusual spikes in file integrity monitoring events" \
-      '{"bool":{"must":[{"term":{"rule.groups":"syscheck"}}]}}' \
-      "fim_event_count"
+      "file-integrity-changes" \
+      "Detects spikes in file integrity monitoring events" \
+      '{"terms":{"rule.groups":["syscheck","fim"]}}' \
+      "fim_count" \
+      ""
     {{- end }}
 
     {{- if .Values.indexer.anomalyDetection.detectors.highSeverity.enabled }}
     create_detector \
-      "high-severity-anomaly" \
-      "Detects unusual spikes in high severity alerts (level >= 10)" \
-      '{"bool":{"must":[{"range":{"rule.level":{"gte":10}}}]}}' \
-      "high_severity_count"
+      "high-severity-alerts" \
+      "Detects spikes in high severity alerts (level >= 7)" \
+      '{"range":{"rule.level":{"gte":7}}}' \
+      "alert_count" \
+      ""
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.perAgent.enabled }}
+    # Per-agent security anomaly detector
+    echo "Checking detector: per-agent-security-anomaly..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"term":{"name.keyword":"per-agent-security-anomaly"}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: per-agent-security-anomaly..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "per-agent-security-anomaly",
+          "description": "Detects anomalous security events per agent",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {
+            "bool": {
+              "should": [
+                {"range": {"rule.level": {"gte": 5}}},
+                {"terms": {"rule.groups": ["authentication_failed", "authentication_failure", "invalid_login", "brute_force"]}},
+                {"terms": {"rule.groups": ["privilege_escalation", "rootcheck", "malware", "trojan", "virus"]}},
+                {"terms": {"rule.groups": ["firewall", "ids", "intrusion_detection", "network", "attack"]}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "category_field": ["agent.name"],
+          "feature_attributes": [{
+            "feature_name": "security_alert_count",
+            "feature_enabled": true,
+            "aggregation_query": {"security_alert_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector per-agent-security-anomaly (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      fi
+    else
+      echo "Detector per-agent-security-anomaly already exists, skipping..."
+    fi
     {{- end }}
 
     {{- if .Values.indexer.anomalyDetection.detectors.blacklistProcess.enabled }}
-    # Blacklist process detector - detects running blacklisted apps regardless of install method
+    # Blacklist process detector
     echo "Checking detector: blacklist-process-execution..."
     existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
       "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
@@ -111,44 +187,26 @@ data:
         -H "Content-Type: application/json" \
         -d '{
           "name": "blacklist-process-execution",
-          "description": "Detects execution of blacklisted applications regardless of installation method",
-          "time_field": "timestamp",
+          "description": "Detects execution of blacklisted applications",
+          "time_field": "@timestamp",
           "indices": ["wazuh-alerts-*", "wazuh-archives-*"],
-          "filter_query": {
-            "bool": {
-              "should": [
-                {"wildcard": {"data.audit.command": "*teamviewer*"}},
-                {"wildcard": {"data.audit.command": "*anydesk*"}},
-                {"wildcard": {"data.audit.command": "*rustdesk*"}},
-                {"wildcard": {"data.audit.command": "*utorrent*"}},
-                {"wildcard": {"data.audit.command": "*bittorrent*"}},
-                {"wildcard": {"data.audit.command": "*qbittorrent*"}},
-                {"wildcard": {"data.audit.command": "*transmission*"}},
-                {"wildcard": {"data.audit.command": "*parsec*"}},
-                {"wildcard": {"data.audit.command": "*logmein*"}},
-                {"wildcard": {"data.audit.command": "*nmap*"}},
-                {"wildcard": {"data.audit.command": "*metasploit*"}},
-                {"wildcard": {"data.audit.command": "*burpsuite*"}},
-                {"wildcard": {"data.audit.command": "*wireshark*"}},
-                {"wildcard": {"data.audit.command": "*hashcat*"}},
-                {"wildcard": {"data.audit.command": "*xmrig*"}},
-                {"wildcard": {"data.audit.command": "*cpuminer*"}},
-                {"wildcard": {"data.audit.exe": "*teamviewer*"}},
-                {"wildcard": {"data.audit.exe": "*anydesk*"}},
-                {"wildcard": {"data.audit.exe": "*rustdesk*"}},
-                {"wildcard": {"process.name": "*teamviewer*"}},
-                {"wildcard": {"process.name": "*anydesk*"}},
-                {"wildcard": {"process.name": "*rustdesk*"}}
-              ],
-              "minimum_should_match": 1
-            }
-          },
-          "detection_interval": {"period": {"interval": 1, "unit": "Minutes"}},
+          "filter_query": {"bool": {"should": [
+            {"wildcard": {"data.audit.command": "*teamviewer*"}},
+            {"wildcard": {"data.audit.command": "*anydesk*"}},
+            {"wildcard": {"data.audit.command": "*rustdesk*"}},
+            {"wildcard": {"data.audit.command": "*torrent*"}},
+            {"wildcard": {"data.audit.command": "*nmap*"}},
+            {"wildcard": {"data.audit.command": "*metasploit*"}},
+            {"wildcard": {"data.audit.command": "*xmrig*"}},
+            {"wildcard": {"data.audit.exe": "*teamviewer*"}},
+            {"wildcard": {"data.audit.exe": "*anydesk*"}}
+          ], "minimum_should_match": 1}},
+          "detection_interval": {"period": {"interval": 5, "unit": "Minutes"}},
           "window_delay": {"period": {"interval": 1, "unit": "Minutes"}},
           "feature_attributes": [{
             "feature_name": "blacklist_exec_count",
             "feature_enabled": true,
-            "aggregation_query": {"blacklist_exec_count": {"value_count": {"field": "_id"}}}
+            "aggregation_query": {"blacklist_exec_count": {"value_count": {"field": "rule.id"}}}
           }]
         }')
 

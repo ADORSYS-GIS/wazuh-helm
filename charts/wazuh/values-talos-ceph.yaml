@@ -16,7 +16,7 @@ storageClasses:
 apiCred:
   auth:
     username: wazuh-admin
-    password: "SecurePassword123!"  # Change this!
+    password: ""  # Change this!
 
 # Wazuh Manager Master configuration
 master:

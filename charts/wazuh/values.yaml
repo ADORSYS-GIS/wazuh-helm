@@ -139,6 +139,8 @@ indexer:
         enabled: true
       blacklistProcess:
         enabled: true  # Detects running blacklisted apps via audit/process events
+      perAgent:
+        enabled: true  # Security anomalies per agent (high severity, auth, malware, network)
 
   # --- Init Containers ---
   initContainers:
