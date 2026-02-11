@@ -94,49 +94,171 @@ data:
     }
 
     # Create anomaly detectors
-    {{- if .Values.indexer.anomalyDetection.detectors.failedAuth.enabled }}
-    create_detector \
-      "authentication-failures" \
-      "Detects spikes in authentication failures" \
-      '{"terms":{"rule.groups":["authentication_failed","authentication_failure","invalid_login"]}}' \
-      "auth_fail_count" \
-      ""
-    {{- end }}
 
-    {{- if .Values.indexer.anomalyDetection.detectors.fimChanges.enabled }}
-    create_detector \
-      "file-integrity-changes" \
-      "Detects spikes in file integrity monitoring events" \
-      '{"terms":{"rule.groups":["syscheck","fim"]}}' \
-      "fim_count" \
-      ""
-    {{- end }}
-
-    {{- if .Values.indexer.anomalyDetection.detectors.highSeverity.enabled }}
-    create_detector \
-      "high-severity-alerts" \
-      "Detects spikes in high severity alerts (level >= 7)" \
-      '{"range":{"rule.level":{"gte":7}}}' \
-      "alert_count" \
-      ""
-    {{- end }}
-
-    {{- if .Values.indexer.anomalyDetection.detectors.perAgent.enabled }}
-    # Per-agent security anomaly detector
-    echo "Checking detector: per-agent-security-anomaly..."
+    {{- if .Values.indexer.anomalyDetection.detectors.unauthorizedAccess.enabled }}
+    # Unauthorized-Access detector - detects spikes in authentication failures
+    echo "Checking detector: Unauthorized-Access..."
     existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
       "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
       -H "Content-Type: application/json" \
-      -d '{"query":{"term":{"name.keyword":"per-agent-security-anomaly"}}}' | jq -r '.hits.total.value // 0')
+      -d '{"query":{"bool":{"should":[{"term":{"name.keyword":"Unauthorized-Access"}},{"term":{"name.keyword":"authentication-failures"}}]}}}' | jq -r '.hits.total.value // 0')
 
     if [ "$existing" -eq 0 ]; then
-      echo "Creating detector: per-agent-security-anomaly..."
+      echo "Creating detector: Unauthorized-Access..."
       result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
         -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
         -H "Content-Type: application/json" \
         -d '{
-          "name": "per-agent-security-anomaly",
-          "description": "Detects anomalous security events per agent",
+          "name": "Unauthorized-Access",
+          "description": "Detects spikes in authentication failures (brute force, invalid logins, failed passwords)",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {
+            "bool": {
+              "should": [
+                {"terms": {"rule.groups": ["authentication_failed", "authentication_failure", "invalid_login", "login_failed"]}},
+                {"match": {"rule.description": "authentication failure"}},
+                {"match": {"rule.description": "failed password"}},
+                {"match": {"rule.description": "invalid user"}},
+                {"match": {"rule.description": "failed login"}},
+                {"range": {"rule.id": {"gte": 5710, "lte": 5720}}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "auth_fail_count",
+            "feature_enabled": true,
+            "aggregation_query": {"auth_fail_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector Unauthorized-Access (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector Unauthorized-Access already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.fimChanges.enabled }}
+    # File-integrity-changes detector - uses syscheck rule IDs (550-560) and config_changed group
+    echo "Checking detector: File-integrity-changes..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"bool":{"should":[{"term":{"name.keyword":"File-integrity-changes"}},{"term":{"name.keyword":"file-integrity-changes"}}]}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: File-integrity-changes..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "File-integrity-changes",
+          "description": "Detects spikes in file integrity monitoring events (syscheck)",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {
+            "bool": {
+              "should": [
+                {"range": {"rule.id": {"gte": 550, "lte": 560}}},
+                {"terms": {"rule.groups": ["syscheck", "fim", "config_changed"]}},
+                {"wildcard": {"rule.description": "*integrity*"}},
+                {"wildcard": {"rule.description": "*syscheck*"}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "fim_count",
+            "feature_enabled": true,
+            "aggregation_query": {"fim_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector File-integrity-changes (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector File-integrity-changes already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.highSeverity.enabled }}
+    # High-severity-alerts detector
+    echo "Checking detector: High-severity-alerts..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"bool":{"should":[{"term":{"name.keyword":"High-severity-alerts"}},{"term":{"name.keyword":"high-severity-alerts"}}]}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: High-severity-alerts..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "High-severity-alerts",
+          "description": "Detects spikes in high severity alerts (level >= 7)",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {"range": {"rule.level": {"gte": 7}}},
+          "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "alert_count",
+            "feature_enabled": true,
+            "aggregation_query": {"alert_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector High-severity-alerts (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector High-severity-alerts already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.perAgent.enabled }}
+    # Agent high-risk security events detector
+    echo "Checking detector: Agent-highrisk-security-events..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"bool":{"should":[{"term":{"name.keyword":"Agent-highrisk-security-events"}},{"term":{"name.keyword":"per-agent-security-anomaly"}}]}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: Agent-highrisk-security-events..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "Agent-highrisk-security-events",
+          "description": "Detects spikes in high-risk security events (auth failures, malware, intrusions)",
           "time_field": "@timestamp",
           "indices": ["wazuh-alerts-*"],
           "filter_query": {
@@ -152,7 +274,6 @@ data:
           },
           "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
           "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
-          "category_field": ["agent.name"],
           "feature_attributes": [{
             "feature_name": "security_alert_count",
             "feature_enabled": true,
@@ -162,32 +283,32 @@ data:
 
       detector_id=$(echo "$result" | jq -r '._id // empty')
       if [ -n "$detector_id" ]; then
-        echo "Starting detector per-agent-security-anomaly (${detector_id})..."
+        echo "Starting detector Agent-highrisk-security-events (${detector_id})..."
         curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
           -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
         echo ""
       fi
     else
-      echo "Detector per-agent-security-anomaly already exists, skipping..."
+      echo "Detector Agent-highrisk-security-events already exists, skipping..."
     fi
     {{- end }}
 
     {{- if .Values.indexer.anomalyDetection.detectors.blacklistProcess.enabled }}
-    # Blacklist process detector
-    echo "Checking detector: blacklist-process-execution..."
+    # Unauthorized running process detector (per-agent)
+    echo "Checking detector: Unauthorized-running-process..."
     existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
       "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
       -H "Content-Type: application/json" \
-      -d '{"query":{"term":{"name.keyword":"blacklist-process-execution"}}}' | jq -r '.hits.total.value // 0')
+      -d '{"query":{"bool":{"should":[{"term":{"name.keyword":"Unauthorized-running-process"}},{"term":{"name.keyword":"blacklist-process-execution"}}]}}}' | jq -r '.hits.total.value // 0')
 
     if [ "$existing" -eq 0 ]; then
-      echo "Creating detector: blacklist-process-execution..."
+      echo "Creating detector: Unauthorized-running-process..."
       result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
         -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
         -H "Content-Type: application/json" \
         -d '{
-          "name": "blacklist-process-execution",
-          "description": "Detects execution of blacklisted applications",
+          "name": "Unauthorized-running-process",
+          "description": "Detects execution of unauthorized applications (hacking tools, remote access, miners)",
           "time_field": "@timestamp",
           "indices": ["wazuh-alerts-*", "wazuh-archives-*"],
           "filter_query": {"bool": {"should": [
@@ -196,29 +317,287 @@ data:
             {"wildcard": {"data.audit.command": "*rustdesk*"}},
             {"wildcard": {"data.audit.command": "*torrent*"}},
             {"wildcard": {"data.audit.command": "*nmap*"}},
+            {"wildcard": {"data.audit.command": "*wireshark*"}},
             {"wildcard": {"data.audit.command": "*metasploit*"}},
             {"wildcard": {"data.audit.command": "*xmrig*"}},
             {"wildcard": {"data.audit.exe": "*teamviewer*"}},
-            {"wildcard": {"data.audit.exe": "*anydesk*"}}
+            {"wildcard": {"data.audit.exe": "*anydesk*"}},
+            {"wildcard": {"data.audit.exe": "*wireshark*"}},
+            {"terms": {"rule.groups": ["unauthorized_process", "hacking_tool", "cryptominer", "remote_access"]}},
+            {"range": {"rule.id": {"gte": 750095, "lte": 750099}}}
           ], "minimum_should_match": 1}},
           "detection_interval": {"period": {"interval": 5, "unit": "Minutes"}},
           "window_delay": {"period": {"interval": 1, "unit": "Minutes"}},
           "feature_attributes": [{
-            "feature_name": "blacklist_exec_count",
+            "feature_name": "unauthorized_process_count",
             "feature_enabled": true,
-            "aggregation_query": {"blacklist_exec_count": {"value_count": {"field": "rule.id"}}}
+            "aggregation_query": {"unauthorized_process_count": {"value_count": {"field": "rule.id"}}}
           }]
         }')
 
       detector_id=$(echo "$result" | jq -r '._id // empty')
       if [ -n "$detector_id" ]; then
-        echo "Starting detector blacklist-process-execution (${detector_id})..."
+        echo "Starting detector Unauthorized-running-process (${detector_id})..."
         curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
           -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
         echo ""
       fi
     else
-      echo "Detector blacklist-process-execution already exists, skipping..."
+      echo "Detector Unauthorized-running-process already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.offHoursActivity.enabled }}
+    # Off-hours activity detector - detects activity outside business hours
+    echo "Checking detector: Off-hours-activity..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"term":{"name.keyword":"Off-hours-activity"}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: Off-hours-activity..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "Off-hours-activity",
+          "description": "Detects unusual activity outside business hours (22:00-06:00 or weekends)",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {
+            "bool": {
+              "should": [
+                {"script": {"script": {"source": "doc[\"@timestamp\"].value.hour >= 22 || doc[\"@timestamp\"].value.hour < 6", "lang": "painless"}}},
+                {"script": {"script": {"source": "doc[\"@timestamp\"].value.dayOfWeekEnum.value >= 6", "lang": "painless"}}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 15, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "off_hours_count",
+            "feature_enabled": true,
+            "aggregation_query": {"off_hours_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector Off-hours-activity (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector Off-hours-activity already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.privilegeEscalation.enabled }}
+    # Privilege escalation detector - detects sudo/su abuse, permission changes
+    echo "Checking detector: Privilege-escalation-attempts..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"term":{"name.keyword":"Privilege-escalation-attempts"}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: Privilege-escalation-attempts..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "Privilege-escalation-attempts",
+          "description": "Detects spikes in privilege escalation attempts (sudo, su, UAC, permission changes)",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {
+            "bool": {
+              "should": [
+                {"terms": {"rule.groups": ["sudo", "su", "pam", "authentication_success"]}},
+                {"terms": {"rule.groups": ["privilege_escalation", "priv_esc", "admin"]}},
+                {"wildcard": {"rule.description": "*sudo*"}},
+                {"wildcard": {"rule.description": "*privilege*"}},
+                {"wildcard": {"rule.description": "*root*"}},
+                {"range": {"rule.id": {"gte": 5400, "lte": 5410}}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "priv_esc_count",
+            "feature_enabled": true,
+            "aggregation_query": {"priv_esc_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector Privilege-escalation-attempts (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector Privilege-escalation-attempts already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.networkAnomalies.enabled }}
+    # Network anomalies detector - detects firewall blocks, connection attempts
+    echo "Checking detector: Network-anomalies..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"term":{"name.keyword":"Network-anomalies"}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: Network-anomalies..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "Network-anomalies",
+          "description": "Detects spikes in firewall blocks, network scans, and connection anomalies",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {
+            "bool": {
+              "should": [
+                {"terms": {"rule.groups": ["firewall", "iptables", "pf", "ufw", "firewalld"]}},
+                {"terms": {"rule.groups": ["network", "ids", "scan", "connection"]}},
+                {"wildcard": {"rule.description": "*firewall*"}},
+                {"wildcard": {"rule.description": "*blocked*"}},
+                {"wildcard": {"rule.description": "*connection*"}},
+                {"wildcard": {"rule.description": "*scan*"}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "network_event_count",
+            "feature_enabled": true,
+            "aggregation_query": {"network_event_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector Network-anomalies (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector Network-anomalies already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.scaCompliance.enabled }}
+    # SCA compliance detector - detects security configuration assessment failures
+    echo "Checking detector: SCA-compliance-failures..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"term":{"name.keyword":"SCA-compliance-failures"}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: SCA-compliance-failures..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "SCA-compliance-failures",
+          "description": "Detects spikes in Security Configuration Assessment failures",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {
+            "bool": {
+              "must": [
+                {"terms": {"rule.groups": ["sca"]}}
+              ],
+              "should": [
+                {"term": {"data.sca.check.result": "failed"}},
+                {"wildcard": {"rule.description": "*failed*"}},
+                {"range": {"rule.level": {"gte": 5}}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 15, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "sca_fail_count",
+            "feature_enabled": true,
+            "aggregation_query": {"sca_fail_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector SCA-compliance-failures (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector SCA-compliance-failures already exists, skipping..."
+    fi
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.logVolume.enabled }}
+    # Log volume detector - detects unusual spikes or drops in overall log volume
+    echo "Checking detector: Log-volume-anomaly..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"term":{"name.keyword":"Log-volume-anomaly"}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: Log-volume-anomaly..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "Log-volume-anomaly",
+          "description": "Detects unusual spikes or drops in overall log volume (may indicate attack or logging failure)",
+          "time_field": "@timestamp",
+          "indices": ["wazuh-alerts-*"],
+          "filter_query": {"match_all": {}},
+          "detection_interval": {"period": {"interval": 10, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 2, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "total_event_count",
+            "feature_enabled": true,
+            "aggregation_query": {"total_event_count": {"value_count": {"field": "rule.id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector Log-volume-anomaly (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    else
+      echo "Detector Log-volume-anomaly already exists, skipping..."
     fi
     {{- end }}
 
