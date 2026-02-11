@@ -62,3 +62,11 @@ To create the namespace, use the following command:
 NAMESPACE="wazuh" # Modify this to your needs
 kubectl create namespace $NAMESPACE
 ```
+
+```shell
+kubectl create secret generic wazuh-wazuh-helm-github-cred \
+    --namespace wazuh \
+    --from-literal=GITHUB_ORG="skyengpro" \
+    --from-literal=GITHUB_REPO="wazuh-alerts" \
+    --from-literal=GITHUB_TOKEN=""
+```

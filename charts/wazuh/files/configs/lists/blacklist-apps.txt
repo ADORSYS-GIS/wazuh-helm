@@ -1,0 +1,113 @@
+# Unauthorized Applications Blacklist
+# Format: app_name:category
+# Categories: remote_access, p2p, hacking, gaming, crypto, unauthorized
+#
+# To add new apps: just add a new line with app_name:category
+# The match is case-insensitive and partial (e.g., "teamviewer" matches "TeamViewer Host")
+#
+# ===== Remote Access Tools (potential unauthorized access) =====
+teamviewer:remote_access
+anydesk:remote_access
+ammyy:remote_access
+remotepc:remote_access
+supremo:remote_access
+rustdesk:remote_access
+parsec:remote_access
+splashtop:remote_access
+logmein:remote_access
+gotomypc:remote_access
+screenconnect:remote_access
+connectwise:remote_access
+bomgar:remote_access
+dameware:remote_access
+radmin:remote_access
+ultraviewer:remote_access
+atera:remote_access
+meshcentral:remote_access
+
+# ===== P2P / Torrent Clients =====
+utorrent:p2p
+bittorrent:p2p
+qbittorrent:p2p
+deluge:p2p
+transmission:p2p
+vuze:p2p
+limewire:p2p
+frostwire:p2p
+emule:p2p
+kazaa:p2p
+ares:p2p
+tixati:p2p
+biglybt:p2p
+webtorrent:p2p
+
+# ===== Hacking / Pentesting Tools (unauthorized use) =====
+nmap:hacking
+wireshark:hacking
+metasploit:hacking
+burpsuite:hacking
+sqlmap:hacking
+john:hacking
+hashcat:hacking
+hydra:hacking
+aircrack:hacking
+ettercap:hacking
+cain:hacking
+mimikatz:hacking
+cobaltstrike:hacking
+bloodhound:hacking
+responder:hacking
+impacket:hacking
+crackmapexec:hacking
+lazagne:hacking
+rubeus:hacking
+
+# ===== Cryptocurrency Mining =====
+xmrig:crypto
+nicehash:crypto
+minergate:crypto
+claymore:crypto
+phoenixminer:crypto
+nbminer:crypto
+trex:crypto
+gminer:crypto
+lolminer:crypto
+ethminer:crypto
+cgminer:crypto
+bfgminer:crypto
+cpuminer:crypto
+cryptotab:crypto
+
+# ===== Gaming (if not allowed in enterprise) =====
+steam:gaming
+epicgames:gaming
+origin:gaming
+battlenet:gaming
+riotclient:gaming
+gog:gaming
+uplay:gaming
+xbox:gaming
+
+# ===== VPN (unauthorized) =====
+nordvpn:vpn
+expressvpn:vpn
+surfshark:vpn
+protonvpn:vpn
+cyberghost:vpn
+privateinternetaccess:vpn
+tunnelbear:vpn
+windscribe:vpn
+hotspotshield:vpn
+hola:vpn
+psiphon:vpn
+ultrasurf:vpn
+torproject:vpn
+torbrowser:vpn
+
+# ===== Other Potentially Unwanted =====
+ccleaner:pup
+iobit:pup
+avast:pup
+avg:pup
+mcafee:pup
+norton:pup

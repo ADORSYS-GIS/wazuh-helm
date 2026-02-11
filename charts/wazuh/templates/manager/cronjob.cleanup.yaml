@@ -1,0 +1,159 @@
+{{- if and .Values.cluster .Values.cluster.cleanup .Values.cluster.cleanup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.names.fullname" $ }}-manager-cleanup
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: manager-cleanup
+spec:
+  schedule: "0 3 * * *"  # Run daily at 3 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 12 }}
+            app.kubernetes.io/component: manager-cleanup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: cleanup
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+                  echo "========================================"
+                  echo "Wazuh Manager Cleanup Job"
+                  echo "Started at: $(date)"
+                  echo "========================================"
+
+                  VD_RETENTION_DAYS={{ .Values.cluster.cleanup.vdFeedRetentionDays }}
+                  FIM_RETENTION_DAYS={{ .Values.cluster.cleanup.fimDiffRetentionDays }}
+                  ALERTS_RETENTION_DAYS={{ .Values.cluster.cleanup.alertsRetentionDays }}
+
+                  echo "Retention settings:"
+                  echo "  - VD feeds: ${VD_RETENTION_DAYS} days"
+                  echo "  - FIM diffs: ${FIM_RETENTION_DAYS} days"
+                  echo "  - Local alerts: ${ALERTS_RETENTION_DAYS} days"
+                  echo ""
+
+                  # Function to run cleanup on a pod
+                  cleanup_pod() {
+                    local pod=$1
+                    echo "Cleaning up: ${pod}"
+
+                    # Cleanup vulnerability detector feed cache
+                    echo "  - Cleaning VD feed cache older than ${VD_RETENTION_DAYS} days..."
+                    kubectl exec -n {{ include "common.names.namespace" $ }} ${pod} -c wazuh-manager -- \
+                      find /var/ossec/queue/vd/feed -type f -mtime +${VD_RETENTION_DAYS} -delete 2>/dev/null || true
+
+                    # Cleanup FIM diff files
+                    echo "  - Cleaning FIM diff files older than ${FIM_RETENTION_DAYS} days..."
+                    kubectl exec -n {{ include "common.names.namespace" $ }} ${pod} -c wazuh-manager -- \
+                      find /var/ossec/queue/diff -type f -mtime +${FIM_RETENTION_DAYS} -delete 2>/dev/null || true
+
+                    # Cleanup old alerts/archives files (local copies)
+                    echo "  - Cleaning local alert files older than ${ALERTS_RETENTION_DAYS} days..."
+                    kubectl exec -n {{ include "common.names.namespace" $ }} ${pod} -c wazuh-manager -- \
+                      find /var/ossec/logs/alerts -type f -mtime +${ALERTS_RETENTION_DAYS} -delete 2>/dev/null || true
+                    kubectl exec -n {{ include "common.names.namespace" $ }} ${pod} -c wazuh-manager -- \
+                      find /var/ossec/logs/archives -type f -mtime +${ALERTS_RETENTION_DAYS} -delete 2>/dev/null || true
+
+                    # Cleanup empty directories
+                    echo "  - Removing empty directories..."
+                    kubectl exec -n {{ include "common.names.namespace" $ }} ${pod} -c wazuh-manager -- \
+                      find /var/ossec/queue/diff -type d -empty -delete 2>/dev/null || true
+
+                    # Show disk usage after cleanup
+                    echo "  - Current disk usage:"
+                    kubectl exec -n {{ include "common.names.namespace" $ }} ${pod} -c wazuh-manager -- \
+                      du -sh /var/ossec/queue/vd /var/ossec/queue/diff /var/ossec/logs 2>/dev/null || true
+                    echo ""
+                  }
+
+                  # Get all manager pods
+                  echo "Finding manager pods..."
+                  MASTER_PODS=$(kubectl get pods -n {{ include "common.names.namespace" $ }} -l app={{ include "common.names.fullname" $ }}-manager,node-type=master -o jsonpath='{.items[*].metadata.name}')
+                  WORKER_PODS=$(kubectl get pods -n {{ include "common.names.namespace" $ }} -l app={{ include "common.names.fullname" $ }}-manager,node-type=worker -o jsonpath='{.items[*].metadata.name}')
+
+                  echo "Master pods: ${MASTER_PODS}"
+                  echo "Worker pods: ${WORKER_PODS}"
+                  echo ""
+
+                  # Cleanup master pods
+                  for pod in ${MASTER_PODS}; do
+                    cleanup_pod "${pod}"
+                  done
+
+                  # Cleanup worker pods
+                  for pod in ${WORKER_PODS}; do
+                    cleanup_pod "${pod}"
+                  done
+
+                  echo "========================================"
+                  echo "Cleanup completed at: $(date)"
+                  echo "========================================"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+          serviceAccountName: {{ include "common.names.fullname" $ }}-cleanup
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "common.names.fullname" $ }}-cleanup
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "common.names.fullname" $ }}-cleanup
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "common.names.fullname" $ }}-cleanup
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "common.names.fullname" $ }}-cleanup
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "common.names.fullname" $ }}-cleanup
+    namespace: {{ include "common.names.namespace" $ }}
+{{- end }}

@@ -1,8 +1,0 @@
-storageClasses:
-  provisioner: microk8s.io/hostpath
-  volumeBindingMode: WaitForFirstConsumer
-  reclaimPolicy: Delete
-
-svcs:
-  '{{ include "common.names.fullname" $ }}-dashboard':
-    type: LoadBalancer

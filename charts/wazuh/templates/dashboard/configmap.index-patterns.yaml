@@ -1,0 +1,107 @@
+{{- if and .Values.dashboard .Values.dashboard.indexPatterns .Values.dashboard.indexPatterns.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-index-patterns
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  setup-index-patterns.sh: |
+    #!/bin/sh
+    # Index Pattern Setup Script for Wazuh Dashboard
+    # Creates index patterns for viewing logs in Discover
+
+    set -e
+
+    DASHBOARD_URL="${DASHBOARD_URL:-https://wazuh-wazuh-helm-dashboard:5601}"
+    DASHBOARD_USER="${DASHBOARD_USERNAME:-kibanaserver}"
+    DASHBOARD_PASS="${DASHBOARD_PASSWORD}"
+
+    echo "========================================"
+    echo "Wazuh Index Pattern Setup"
+    echo "========================================"
+
+    # Wait for dashboard to be ready
+    echo "Waiting for dashboard to be ready..."
+    max_attempts=60
+    attempt=0
+    until curl -s -k -u "${DASHBOARD_USER}:${DASHBOARD_PASS}" "${DASHBOARD_URL}/api/status" 2>/dev/null | grep -q '"state":"green"'; do
+      attempt=$((attempt + 1))
+      if [ $attempt -ge $max_attempts ]; then
+        echo "ERROR: Dashboard not ready after ${max_attempts} attempts"
+        exit 1
+      fi
+      echo "Dashboard not ready (attempt ${attempt}/${max_attempts}), waiting..."
+      sleep 5
+    done
+    echo "Dashboard is ready!"
+
+    # Function to create index pattern
+    create_index_pattern() {
+      local pattern_id=$1
+      local pattern_title=$2
+      local time_field=$3
+
+      echo "Creating index pattern: ${pattern_title}"
+
+      # Check if pattern already exists
+      existing=$(curl -s -k -u "${DASHBOARD_USER}:${DASHBOARD_PASS}" \
+        "${DASHBOARD_URL}/api/saved_objects/index-pattern/${pattern_id}" 2>/dev/null)
+
+      if echo "$existing" | grep -q '"id"'; then
+        echo "  Index pattern '${pattern_title}' already exists, skipping..."
+        return 0
+      fi
+
+      # Create index pattern
+      response=$(curl -s -k -X POST "${DASHBOARD_URL}/api/saved_objects/index-pattern/${pattern_id}" \
+        -u "${DASHBOARD_USER}:${DASHBOARD_PASS}" \
+        -H 'osd-xsrf: true' \
+        -H 'Content-Type: application/json' \
+        -d "{
+          \"attributes\": {
+            \"title\": \"${pattern_title}\",
+            \"timeFieldName\": \"${time_field}\"
+          }
+        }")
+
+      if echo "$response" | grep -q '"id"'; then
+        echo "  Successfully created index pattern: ${pattern_title}"
+      else
+        echo "  Warning: Could not create index pattern ${pattern_title}"
+        echo "  Response: $response"
+      fi
+    }
+
+    echo ""
+    echo "Creating index patterns..."
+    echo "----------------------------------------"
+
+    {{- if .Values.dashboard.indexPatterns.archives.enabled }}
+    # Create wazuh-archives-* index pattern
+    create_index_pattern "wazuh-archives-*" "wazuh-archives-*" "@timestamp"
+    {{- end }}
+
+    {{- if .Values.dashboard.indexPatterns.alerts.enabled }}
+    # Create wazuh-alerts-* index pattern (usually exists by default)
+    create_index_pattern "wazuh-alerts-*" "wazuh-alerts-*" "@timestamp"
+    {{- end }}
+
+    {{- if .Values.dashboard.indexPatterns.monitoring.enabled }}
+    # Create wazuh-monitoring-* index pattern
+    create_index_pattern "wazuh-monitoring-*" "wazuh-monitoring-*" "@timestamp"
+    {{- end }}
+
+    {{- if .Values.dashboard.indexPatterns.statistics.enabled }}
+    # Create wazuh-statistics-* index pattern
+    create_index_pattern "wazuh-statistics-*" "wazuh-statistics-*" "@timestamp"
+    {{- end }}
+
+    echo ""
+    echo "========================================"
+    echo "Index pattern setup completed!"
+    echo "========================================"
+{{- end }}

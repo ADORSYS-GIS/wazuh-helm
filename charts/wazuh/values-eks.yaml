@@ -101,11 +101,3 @@ extraVolumeConfigs:
     resources:
       requests:
         storage: 10Gi
-  snort-alerts:
-    resources:
-      requests:
-        storage: 10Gi
-  owasp-zap-alerts:
-    resources:
-      requests:
-        storage: 10Gi

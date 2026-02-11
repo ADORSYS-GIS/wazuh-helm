@@ -1,0 +1,60 @@
+{{- if and .Values.indexer .Values.indexer.lifecycle .Values.indexer.lifecycle.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-ism-setup
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: ism-setup
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 8 }}
+        app.kubernetes.io/component: ism-setup
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: ism-setup
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - /scripts/setup-ism.sh
+          env:
+            - name: INDEXER_URL
+              value: "https://{{ include "common.names.fullname" $ }}-indexer:9200"
+            - name: INDEXER_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_USERNAME
+            - name: INDEXER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_PASSWORD
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-ism-policies
+            defaultMode: 0755
+{{- end }}

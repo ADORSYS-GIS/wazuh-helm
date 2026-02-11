@@ -1,0 +1,48 @@
+<!--
+  Custom Suricata rules for Wazuh
+  Enhanced rules that inherit from parent rule 86600
+-->
+
+<group name="ids,suricata,custom,">
+
+    <!-- Standalone Flow rule -->
+    <rule id="200603" level="3">
+        <decoded_as>json</decoded_as>
+        <field name="event_type">^flow$</field>
+        <description>Suricata: Network flow</description>
+        <group>netflow,suricata,</group>
+    </rule>
+
+    <!-- Standalone HTTP rule -->
+    <rule id="200605" level="4">
+        <decoded_as>json</decoded_as>
+        <field name="event_type">^http$</field>
+        <description>Suricata: HTTP request</description>
+        <group>web,suricata,</group>
+    </rule>
+
+    <!-- Standalone TLS rule -->
+    <rule id="200606" level="4">
+        <decoded_as>json</decoded_as>
+        <field name="event_type">^tls$</field>
+        <description>Suricata: TLS connection</description>
+        <group>ssl,suricata,</group>
+    </rule>
+
+    <!-- Standalone SSH rule -->
+    <rule id="200607" level="4">
+        <decoded_as>json</decoded_as>
+        <field name="event_type">^ssh$</field>
+        <description>Suricata: SSH connection</description>
+        <group>ssh,suricata,</group>
+    </rule>
+
+    <!-- Standalone File rule -->
+    <rule id="200608" level="4">
+        <decoded_as>json</decoded_as>
+        <field name="event_type">^files$</field>
+        <description>Suricata: File transfer</description>
+        <group>files,suricata,</group>
+    </rule>
+
+</group>

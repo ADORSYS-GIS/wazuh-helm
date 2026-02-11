@@ -1,0 +1,44 @@
+cluster.name: ${CLUSTER_NAME}
+node.name: ${NODE_NAME}
+network.host: ${NETWORK_HOST}
+discovery.seed_hosts:
+  - ${RELEASE_FULLNAME}-indexer-0.${DISCOVERY_SERVICE}
+  - ${RELEASE_FULLNAME}-indexer-1.${DISCOVERY_SERVICE}
+  - ${RELEASE_FULLNAME}-indexer-2.${DISCOVERY_SERVICE}
+cluster.initial_master_nodes:
+  - ${RELEASE_FULLNAME}-indexer-0
+  - ${RELEASE_FULLNAME}-indexer-1
+  - ${RELEASE_FULLNAME}-indexer-2
+node.max_local_storage_nodes: ${RELEASE_MAX_STORAGE_NODE}
+path.data: /var/lib/wazuh-indexer
+path.logs: /var/log/wazuh-indexer
+plugins.security.ssl.http.pemcert_filepath: /usr/share/wazuh-indexer/config/certs/indexer.pem
+plugins.security.ssl.http.pemkey_filepath: /usr/share/wazuh-indexer/config/certs/indexer-key.pem
+plugins.security.ssl.http.pemtrustedcas_filepath: /usr/share/wazuh-indexer/config/certs/root-ca.pem
+plugins.security.ssl.transport.pemcert_filepath: /usr/share/wazuh-indexer/config/certs/indexer.pem
+plugins.security.ssl.transport.pemkey_filepath: /usr/share/wazuh-indexer/config/certs/indexer-key.pem
+plugins.security.ssl.transport.pemtrustedcas_filepath: /usr/share/wazuh-indexer/config/certs/root-ca.pem
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.transport.enforce_hostname_verification: false
+plugins.security.ssl.transport.resolve_hostname: false
+plugins.security.authcz.admin_dn:
+  - CN=admin,O=Adorsys,L=Bayern,C=DE
+  - CN=*.admin,O=Adorsys,L=Bayern,C=DE
+plugins.security.check_snapshot_restore_write_privileges: true
+plugins.security.enable_snapshot_restore_privilege: true
+plugins.security.nodes_dn:
+  - CN=*.${RELEASE_FULLNAME}-indexer-api,O=Adorsys,L=Bayern,C=DE
+  - CN=${RELEASE_FULLNAME}-indexer-api,O=Adorsys,L=Bayern,C=DE
+  - CN=*.${RELEASE_FULLNAME}-indexer,O=Adorsys,L=Bayern,C=DE
+  - CN=${RELEASE_FULLNAME}-indexer,O=Adorsys,L=Bayern,C=DE
+plugins.security.restapi.roles_enabled:
+  - "all_access"
+  - "security_rest_api_access"
+plugins.security.allow_default_init_securityindex: true
+cluster.routing.allocation.disk.threshold_enabled: false
+compatibility.override_main_response_version: true
+
+# Email notification SMTP settings
+# NOTE: Email destinations in OpenSearch 2.x must be configured via the Alerting API,
+# not in opensearch.yml. Use the Wazuh Dashboard > Alerting > Destinations to configure.
+# See: https://opensearch.org/docs/latest/observing-your-data/alerting/monitors/

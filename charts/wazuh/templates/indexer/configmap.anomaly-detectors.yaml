@@ -1,0 +1,168 @@
+{{- if .Values.indexer.anomalyDetection.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-anomaly-detectors
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  setup-anomaly-detectors.sh: |
+    #!/bin/bash
+    set -e
+
+    INDEXER_URL="https://{{ include "common.names.fullname" $ }}-indexer-api:9200"
+    INDEXER_USER="${INDEXER_USERNAME}"
+    INDEXER_PASS="${INDEXER_PASSWORD}"
+
+    echo "Waiting for indexer to be ready..."
+    until curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" "${INDEXER_URL}/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+      echo "Waiting for indexer..."
+      sleep 5
+    done
+    echo "Indexer is ready."
+
+    create_detector() {
+      local name=$1
+      local description=$2
+      local filter=$3
+      local feature_name=$4
+
+      echo "Checking detector: ${name}..."
+
+      # Check if detector exists
+      existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+        -H "Content-Type: application/json" \
+        -d "{\"query\":{\"term\":{\"name.keyword\":\"${name}\"}}}" | jq -r '.hits.total.value // 0')
+
+      if [ "$existing" -gt 0 ]; then
+        echo "Detector ${name} already exists, skipping..."
+        return
+      fi
+
+      echo "Creating detector: ${name}..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"name\": \"${name}\",
+          \"description\": \"${description}\",
+          \"time_field\": \"timestamp\",
+          \"indices\": [\"wazuh-alerts-*\"],
+          \"filter_query\": ${filter},
+          \"detection_interval\": {\"period\": {\"interval\": 5, \"unit\": \"Minutes\"}},
+          \"window_delay\": {\"period\": {\"interval\": 1, \"unit\": \"Minutes\"}},
+          \"feature_attributes\": [{
+            \"feature_name\": \"${feature_name}\",
+            \"feature_enabled\": true,
+            \"aggregation_query\": {\"${feature_name}\": {\"value_count\": {\"field\": \"_id\"}}}
+          }]
+        }")
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector ${name} (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      else
+        echo "Failed to create detector: $(echo "$result" | jq -r '.error.reason // .')"
+      fi
+    }
+
+    # Create anomaly detectors
+    {{- if .Values.indexer.anomalyDetection.detectors.failedAuth.enabled }}
+    create_detector \
+      "failed-auth-anomaly" \
+      "Detects unusual spikes in failed authentication attempts" \
+      '{"bool":{"must":[{"term":{"rule.groups":"authentication_failed"}}]}}' \
+      "failed_auth_count"
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.fimChanges.enabled }}
+    create_detector \
+      "fim-changes-anomaly" \
+      "Detects unusual spikes in file integrity monitoring events" \
+      '{"bool":{"must":[{"term":{"rule.groups":"syscheck"}}]}}' \
+      "fim_event_count"
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.highSeverity.enabled }}
+    create_detector \
+      "high-severity-anomaly" \
+      "Detects unusual spikes in high severity alerts (level >= 10)" \
+      '{"bool":{"must":[{"range":{"rule.level":{"gte":10}}}]}}' \
+      "high_severity_count"
+    {{- end }}
+
+    {{- if .Values.indexer.anomalyDetection.detectors.blacklistProcess.enabled }}
+    # Blacklist process detector - detects running blacklisted apps regardless of install method
+    echo "Checking detector: blacklist-process-execution..."
+    existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/_search" \
+      -H "Content-Type: application/json" \
+      -d '{"query":{"term":{"name.keyword":"blacklist-process-execution"}}}' | jq -r '.hits.total.value // 0')
+
+    if [ "$existing" -eq 0 ]; then
+      echo "Creating detector: blacklist-process-execution..."
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "name": "blacklist-process-execution",
+          "description": "Detects execution of blacklisted applications regardless of installation method",
+          "time_field": "timestamp",
+          "indices": ["wazuh-alerts-*", "wazuh-archives-*"],
+          "filter_query": {
+            "bool": {
+              "should": [
+                {"wildcard": {"data.audit.command": "*teamviewer*"}},
+                {"wildcard": {"data.audit.command": "*anydesk*"}},
+                {"wildcard": {"data.audit.command": "*rustdesk*"}},
+                {"wildcard": {"data.audit.command": "*utorrent*"}},
+                {"wildcard": {"data.audit.command": "*bittorrent*"}},
+                {"wildcard": {"data.audit.command": "*qbittorrent*"}},
+                {"wildcard": {"data.audit.command": "*transmission*"}},
+                {"wildcard": {"data.audit.command": "*parsec*"}},
+                {"wildcard": {"data.audit.command": "*logmein*"}},
+                {"wildcard": {"data.audit.command": "*nmap*"}},
+                {"wildcard": {"data.audit.command": "*metasploit*"}},
+                {"wildcard": {"data.audit.command": "*burpsuite*"}},
+                {"wildcard": {"data.audit.command": "*wireshark*"}},
+                {"wildcard": {"data.audit.command": "*hashcat*"}},
+                {"wildcard": {"data.audit.command": "*xmrig*"}},
+                {"wildcard": {"data.audit.command": "*cpuminer*"}},
+                {"wildcard": {"data.audit.exe": "*teamviewer*"}},
+                {"wildcard": {"data.audit.exe": "*anydesk*"}},
+                {"wildcard": {"data.audit.exe": "*rustdesk*"}},
+                {"wildcard": {"process.name": "*teamviewer*"}},
+                {"wildcard": {"process.name": "*anydesk*"}},
+                {"wildcard": {"process.name": "*rustdesk*"}}
+              ],
+              "minimum_should_match": 1
+            }
+          },
+          "detection_interval": {"period": {"interval": 1, "unit": "Minutes"}},
+          "window_delay": {"period": {"interval": 1, "unit": "Minutes"}},
+          "feature_attributes": [{
+            "feature_name": "blacklist_exec_count",
+            "feature_enabled": true,
+            "aggregation_query": {"blacklist_exec_count": {"value_count": {"field": "_id"}}}
+          }]
+        }')
+
+      detector_id=$(echo "$result" | jq -r '._id // empty')
+      if [ -n "$detector_id" ]; then
+        echo "Starting detector blacklist-process-execution (${detector_id})..."
+        curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -X POST "${INDEXER_URL}/_plugins/_anomaly_detection/detectors/${detector_id}/_start"
+        echo ""
+      fi
+    else
+      echo "Detector blacklist-process-execution already exists, skipping..."
+    fi
+    {{- end }}
+
+    echo "Anomaly detector setup complete!"
+{{- end }}

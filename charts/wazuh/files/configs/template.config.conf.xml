@@ -105,6 +105,7 @@
         <skip_nfs>yes</skip_nfs>
     </sca>
 
+    <!-- Vulnerability detection -->
     <vulnerability-detection>
         <enabled>yes</enabled>
         <index-status>yes</index-status>
@@ -342,13 +343,12 @@
             <after_registration_time>1h</after_registration_time>
         </force>
         <purge>no</purge>
-        <use_password>no</use_password>
+        <use_password>${USE_PASSWORD_AUTH}</use_password>
         <ciphers>HIGH:!ADH:!EXP:!MD5:!RC4:!3DES:!CAMELLIA:@STRENGTH</ciphers>
-        <ssl_agent_ca>/etc/ssl/root-ca.pem</ssl_agent_ca>
         <ssl_verify_host>no</ssl_verify_host>
         <ssl_manager_cert>/var/ossec/etc/sslmanager.cert</ssl_manager_cert>
         <ssl_manager_key>/var/ossec/etc/sslmanager.key</ssl_manager_key>
-        <ssl_auto_negotiate>no</ssl_auto_negotiate>
+        <ssl_auto_negotiate>yes</ssl_auto_negotiate>
     </auth>
 
     <cluster>
@@ -368,12 +368,6 @@
     <localfile>
         <log_format>syslog</log_format>
         <location>/var/ossec/logs/active-responses.log</location>
-    </localfile>
-
-    <!-- Wazuh - Snort configuration -->
-    <localfile>
-        <location>/var/log/snort/*/alert_json.txt</location>
-        <log_format>json</log_format>
     </localfile>
 
     <!-- Wazuh - Manager - Yara configuration -->
@@ -414,12 +408,6 @@
         <rules_id>100302,100304</rules_id>
     </active-response>
 
-    <!-- Wazuh - Owasp-ZAP configuration -->
-    <localfile>
-        <location>/var/log/owasp-zap/*.jsonl</location>
-        <log_format>json</log_format>
-    </localfile>
-
     <!-- AWS configurations -->
     ${AWS_CONFIGS}
 
@@ -431,4 +419,7 @@
 
     <!-- Jira integration -->
     ${JIRA_CONFIG}
+
+    <!-- GitHub integration -->
+    ${GITHUB_CONFIGS}
 </ossec_config>
