@@ -1,0 +1,42 @@
+{{- if .Values.indexer.anomalyDetection.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-anomaly-detectors-{{ .Release.Revision }}
+  namespace: {{ include "common.names.namespace" $ }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: setup-anomaly-detectors
+          image: curlimages/curl:latest
+          command: ["/bin/sh", "/scripts/setup-anomaly-detectors.sh"]
+          env:
+            - name: INDEXER_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_USERNAME
+            - name: INDEXER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_PASSWORD
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-anomaly-detectors
+            defaultMode: 0755
+{{- end }}

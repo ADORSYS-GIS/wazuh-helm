@@ -1,0 +1,346 @@
+# Wazuh deployment for Talos Kubernetes with Ceph storage
+# Optimized for bare metal deployment with MetalLB and nginx-ingress
+
+global:
+  domain: wazuh.homelab.local
+  version: "4.14.2"
+  # Use Ceph RBD storage class
+  storageClassName: ceph-rbd
+
+# Storage configuration for Ceph
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    enabled: false  # Use existing ceph-rbd storage class
+
+# API credentials for Wazuh
+apiCred:
+  auth:
+    username: wazuh-admin
+    password: "SecurePassword123!"  # Change this!
+
+# Wazuh Manager Master configuration
+master:
+  replicaCount: 1
+
+  # Resource limits - master needs more memory for analysisd
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 6Gi
+
+  # Persistent storage for master data
+  persistence:
+    storageClassName: ceph-rbd
+    size: 50Gi
+    accessModes:
+      - ReadWriteOnce
+
+  # Use emptyDir for backup to avoid RBD multi-attach
+  volumes:
+    - name: manager-backup
+      emptyDir: {}
+
+  volumeMounts: []
+
+  # Node affinity - prefer control plane nodes
+  nodeSelector: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+# Wazuh Manager Worker configuration
+worker:
+  replicaCount: 2
+
+  # Resource limits - workers need moderate memory
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 5Gi
+
+  # Persistent storage for worker data
+  persistence:
+    storageClassName: ceph-rbd
+    size: 50Gi
+    accessModes:
+      - ReadWriteOnce
+
+  # Service configuration - expose via LoadBalancer for agent connections
+  service:
+    type: LoadBalancer
+    # MetalLB will assign IP from pool (e.g., 192.168.178.201)
+    annotations:
+      metallb.universe.tf/allow-shared-ip: "wazuh-manager"
+    ports:
+      - name: registration
+        port: 1515
+        targetPort: registration
+        protocol: TCP
+      - name: agents-events
+        port: 1514
+        targetPort: agents-events
+        protocol: TCP
+
+  # Use emptyDir for backup to avoid RBD multi-attach
+  volumes:
+    - name: manager-backup
+      emptyDir: {}
+
+  # Node affinity - prefer control plane nodes
+  nodeSelector: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+# Wazuh Indexer (OpenSearch) configuration
+indexer:
+  # Disable Keycloak/OpenID authentication (use basic auth)
+  keycloak:
+    enabled: false
+
+  # Number of indexer replicas
+  replicas: 3
+
+  # Java heap size - ~40% of memory limit (leave room for OS and OpenSearch overhead)
+  # 1.5GB heap for 4Gi container is a safe balance
+  env:
+    - name: OPENSEARCH_JAVA_OPTS
+      value: '-Xms1536m -Xmx1536m -Dlog4j2.formatMsgNoLookups=true'
+
+  # Resource limits - optimized for 8GB nodes
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  # Persistent storage for indexer data (logs and events)
+  persistence:
+    enabled: true
+    storageClassName: ceph-rbd
+    size: 50Gi  # Adjust based on log volume
+    accessModes:
+      - ReadWriteOnce
+
+  # Service configuration
+  service:
+    type: ClusterIP
+
+  # Node affinity - prefer nodes with more resources
+  nodeSelector: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+  # Index State Management (ISM) lifecycle policies
+  # Automatically delete old indices to prevent disk from filling up
+  lifecycle:
+    enabled: true
+    alerts:
+      warmAfterDays: 7    # Move to warm state after 7 days (reduces replicas)
+      deleteAfterDays: 90  # Delete alerts after 90 days
+    archives:
+      deleteAfterDays: 30  # Delete archives after 30 days
+    statistics:
+      deleteAfterDays: 56  # Delete statistics after 56 days (8 weeks)
+    monitoring:
+      deleteAfterDays: 28  # Delete monitoring data after 28 days (4 weeks)
+    states:
+      # State/inventory indices (includes browser-extensions, services, etc.)
+      # These are refreshed regularly, old data becomes stale
+      forceMergeAfterDays: 7   # Force merge segments after 7 days (cleanup deleted docs)
+      readOnlyAfterDays: 14    # Make read-only after 14 days
+      deleteAfterDays: 90      # Delete state data older than 90 days
+
+  # OpenSearch Alerting - Monitors for detecting unauthorized applications
+  # Monitors the blacklist rules (750010-750091) and sends alerts
+  alerting:
+    enabled: true
+    monitors:
+      # General unauthorized applications (P2P, VPN, Gaming, etc.)
+      unauthorizedApps:
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 30
+      # Critical tools (Hacking tools, Crypto miners) - check frequently
+      criticalTools:
+        intervalMinutes: 1
+        lookbackMinutes: 2
+        throttleMinutes: 5
+      # Remote access tools (TeamViewer, AnyDesk, etc.)
+      remoteAccess:
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 15
+      # Security software removal detection
+      securityRemoval:
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 5
+
+# Filebeat configuration
+filebeat:
+  # Enable archives indexing (in addition to alerts)
+  # Set to true to index all events, not just alerts
+  archives:
+    enabled: true
+  # SSL verification mode for OpenSearch connection
+  ssl:
+    verification_mode: full  # Options: full, none, certificate
+
+# Wazuh Dashboard configuration
+dashboard:
+  # Number of dashboard replicas
+  replicas: 1
+
+  # Resource limits
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  # Service configuration
+  service:
+    type: ClusterIP
+
+  # Ingress configuration for web UI access
+  ingress:
+    enabled: true
+    name: wazuh-dashboard
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-staging"  # Change to production when ready
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    host: "wazuh.homelab.local"  # Change to your domain
+    port: 5601
+    tls:
+      enabled: true
+      useSecret: true
+
+  # Node affinity
+  nodeSelector: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+  # Index patterns - create wazuh-archives-* for viewing all events in Discover
+  indexPatterns:
+    enabled: true
+    archives:
+      enabled: true  # Required since filebeat.archives.enabled is true
+    alerts:
+      enabled: false  # Already exists by default
+    monitoring:
+      enabled: false
+    statistics:
+      enabled: false
+
+# Cluster certificate configuration
+cluster:
+  rootCaSecretName: wazuh-root-ca  # Use self-signed root CA
+  # Agent registration authentication
+  auth:
+    # Cluster key for internal communication
+    key: "dfbb2c1b9d679c39af94d5c1c821c952"
+    # Enable password-based agent registration (simpler for homelab)
+    usePassword: true
+    # Password for agent registration
+    agentPassword: "wazuh123"
+
+# Service overrides
+svcs:
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: true
+    type: LoadBalancer
+    annotations:
+      metallb.universe.tf/allow-shared-ip: "wazuh-manager"
+    ports:
+      - name: registration
+        port: 1515
+        targetPort: registration
+        protocol: TCP
+      - name: agents-events
+        port: 1514
+        targetPort: agents-events
+        protocol: TCP
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: worker
+
+# Security context - wazuh user/group is 999 in the container
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  fsGroup: 999
+
+# Disable shared PVCs to avoid RBD multi-attach errors
+# These volumes are redefined as emptyDir in master.volumes and worker.volumes
+extraVolumeConfigs:
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    enabled: false
+
+# Notification configuration
+notification:
+  slack:
+    enabled: false
+    # webhookUrl: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+  # Email notification settings (OpenSearch Notifications)
+  # Credentials are stored in OpenSearch keystore for security
+  email:
+    enabled: true
+    # SMTP account name (used in keystore and notification channel)
+    accountName: "wazuh-smtp-account"
+    # SMTP server configuration
+    host: "smtp.gmail.com"
+    port: 587
+    method: "starttls"
+    # Sender email address
+    from: "tech@skyengpro.com"
+    # SMTP authentication
+    username: "tech@skyengpro.com"
+    password: ""  # For Gmail, use App Password
+    # Use existing secret instead (optional)
+    # existingSecret: "my-smtp-secret"
+    # Recipients for alerts
+    recipients:
+      - "tech@skyengpro.com"
+      - "yannick.siewe@gmail.com"
+
+  # GitHub Issues notification - creates tickets for security alerts
+  github:
+    enabled: true
+    owner: "skyengpro"
+    repo: "security-alerts"
+    token: ""  # Set via --set notification.github.token=<your-token>
+    labels:
+      - "security-alert"
+      - "wazuh"
+
+integration:
+  jira:
+    enabled: false
+  azure:
+    enabled: false
+  aws:
+    enabled: false
+
+  # GitHub Audit Log monitoring (DISABLED)
+  # NOTE: Requires GitHub Enterprise Cloud - not available for regular orgs
+  # https://documentation.wazuh.com/current/cloud-security/github/index.html
+  github: []

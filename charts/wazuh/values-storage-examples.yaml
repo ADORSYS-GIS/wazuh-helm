@@ -1,0 +1,132 @@
+# Storage Class Examples for Different Kubernetes Environments
+# Usage: helm install wazuh . -f values-storage-examples.yaml
+# Uncomment the section matching your environment
+
+# ============================================
+# Docker Desktop (macOS/Windows)
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     provisioner: docker.io/hostpath
+#     volumeBindingMode: Immediate
+
+# ============================================
+# Minikube
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     provisioner: k8s.io/minikube-hostpath
+#     volumeBindingMode: WaitForFirstConsumer
+
+# ============================================
+# MicroK8s
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     provisioner: microk8s.io/hostpath
+#     volumeBindingMode: WaitForFirstConsumer
+#     reclaimPolicy: Delete
+
+# ============================================
+# K3s (Rancher Local Path)
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     provisioner: rancher.io/local-path
+#     volumeBindingMode: WaitForFirstConsumer
+
+# ============================================
+# Longhorn
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     provisioner: driver.longhorn.io
+#     volumeBindingMode: Immediate
+#     allowVolumeExpansion: true
+
+# ============================================
+# OpenEBS
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     provisioner: openebs.io/local
+#     volumeBindingMode: WaitForFirstConsumer
+
+# ============================================
+# AWS EBS (gp3)
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     enabled: false
+#   '{{ include "common.names.fullname" $ }}-ebs':
+#     enabled: true
+#     provisioner: ebs.csi.aws.com
+#     parameters:
+#       encrypted: 'true'
+#       type: gp3
+#     volumeBindingMode: WaitForFirstConsumer
+#     reclaimPolicy: Retain
+#
+# indexer:
+#   persistence:
+#     storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
+# worker:
+#   persistence:
+#     storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
+# worker_integration:
+#   persistence:
+#     storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
+# master:
+#   persistence:
+#     storageClassName: '{{ include "common.names.fullname" $ }}-ebs'
+
+# ============================================
+# AWS EFS (for shared volumes)
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     enabled: false
+#   '{{ include "common.names.fullname" $ }}-efs':
+#     enabled: true
+#     provisioner: efs.csi.aws.com
+#     parameters:
+#       basePath: /wazuh-data
+#       directoryPerms: '775'
+#       fileSystemId: '<YOUR-EFS-FILESYSTEM-ID>'
+#       uid: '0'
+#       gid: '0'
+#       provisioningMode: efs-ap
+#     reclaimPolicy: Retain
+#
+# extraVolumeConfigs:
+#   '{{ include "common.names.fullname" $ }}-manager-backup':
+#     storageClassName: '{{ include "common.names.fullname" $ }}-efs'
+#     accessModes:
+#       - ReadWriteMany
+
+# ============================================
+# GKE Persistent Disk + Filestore
+# ============================================
+# storageClasses:
+#   '{{ include "wazuh.storageClassName" $ }}':
+#     allowVolumeExpansion: true
+#     parameters:
+#       type: pd-balanced
+#     provisioner: pd.csi.storage.gke.io
+#     reclaimPolicy: Delete
+#     volumeBindingMode: WaitForFirstConsumer
+#   '{{ include "common.names.fullname" $ }}-rwx':
+#     parameters:
+#       tier: standard
+#       network: <YOUR-VPC-NAME>
+#     enabled: true
+#     provisioner: filestore.csi.storage.gke.io
+#     reclaimPolicy: Delete
+#     volumeBindingMode: WaitForFirstConsumer
+#     allowVolumeExpansion: true
+#
+# extraVolumeConfigs:
+#   '{{ include "common.names.fullname" $ }}-manager-backup':
+#     storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+#     accessModes:
+#       - ReadWriteMany

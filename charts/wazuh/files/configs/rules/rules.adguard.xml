@@ -1,0 +1,119 @@
+<!--
+  AdGuard Home DNS Security Rules
+  Monitors DNS queries for security threats
+
+  Rule ID Range: 110000-110099
+-->
+<group name="adguard,dns,">
+
+  <!-- Base rule for AdGuard DNS logs -->
+  <rule id="110000" level="0">
+    <match>^{"T":"</match>
+    <description>AdGuard Home DNS query log</description>
+  </rule>
+
+  <!-- DNS query allowed -->
+  <rule id="110001" level="3">
+    <if_sid>110000</if_sid>
+    <field name="Result.IsFiltered">false</field>
+    <description>AdGuard: DNS query allowed - $(QH)</description>
+    <group>adguard_allowed,</group>
+  </rule>
+
+  <!-- DNS query blocked by filter -->
+  <rule id="110002" level="5">
+    <if_sid>110000</if_sid>
+    <field name="Result.IsFiltered">true</field>
+    <description>AdGuard: DNS query BLOCKED - $(QH)</description>
+    <group>adguard_blocked,</group>
+  </rule>
+
+  <!-- Multiple blocked queries from same client (potential malware) -->
+  <rule id="110003" level="10" frequency="10" timeframe="60">
+    <if_matched_sid>110002</if_matched_sid>
+    <same_field>IP</same_field>
+    <description>AdGuard: High volume of blocked DNS queries from $(IP) - possible malware</description>
+    <group>adguard_malware_suspect,</group>
+  </rule>
+
+  <!-- Suspicious domain patterns - potential C2 -->
+  <rule id="110010" level="12">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">^[a-z0-9]{20,}\.</field>
+    <description>AdGuard: Suspicious long random domain - possible C2 - $(QH)</description>
+    <group>adguard_c2_suspect,threat_intel,</group>
+  </rule>
+
+  <!-- DNS tunneling detection - TXT queries -->
+  <rule id="110011" level="8">
+    <if_sid>110000</if_sid>
+    <field name="QT">TXT</field>
+    <description>AdGuard: TXT record query - potential DNS tunneling - $(QH)</description>
+    <group>adguard_tunnel_suspect,</group>
+  </rule>
+
+  <!-- High frequency TXT queries (DNS exfiltration) -->
+  <rule id="110012" level="14" frequency="20" timeframe="60">
+    <if_matched_sid>110011</if_matched_sid>
+    <same_field>IP</same_field>
+    <description>AdGuard: High volume TXT queries from $(IP) - DNS exfiltration suspected</description>
+    <group>adguard_exfiltration,data_exfiltration,</group>
+  </rule>
+
+  <!-- Known malicious TLDs -->
+  <rule id="110020" level="10">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">\.(tk|ml|ga|cf|gq|buzz|top|loan|work|click)$</field>
+    <description>AdGuard: Query to high-risk TLD - $(QH)</description>
+    <group>adguard_risky_tld,threat_intel,</group>
+  </rule>
+
+  <!-- Cryptocurrency mining domains -->
+  <rule id="110021" level="8">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">(coinhive|cryptoloot|coin-hive|minero|cryptonight|minergate)</field>
+    <description>AdGuard: Cryptomining domain detected - $(QH)</description>
+    <group>adguard_cryptominer,malware,</group>
+  </rule>
+
+  <!-- Phishing patterns -->
+  <rule id="110022" level="10">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">(login|signin|account|secure|update|verify).*(paypal|apple|microsoft|google|amazon)</field>
+    <description>AdGuard: Potential phishing domain - $(QH)</description>
+    <group>adguard_phishing,threat_intel,</group>
+  </rule>
+
+  <!-- Dynamic DNS services (often used by malware) -->
+  <rule id="110023" level="6">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">\.(duckdns|no-ip|dynu|freedns|hopto|zapto)\.(org|net)$</field>
+    <description>AdGuard: Dynamic DNS domain queried - $(QH)</description>
+    <group>adguard_ddns,</group>
+  </rule>
+
+  <!-- Tor exit nodes / .onion related -->
+  <rule id="110024" level="10">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">(torproject|onion\.|exit.*node)</field>
+    <description>AdGuard: Tor-related domain queried - $(QH)</description>
+    <group>adguard_tor,anonymizer,</group>
+  </rule>
+
+  <!-- VPN/Proxy services -->
+  <rule id="110025" level="5">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">(nordvpn|expressvpn|surfshark|protonvpn|hidemyass)</field>
+    <description>AdGuard: VPN service domain queried - $(QH)</description>
+    <group>adguard_vpn,</group>
+  </rule>
+
+  <!-- Newly registered domain pattern (short random + new TLD) -->
+  <rule id="110026" level="8">
+    <if_sid>110001</if_sid>
+    <field name="QH" type="pcre2">^[a-z0-9]{5,12}\.(xyz|online|site|club|icu|top)$</field>
+    <description>AdGuard: Suspicious newly-registered domain pattern - $(QH)</description>
+    <group>adguard_nrd_suspect,threat_intel,</group>
+  </rule>
+
+</group>

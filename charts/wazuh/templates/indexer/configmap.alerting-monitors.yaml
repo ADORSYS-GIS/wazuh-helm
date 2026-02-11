@@ -1,0 +1,809 @@
+{{- if and .Values.indexer .Values.indexer.alerting .Values.indexer.alerting.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-alerting-monitors
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  setup-alerting-monitors.sh: |
+    #!/bin/sh
+    # OpenSearch Alerting Monitors Setup Script
+    # Creates monitors for detecting unauthorized applications
+
+    # Don't exit on error - we handle errors manually
+    # set -e
+
+    INDEXER_URL="${INDEXER_URL:-https://wazuh-wazuh-helm-indexer:9200}"
+    INDEXER_USER="${INDEXER_USERNAME:-admin}"
+    INDEXER_PASS="${INDEXER_PASSWORD}"
+
+    {{- if .Values.notification.slack.enabled }}
+    SLACK_WEBHOOK="{{ .Values.notification.slack.webhookUrl }}"
+    {{- end }}
+    {{- if and .Values.notification.email .Values.notification.email.enabled }}
+    EMAIL_HOST="{{ .Values.notification.email.host }}"
+    EMAIL_PORT="{{ .Values.notification.email.port }}"
+    EMAIL_METHOD="{{ .Values.notification.email.method | default "starttls" }}"
+    EMAIL_FROM="{{ .Values.notification.email.from }}"
+    EMAIL_USERNAME="{{ .Values.notification.email.username }}"
+    EMAIL_PASSWORD="{{ .Values.notification.email.password }}"
+    EMAIL_RECIPIENTS="{{ .Values.notification.email.recipients | join "," }}"
+    {{- end }}
+
+    echo "========================================"
+    echo "OpenSearch Alerting Monitors Setup"
+    echo "========================================"
+
+    # Wait for indexer to be ready
+    echo "Waiting for indexer to be ready..."
+    max_attempts=60
+    attempt=0
+    until curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" "${INDEXER_URL}/_cluster/health" 2>/dev/null | grep -q '"status":"green"\|"status":"yellow"'; do
+      attempt=$((attempt + 1))
+      if [ $attempt -ge $max_attempts ]; then
+        echo "ERROR: Indexer not ready after ${max_attempts} attempts"
+        exit 1
+      fi
+      echo "Indexer not ready (attempt ${attempt}/${max_attempts}), waiting..."
+      sleep 5
+    done
+    echo "Indexer is ready!"
+
+    # Function to create or update a destination (notification channel)
+    create_destination() {
+      dest_name=$1
+      dest_type=$2
+      webhook_url=$3
+
+      echo "Creating notification destination: ${dest_name}"
+
+      # Check if destination exists (404 is expected on fresh install)
+      existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_alerting/destinations" 2>/dev/null || echo "{}")
+
+      if echo "$existing" | grep -q "\"name\":\"${dest_name}\""; then
+        echo "  Destination ${dest_name} already exists, skipping..."
+        return 0
+      fi
+
+      curl -s -k -X POST "${INDEXER_URL}/_plugins/_alerting/destinations" \
+        -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -H 'Content-Type: application/json' \
+        -d '{
+          "name": "'"${dest_name}"'",
+          "type": "slack",
+          "slack": {
+            "url": "'"${webhook_url}"'"
+          }
+        }'
+      echo ""
+    }
+
+    # Function to get destination ID by name
+    get_destination_id() {
+      dest_name=$1
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_alerting/destinations" 2>/dev/null || echo "{}")
+      echo "$result" | \
+        grep -o '"id":"[^"]*","type":"[^"]*","name":"'"${dest_name}"'"' | \
+        grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true
+    }
+
+    # Function to create or update a monitor
+    create_monitor() {
+      monitor_name=$1
+      monitor_json=$2
+
+      echo "Creating/updating monitor: ${monitor_name}"
+
+      # Search for existing monitor with exact name match (404 is expected on fresh install)
+      search_result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_alerting/monitors/_search" \
+        -H 'Content-Type: application/json' \
+        -d '{"query":{"term":{"monitor.name.keyword":"'"${monitor_name}"'"}}}' 2>/dev/null || echo "{}")
+
+      # Check if we found a matching monitor
+      hits_total=$(echo "$search_result" | grep -o '"total":{"value":[0-9]*' | head -1 | grep -o '[0-9]*$')
+
+      if [ "$hits_total" != "" ] && [ "$hits_total" -gt 0 ]; then
+        # Extract monitor ID from the hits
+        monitor_id=$(echo "$search_result" | grep -o '"hits":\[{"_index":"[^"]*","_id":"[^"]*"' | grep -o '"_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [ -n "$monitor_id" ] && [ "$monitor_id" != "" ]; then
+          echo "  Monitor exists with ID: ${monitor_id}, updating..."
+          curl -s -k -X PUT "${INDEXER_URL}/_plugins/_alerting/monitors/${monitor_id}" \
+            -u "${INDEXER_USER}:${INDEXER_PASS}" \
+            -H 'Content-Type: application/json' \
+            -d "${monitor_json}"
+          echo ""
+          return 0
+        fi
+      fi
+
+      # Create new monitor
+      echo "  Creating new monitor..."
+      curl -s -k -X POST "${INDEXER_URL}/_plugins/_alerting/monitors" \
+        -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -H 'Content-Type: application/json' \
+        -d "${monitor_json}"
+      echo ""
+    }
+
+    {{- if .Values.notification.slack.enabled }}
+    # Create Slack notification channel using OpenSearch Notifications plugin
+    echo "Creating Slack notification channel..."
+
+    # Delete existing Slack channel to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-slack-channel" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    SLACK_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-slack-channel",
+        "config": {
+          "name": "wazuh-slack-alerts",
+          "description": "Wazuh Slack Alerts Channel",
+          "config_type": "slack",
+          "is_enabled": true,
+          "slack": {
+            "url": "'"${SLACK_WEBHOOK}"'"
+          }
+        }
+      }' 2>/dev/null)
+    echo "Slack Response: $SLACK_RESPONSE"
+
+    SLACK_DEST_ID="wazuh-slack-channel"
+    echo "Slack destination ID: ${SLACK_DEST_ID}"
+    {{- end }}
+
+    {{- if and .Values.notification.email .Values.notification.email.enabled }}
+    # Create Email notification channel using OpenSearch Notifications plugin
+    echo "Configuring email notification channels..."
+
+    # Delete existing SMTP config to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-smtp-account" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating SMTP account..."
+    # Note: method must be "start_tls" (not "starttls"), "ssl", or "none"
+    SMTP_METHOD_FIXED=$(echo "${EMAIL_METHOD}" | sed 's/starttls/start_tls/')
+    SMTP_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-smtp-account",
+        "config": {
+          "name": "wazuh-smtp-account",
+          "description": "Wazuh SMTP Account for alerts",
+          "config_type": "smtp_account",
+          "is_enabled": true,
+          "smtp_account": {
+            "host": "'"${EMAIL_HOST}"'",
+            "port": '"${EMAIL_PORT}"',
+            "method": "'"${SMTP_METHOD_FIXED}"'",
+            "from_address": "'"${EMAIL_FROM}"'"
+          }
+        }
+      }' 2>/dev/null)
+    echo "SMTP Response: $SMTP_RESPONSE"
+
+    # Delete existing email group to update it with current recipients
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-email-group" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating email group..."
+    GROUP_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-email-group",
+        "config": {
+          "name": "wazuh-security-team",
+          "description": "Wazuh Security Team Recipients",
+          "config_type": "email_group",
+          "is_enabled": true,
+          "email_group": {
+            "recipient_list": [
+              {{- $recipients := .Values.notification.email.recipients }}
+              {{- range $i, $email := $recipients }}
+              {{- if $i }},{{ end }}
+              {"recipient": "{{ $email }}"}
+              {{- end }}
+            ]
+          }
+        }
+      }' 2>/dev/null)
+    echo "Email Group Response: $GROUP_RESPONSE"
+
+    # Delete existing email channel to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-email-channel" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating email notification channel..."
+    CHANNEL_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-email-channel",
+        "config": {
+          "name": "wazuh-email-alerts",
+          "description": "Wazuh Email Alerts Channel",
+          "config_type": "email",
+          "is_enabled": true,
+          "email": {
+            "email_account_id": "wazuh-smtp-account",
+            "recipient_list": [
+              {{- $recipients := .Values.notification.email.recipients }}
+              {{- range $i, $email := $recipients }}
+              {{- if $i }},{{ end }}
+              {"recipient": "{{ $email }}"}
+              {{- end }}
+            ],
+            "email_group_id_list": ["wazuh-email-group"]
+          }
+        }
+      }' 2>/dev/null)
+    echo "Email Channel Response: $CHANNEL_RESPONSE"
+
+    EMAIL_DEST_ID="wazuh-email-channel"
+    echo "Email destination ID: ${EMAIL_DEST_ID}"
+    {{- end }}
+
+    {{- if and .Values.notification.github .Values.notification.github.enabled }}
+    # Create GitHub webhook notification channel for creating issues
+    echo "Creating GitHub webhook notification channel..."
+
+    GITHUB_OWNER="{{ .Values.notification.github.owner }}"
+    GITHUB_REPO="{{ .Values.notification.github.repo }}"
+    GITHUB_TOKEN="{{ .Values.notification.github.token }}"
+    GITHUB_LABELS='{{ .Values.notification.github.labels | toJson }}'
+
+    # Delete existing GitHub webhook config to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-github-webhook" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating GitHub webhook..."
+    GITHUB_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-github-webhook",
+        "config": {
+          "name": "wazuh-github-issues",
+          "description": "Wazuh GitHub Issues Webhook",
+          "config_type": "webhook",
+          "is_enabled": true,
+          "webhook": {
+            "url": "https://api.github.com/repos/'"${GITHUB_OWNER}"'/'"${GITHUB_REPO}"'/issues",
+            "header_params": {
+              "Authorization": "Bearer '"${GITHUB_TOKEN}"'",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28"
+            },
+            "method": "POST"
+          }
+        }
+      }' 2>/dev/null)
+    echo "GitHub Webhook Response: $GITHUB_RESPONSE"
+
+    GITHUB_DEST_ID="wazuh-github-webhook"
+    echo "GitHub destination ID: ${GITHUB_DEST_ID}"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 1: Unauthorized Application Installations
+    # Detects blacklisted software installations (Rules 750010-750091)
+    # ================================================================
+
+    UNAUTHORIZED_APP_MONITOR='{
+      "name": "Unauthorized Application Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.unauthorizedApps.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.unauthorizedApps.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "unauthorized_software"}},
+                          {"match": {"rule.groups": "remote_access"}},
+                          {"match": {"rule.groups": "hacking_tool"}},
+                          {"match": {"rule.groups": "cryptominer"}},
+                          {"match": {"rule.groups": "p2p"}},
+                          {"range": {"rule.id": {"gte": 750010, "lte": 750091}}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_category": {
+                  "terms": {
+                    "field": "rule.groups",
+                    "size": 10
+                  }
+                },
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 10
+                  }
+                },
+                "by_app": {
+                  "terms": {
+                    "field": "data.program.name",
+                    "size": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Unauthorized App Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Unauthorized App",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.unauthorizedApps.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":rotating_light: *SECURITY ALERT: Unauthorized Application Detected*\n\n*Summary:*\n- Total detections: {{`{{ctx.results[0].hits.total.value}}`}}\n- Time: {{`{{ctx.periodEnd}}`}}\n\n*Applications Detected:*\n{{`{{#ctx.results[0].aggregations.by_app.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} occurrences\n{{`{{/ctx.results[0].aggregations.by_app.buckets}}`}}\n\n*Affected Agents:*\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} alerts\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\n\n*Categories:*\n{{`{{#ctx.results[0].aggregations.by_category.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}}\n{{`{{/ctx.results[0].aggregations.by_category.buckets}}`}}\n\n:mag: Check Wazuh Dashboard for details.",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Unauthorized App",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.unauthorizedApps.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH ALERT] Unauthorized Application Detected",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "SECURITY ALERT: Unauthorized Application Detected\n\nSummary:\n- Total detections: {{`{{ctx.results[0].hits.total.value}}`}}\n- Time: {{`{{ctx.periodEnd}}`}}\n\nApplications Detected:\n{{`{{#ctx.results[0].aggregations.by_app.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} occurrences\n{{`{{/ctx.results[0].aggregations.by_app.buckets}}`}}\n\nAffected Agents:\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} alerts\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\n\nPlease check Wazuh Dashboard for details.",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Unauthorized App",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.unauthorizedApps.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH] Unauthorized Application Detected\",\"body\":\"## Security Alert\\n\\n**Total detections:** {{`{{ctx.results[0].hits.total.value}}`}}\\n**Time:** {{`{{ctx.periodEnd}}`}}\\n\\n### Applications Detected\\n{{`{{#ctx.results[0].aggregations.by_app.buckets}}`}}\\n- {{`{{key}}`}}: {{`{{doc_count}}`}} occurrences\\n{{`{{/ctx.results[0].aggregations.by_app.buckets}}`}}\\n\\n### Affected Agents\\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\\n- {{`{{key}}`}}: {{`{{doc_count}}`}} alerts\\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\\n\\n---\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"unauthorized-app\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Unauthorized Application Monitor" "$UNAUTHORIZED_APP_MONITOR"
+
+    # ================================================================
+    # MONITOR 2: Critical Security Tools Detection
+    # Specifically monitors for hacking tools and crypto miners
+    # ================================================================
+
+    CRITICAL_TOOLS_MONITOR='{
+      "name": "Critical Hacking Tools Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.criticalTools.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.criticalTools.lookbackMinutes | default 2 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "hacking_tool"}},
+                          {"match": {"rule.groups": "cryptominer"}},
+                          {"term": {"rule.id": 750030}},
+                          {"term": {"rule.id": 750040}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Critical Tool Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Critical Tool",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalTools.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":skull_and_crossbones: *CRITICAL SECURITY ALERT*\n\n*Hacking Tool or Crypto Miner Detected!*\n\n{{`{{#ctx.results[0].hits.hits}}`}}\n:warning: *Agent:* {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\n*Rule:* {{`{{_source.rule.description}}`}}\n*Program:* {{`{{_source.data.program.name}}`}}\n*Level:* {{`{{_source.rule.level}}`}}\n*Time:* {{`{{_source.timestamp}}`}}\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:rotating_light: *Immediate investigation required!*",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Critical Tool",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalTools.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL] Hacking Tool or Crypto Miner Detected!",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "CRITICAL SECURITY ALERT\n\nHacking Tool or Crypto Miner Detected!\n\n{{`{{#ctx.results[0].hits.hits}}`}}\nAgent: {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\nRule: {{`{{_source.rule.description}}`}}\nProgram: {{`{{_source.data.program.name}}`}}\nLevel: {{`{{_source.rule.level}}`}}\nTime: {{`{{_source.timestamp}}`}}\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\nIMMEDIATE INVESTIGATION REQUIRED!",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Critical Tool",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalTools.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL] Hacking Tool or Crypto Miner Detected!\",\"body\":\"## Critical Security Alert\\n\\n**Hacking Tool or Crypto Miner Detected!**\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Detection Details\\n- **Agent:** {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\\n- **Rule:** {{`{{_source.rule.description}}`}}\\n- **Program:** {{`{{_source.data.program.name}}`}}\\n- **Level:** {{`{{_source.rule.level}}`}}\\n- **Time:** {{`{{_source.timestamp}}`}}\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n⚠️ **IMMEDIATE INVESTIGATION REQUIRED!**\\n\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"critical\",\"hacking-tool\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Critical Hacking Tools Monitor" "$CRITICAL_TOOLS_MONITOR"
+
+    # ================================================================
+    # MONITOR 3: Remote Access Tools Detection
+    # Monitors for unauthorized remote access software
+    # ================================================================
+
+    REMOTE_ACCESS_MONITOR='{
+      "name": "Remote Access Tools Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.remoteAccess.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.remoteAccess.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "remote_access"}},
+                          {"term": {"rule.id": 750010}},
+                          {"term": {"rule.id": 750070}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Remote Access Tool Detected",
+          "severity": "2",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Remote Access",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.remoteAccess.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":computer: *ALERT: Remote Access Tool Detected*\n\n*Potential unauthorized remote access software found!*\n\n{{`{{#ctx.results[0].hits.hits}}`}}\n:warning: *Agent:* {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\n*Tool:* {{`{{_source.data.program.name}}`}}\n*Rule:* {{`{{_source.rule.description}}`}}\n*MITRE:* T1219 (Remote Access Software)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:eyes: Please verify if this is authorized.",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Remote Access",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.remoteAccess.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH] Remote Access Tool Detected",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "ALERT: Remote Access Tool Detected\n\nPotential unauthorized remote access software found!\n\n{{`{{#ctx.results[0].hits.hits}}`}}\nAgent: {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\nTool: {{`{{_source.data.program.name}}`}}\nRule: {{`{{_source.rule.description}}`}}\nMITRE: T1219 (Remote Access Software)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\nPlease verify if this is authorized.",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Remote Access",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.remoteAccess.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH] Remote Access Tool Detected\",\"body\":\"## Remote Access Tool Alert\\n\\n**Potential unauthorized remote access software found!**\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Detection Details\\n- **Agent:** {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\\n- **Tool:** {{`{{_source.data.program.name}}`}}\\n- **Rule:** {{`{{_source.rule.description}}`}}\\n- **MITRE:** T1219 (Remote Access Software)\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n⚠️ Please verify if this is authorized.\\n\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"remote-access\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Remote Access Tools Monitor" "$REMOTE_ACCESS_MONITOR"
+
+    # ================================================================
+    # MONITOR 4: Security Software Removal Detection
+    # Detects when security software is uninstalled
+    # ================================================================
+
+    SECURITY_REMOVAL_MONITOR='{
+      "name": "Security Software Removal Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.securityRemoval.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.securityRemoval.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "security_software_removed"}},
+                          {"match": {"rule.groups": "defense_evasion"}},
+                          {"term": {"rule.id": 750091}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Security Software Removed",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Security Removal",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.securityRemoval.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":shield: *CRITICAL: Security Software Removed*\n\n*Potential defense evasion detected!*\n\n{{`{{#ctx.results[0].hits.hits}}`}}\n:rotating_light: *Agent:* {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\n*Removed:* {{`{{_source.data.program.name}}`}}\n*MITRE:* T1562.001 (Disable or Modify Tools)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:warning: *Immediate investigation required!*",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Security Removal",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.securityRemoval.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL] Security Software Removed - Defense Evasion Detected",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "CRITICAL: Security Software Removed\n\nPotential defense evasion detected!\n\n{{`{{#ctx.results[0].hits.hits}}`}}\nAgent: {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\nRemoved: {{`{{_source.data.program.name}}`}}\nMITRE: T1562.001 (Disable or Modify Tools)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\nIMMEDIATE INVESTIGATION REQUIRED!",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Security Removal",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.securityRemoval.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL] Security Software Removed - Defense Evasion\",\"body\":\"## Critical Security Alert\\n\\n**Potential defense evasion detected!**\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Detection Details\\n- **Agent:** {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\\n- **Removed:** {{`{{_source.data.program.name}}`}}\\n- **MITRE:** T1562.001 (Disable or Modify Tools)\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n⚠️ **IMMEDIATE INVESTIGATION REQUIRED!**\\n\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"critical\",\"defense-evasion\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Security Software Removal Monitor" "$SECURITY_REMOVAL_MONITOR"
+
+    echo ""
+    echo "========================================"
+    echo "Alerting monitors setup completed!"
+    echo "========================================"
+    echo ""
+    echo "Created monitors:"
+    echo "  1. Unauthorized Application Monitor"
+    echo "  2. Critical Hacking Tools Monitor"
+    echo "  3. Remote Access Tools Monitor"
+    echo "  4. Security Software Removal Monitor"
+    echo ""
+{{- end }}

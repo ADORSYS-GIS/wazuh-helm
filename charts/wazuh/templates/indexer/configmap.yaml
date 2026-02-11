@@ -8,6 +8,6 @@ metadata:
     {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
 data:
   "opensearch.yml": |
-    {{ $.Files.Get "files/configs/opensearch.yml" | nindent 4 }}
+    {{ $.Files.Get "files/configs/opensearch/opensearch.yml" | nindent 4 }}
   "internal_users.yml": |
-    {{ $.Files.Get "files/configs/internal_users.yml" | nindent 4 }}
+    {{ $.Files.Get "files/configs/opensearch/internal_users.yml" | nindent 4 }}

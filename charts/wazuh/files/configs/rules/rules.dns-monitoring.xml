@@ -1,0 +1,164 @@
+<!--
+  DNS Monitoring and Malicious Domain Detection Rules
+  Monitors DNS queries across Windows (Sysmon), macOS, and Linux
+
+  Rule IDs: 760000-760099
+-->
+
+<group name="dns_monitoring,network,">
+
+  <!-- ================================================== -->
+  <!-- WINDOWS - SYSMON DNS QUERIES (Event ID 22)         -->
+  <!-- ================================================== -->
+
+  <!-- Base rule for Sysmon DNS events -->
+  <rule id="760001" level="3">
+    <if_sid>61650</if_sid>
+    <field name="win.system.eventID">^22$</field>
+    <description>Sysmon: DNS query - $(win.eventdata.queryName)</description>
+    <group>sysmon,dns_query,</group>
+  </rule>
+
+  <!-- Cryptomining pool DNS queries -->
+  <rule id="760010" level="14">
+    <if_sid>760001</if_sid>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)minergate|xmrpool|supportxmr|moneropool|nicehash|ethermine|2miners|nanopool</field>
+    <description>CRITICAL: Cryptomining pool DNS query - $(win.eventdata.queryName)</description>
+    <mitre>
+      <id>T1496</id>
+    </mitre>
+    <group>cryptomining,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- Tor/Anonymizer DNS queries -->
+  <rule id="760011" level="10">
+    <if_sid>760001</if_sid>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)torproject\.org|\.onion\.</field>
+    <description>WARNING: Tor/Anonymizer DNS query - $(win.eventdata.queryName)</description>
+    <mitre>
+      <id>T1090.003</id>
+    </mitre>
+    <group>anonymizer,dns_query,policy_violation,</group>
+  </rule>
+
+  <!-- Dynamic DNS -->
+  <rule id="760012" level="8">
+    <if_sid>760001</if_sid>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)duckdns\.org|no-ip\.com|dynu\.com|ddns\.net</field>
+    <description>Suspicious: Dynamic DNS query - $(win.eventdata.queryName)</description>
+    <mitre>
+      <id>T1568.002</id>
+    </mitre>
+    <group>dyndns,dns_query,suspicious,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- LINUX - DNS QUERY MONITORING                        -->
+  <!-- ================================================== -->
+
+  <!-- systemd-resolved logs -->
+  <rule id="760030" level="3">
+    <if_group>syslog</if_group>
+    <program_name>systemd-resolved</program_name>
+    <description>Linux DNS query detected</description>
+    <group>linux_dns,dns_query,</group>
+  </rule>
+
+  <!-- dnsmasq logs -->
+  <rule id="760031" level="3">
+    <if_group>syslog</if_group>
+    <program_name>dnsmasq</program_name>
+    <description>Linux dnsmasq DNS query</description>
+    <group>linux_dns,dns_query,dnsmasq,</group>
+  </rule>
+
+  <!-- Linux - Cryptomining DNS -->
+  <rule id="760032" level="14">
+    <if_sid>760030,760031</if_sid>
+    <match>minergate|xmrpool|nicehash|ethermine</match>
+    <description>CRITICAL: Linux - Cryptomining pool DNS query</description>
+    <mitre>
+      <id>T1496</id>
+    </mitre>
+    <group>cryptomining,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- macOS - DNS QUERY MONITORING                       -->
+  <!-- ================================================== -->
+
+  <!-- mDNSResponder logs - silenced (level 0) to reduce noise -->
+  <rule id="760040" level="0">
+    <if_group>syslog</if_group>
+    <program_name>mDNSResponder</program_name>
+    <description>macOS DNS query detected (silenced)</description>
+    <group>macos_dns,dns_query,</group>
+  </rule>
+
+  <!-- macOS - Cryptomining DNS -->
+  <rule id="760042" level="14">
+    <if_sid>760040</if_sid>
+    <match>minergate|xmrpool|nicehash|ethermine</match>
+    <description>CRITICAL: macOS - Cryptomining pool DNS query</description>
+    <mitre>
+      <id>T1496</id>
+    </mitre>
+    <group>cryptomining,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- macOS/Linux - TCPDUMP DNS CAPTURE                  -->
+  <!-- ================================================== -->
+
+  <!-- Base rule for tcpdump DNS capture -->
+  <rule id="760050" level="3">
+    <match>DNS_QUERY:</match>
+    <description>DNS query captured: $(dns.query)</description>
+    <group>dns_query,dns_capture,</group>
+  </rule>
+
+  <!-- Cryptomining pool DNS queries via tcpdump -->
+  <rule id="760051" level="14">
+    <if_sid>760050</if_sid>
+    <match type="pcre2">(?i)minergate|xmrpool|supportxmr|moneropool|nicehash|ethermine|2miners|nanopool|coinhive</match>
+    <description>CRITICAL: Cryptomining pool DNS query detected</description>
+    <mitre>
+      <id>T1496</id>
+    </mitre>
+    <group>cryptomining,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- Tor/Anonymizer DNS queries via tcpdump -->
+  <rule id="760052" level="10">
+    <if_sid>760050</if_sid>
+    <match type="pcre2">(?i)torproject\.org|\.onion|tor2web</match>
+    <description>WARNING: Tor/Anonymizer DNS query detected</description>
+    <mitre>
+      <id>T1090.003</id>
+    </mitre>
+    <group>anonymizer,dns_query,policy_violation,</group>
+  </rule>
+
+  <!-- Dynamic DNS queries via tcpdump -->
+  <rule id="760053" level="8">
+    <if_sid>760050</if_sid>
+    <match type="pcre2">(?i)duckdns\.org|no-ip\.com|dynu\.com|ddns\.net|freedns|changeip</match>
+    <description>Suspicious: Dynamic DNS query detected</description>
+    <mitre>
+      <id>T1568.002</id>
+    </mitre>
+    <group>dyndns,dns_query,suspicious,</group>
+  </rule>
+
+  <!-- Malicious/Suspicious domain patterns -->
+  <rule id="760054" level="12">
+    <if_sid>760050</if_sid>
+    <match type="pcre2">(?i)\.tk$|\.ml$|\.ga$|\.cf$|\.gq$|\.top$|\.xyz$|\.pw$</match>
+    <description>Suspicious TLD in DNS query - potential malware C2</description>
+    <mitre>
+      <id>T1071.004</id>
+    </mitre>
+    <group>suspicious_tld,dns_query,suspicious,</group>
+  </rule>
+
+</group>
