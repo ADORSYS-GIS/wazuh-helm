@@ -108,72 +108,128 @@
   </rule>
 
   <!-- ================================================== -->
-  <!-- RUNNING PROCESS DETECTION                          -->
-  <!-- Catches apps that bypassed install detection or    -->
-  <!-- were installed before rules existed                -->
+  <!-- RUNNING PROCESS DETECTION (Linux Audit-based)      -->
+  <!-- Catches apps when executed via auditd monitoring   -->
+  <!-- Requires auditd with execve rules on Linux agents  -->
   <!-- ================================================== -->
 
-  <!-- CRITICAL: Crypto miners running (Level 14) -->
+  <!-- CRITICAL: Crypto miners executed (Level 14) -->
   <rule id="750070" level="14">
-    <if_sid>592</if_sid>
-    <field name="data.process.name" type="pcre2">(?i)xmrig|nicehash|minergate|claymore|phoenixminer|nbminer|t-rex|gminer|lolminer|ethminer|cgminer|bfgminer|cpuminer|cryptotab|minerd|xmr-stak</field>
-    <description>CRITICAL: Cryptocurrency miner process running - $(data.process.name) (PID: $(data.process.pid))</description>
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)xmrig|nicehash|minergate|claymore|phoenixminer|nbminer|t-rex|gminer|lolminer|ethminer|cgminer|bfgminer|cpuminer|cryptotab|minerd|xmr-stak</field>
+    <description>CRITICAL: Cryptocurrency miner executed - $(audit.execve.a0)</description>
     <mitre>
       <id>T1496</id>
     </mitre>
     <group>unauthorized_software,unauthorized_process,cryptominer,</group>
   </rule>
 
-  <!-- CRITICAL: Hacking tools running (Level 14) -->
+  <!-- CRITICAL: Hacking tools executed (Level 14) -->
   <rule id="750071" level="14">
-    <if_sid>592</if_sid>
-    <field name="data.process.name" type="pcre2">(?i)nmap|wireshark|metasploit|msfconsole|msfvenom|burpsuite|sqlmap|john|hashcat|hydra|aircrack|airmon|ettercap|mimikatz|cobaltstrike|bloodhound|responder|impacket|crackmapexec|lazagne|rubeus|powersploit|empire</field>
-    <description>CRITICAL: Hacking/pentesting tool process running - $(data.process.name) (PID: $(data.process.pid))</description>
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)^nmap$|^wireshark$|^tshark$|^tcpdump$|^metasploit$|^msfconsole$|^msfvenom$|^burpsuite$|^sqlmap$|^john$|^hashcat$|^hydra$|^aircrack|^airmon|^ettercap$|^mimikatz$|^cobaltstrike$|^bloodhound$|^responder$|^crackmapexec$|^lazagne$|^rubeus$|^powersploit$|^empire$</field>
+    <description>CRITICAL: Hacking/pentesting tool executed - $(audit.execve.a0)</description>
     <mitre>
       <id>T1588.002</id>
     </mitre>
     <group>unauthorized_software,unauthorized_process,hacking_tool,</group>
   </rule>
 
-  <!-- HIGH: Remote access tools running (Level 12) -->
+  <!-- HIGH: Remote access tools executed (Level 12) -->
   <rule id="750072" level="12">
-    <if_sid>592</if_sid>
-    <field name="data.process.name" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|gotomypc|screenconnect|connectwise|bomgar|dameware|radmin|ultraviewer|atera|meshcentral|vnc|tightvnc|ultravnc|realvnc</field>
-    <description>ALERT: Remote access tool process running - $(data.process.name) (PID: $(data.process.pid))</description>
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|gotomypc|screenconnect|connectwise|bomgar|dameware|radmin|ultraviewer|atera|meshcentral|vnc|tightvnc|ultravnc|realvnc</field>
+    <description>ALERT: Remote access tool executed - $(audit.execve.a0)</description>
     <mitre>
       <id>T1219</id>
     </mitre>
     <group>unauthorized_software,unauthorized_process,remote_access,</group>
   </rule>
 
-  <!-- MEDIUM: P2P/Torrent clients running (Level 10) -->
+  <!-- MEDIUM: P2P/Torrent clients executed (Level 10) -->
   <rule id="750073" level="10">
-    <if_sid>592</if_sid>
-    <field name="data.process.name" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent|aria2</field>
-    <description>ALERT: P2P/Torrent client process running - $(data.process.name) (PID: $(data.process.pid))</description>
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent|aria2</field>
+    <description>ALERT: P2P/Torrent client executed - $(audit.execve.a0)</description>
     <mitre>
       <id>T1048</id>
     </mitre>
     <group>unauthorized_software,unauthorized_process,p2p,</group>
   </rule>
 
-  <!-- MEDIUM: VPN/Proxy tools running (Level 8) -->
+  <!-- MEDIUM: VPN/Proxy tools executed (Level 8) -->
   <rule id="750074" level="8">
-    <if_sid>592</if_sid>
-    <field name="data.process.name" type="pcre2">(?i)nordvpn|expressvpn|surfshark|protonvpn|cyberghost|pia|tunnelbear|windscribe|hotspotshield|hola|psiphon|ultrasurf|tor|torbrowser|openvpn|wireguard</field>
-    <description>ALERT: VPN/Proxy process running - $(data.process.name) (PID: $(data.process.pid))</description>
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)nordvpn|expressvpn|surfshark|protonvpn|cyberghost|pia|tunnelbear|windscribe|hotspotshield|hola|psiphon|ultrasurf|^tor$|torbrowser|openvpn|wireguard</field>
+    <description>ALERT: VPN/Proxy tool executed - $(audit.execve.a0)</description>
     <mitre>
       <id>T1090</id>
     </mitre>
     <group>unauthorized_software,unauthorized_process,vpn,</group>
   </rule>
 
-  <!-- LOW: Gaming software running (Level 6) -->
+  <!-- LOW: Gaming software executed (Level 6) -->
   <rule id="750075" level="6">
-    <if_sid>592</if_sid>
-    <field name="data.process.name" type="pcre2">(?i)^steam$|steam\.exe|steamwebhelper|epicgameslauncher|origin\.exe|battlenet|battle\.net|riotclient|leagueclient|valorant|gog|uplay|ubisoft|xbox|playnite</field>
-    <description>Policy Violation: Gaming software process running - $(data.process.name) (PID: $(data.process.pid))</description>
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)^steam$|steamwebhelper|epicgameslauncher|^origin$|battlenet|battle\.net|riotclient|leagueclient|valorant|^gog$|uplay|ubisoft|xbox|playnite</field>
+    <description>Policy Violation: Gaming software executed - $(audit.execve.a0)</description>
     <group>unauthorized_software,unauthorized_process,gaming,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- COMMAND-BASED PROCESS DETECTION (macOS/Cross-platform) -->
+  <!-- Detects blacklisted processes via ps command monitoring -->
+  <!-- ================================================== -->
+
+  <!-- Base rule for blacklist process check command -->
+  <rule id="750095" level="0">
+    <decoded_as>ossec</decoded_as>
+    <match>^ossec: output: 'blacklist_process_check'</match>
+    <description>Blacklist process check command output</description>
+  </rule>
+
+  <!-- CRITICAL: Hacking tools detected via ps command -->
+  <rule id="750096" level="14">
+    <if_sid>750095</if_sid>
+    <match type="pcre2">(?i)wireshark|tshark|nmap|tcpdump|metasploit|burpsuite|sqlmap|hashcat|hydra|aircrack|ettercap|mimikatz</match>
+    <description>CRITICAL: Hacking/pentesting tool running - detected via process monitoring</description>
+    <mitre>
+      <id>T1588.002</id>
+    </mitre>
+    <group>unauthorized_software,unauthorized_process,hacking_tool,</group>
+  </rule>
+
+  <!-- HIGH: Remote access tools detected via ps command -->
+  <rule id="750097" level="12">
+    <if_sid>750095</if_sid>
+    <match type="pcre2">(?i)teamviewer|anydesk|rustdesk|parsec|splashtop|screenconnect|vnc</match>
+    <description>ALERT: Remote access tool running - detected via process monitoring</description>
+    <mitre>
+      <id>T1219</id>
+    </mitre>
+    <group>unauthorized_software,unauthorized_process,remote_access,</group>
+  </rule>
+
+  <!-- CRITICAL: Crypto miners detected via ps command -->
+  <rule id="750098" level="14">
+    <if_sid>750095</if_sid>
+    <match type="pcre2">(?i)xmrig|nicehash|minergate|phoenixminer|ethminer|cpuminer</match>
+    <description>CRITICAL: Cryptocurrency miner running - detected via process monitoring</description>
+    <mitre>
+      <id>T1496</id>
+    </mitre>
+    <group>unauthorized_software,unauthorized_process,cryptominer,</group>
+  </rule>
+
+  <!-- MEDIUM: P2P/Torrent detected via ps command -->
+  <rule id="750099" level="10">
+    <if_sid>750095</if_sid>
+    <match type="pcre2">(?i)utorrent|bittorrent|qbittorrent|transmission|deluge|vuze</match>
+    <description>ALERT: P2P/Torrent client running - detected via process monitoring</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>unauthorized_software,unauthorized_process,p2p,</group>
   </rule>
 
   <!-- ================================================== -->

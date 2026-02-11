@@ -126,13 +126,51 @@ indexer:
         intervalMinutes: 5
         lookbackMinutes: 5
         throttleMinutes: 5
+      # New monitors
+      newAgentRegistered:
+        enabled: true
+        intervalMinutes: 5
+        throttleMinutes: 60
+      anomalyDetected:
+        enabled: true
+        intervalMinutes: 5
+        throttleMinutes: 30
+      agentDisconnected:
+        enabled: true
+        intervalMinutes: 60           # Check every hour
+        noEventPeriodDays: 7          # Alert if no events for 7 days (configurable)
+        throttleMinutes: 1440         # Once per day per agent
+      bruteForceAttack:
+        enabled: true
+        intervalMinutes: 5
+        lookbackMinutes: 10
+        threshold: 5                  # Number of failed attempts to trigger
+        throttleMinutes: 15
+      rootkitMalwareDetected:
+        enabled: true
+        intervalMinutes: 1
+        throttleMinutes: 5
+      criticalSeverityAlert:
+        enabled: true
+        intervalMinutes: 1
+        minLevel: 12                  # Minimum rule level for critical alerts
+        throttleMinutes: 5
+      dailySecuritySummary:
+        enabled: true
+        scheduleHour: 8               # 8:00 AM
+        scheduleMinute: 0
+        scheduleTimezone: "Europe/Berlin"
+      weeklyComplianceReport:
+        enabled: true
+        scheduleDay: "MON"            # Monday
+        scheduleHour: 8               # 8:00 AM
+        scheduleMinute: 0
+        scheduleTimezone: "Europe/Berlin"
 
   # --- Anomaly Detection ---
   anomalyDetection:
     enabled: true
     detectors:
-      failedAuth:
-        enabled: true
       fimChanges:
         enabled: true
       highSeverity:
@@ -140,7 +178,20 @@ indexer:
       blacklistProcess:
         enabled: true  # Detects running blacklisted apps via audit/process events
       perAgent:
-        enabled: true  # Security anomalies per agent (high severity, auth, malware, network)
+        enabled: true  # Security anomalies (high severity, auth, malware, network)
+      # Additional detectors
+      unauthorizedAccess:
+        enabled: true  # Detects spikes in authentication failures (brute force, invalid logins)
+      offHoursActivity:
+        enabled: true  # Detects activity outside business hours (22:00-06:00, weekends)
+      privilegeEscalation:
+        enabled: true  # Detects sudo/su abuse, permission changes
+      networkAnomalies:
+        enabled: true  # Detects unusual firewall blocks, connection attempts
+      scaCompliance:
+        enabled: true  # Detects SCA compliance failures
+      logVolume:
+        enabled: true  # Detects unusual spikes/drops in overall log volume
 
   # --- Init Containers ---
   initContainers:
