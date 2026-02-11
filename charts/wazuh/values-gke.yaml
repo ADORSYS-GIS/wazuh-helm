@@ -1,3 +1,9 @@
+# GKE (Google Kubernetes Engine) Configuration
+# Usage: helm install wazuh . -f values-gke.yaml
+
+# ============================================
+# INGRESS
+# ============================================
 dashboard:
   ingress:
     enabled: true
@@ -5,6 +11,9 @@ dashboard:
     annotations:
       kubernetes.io/ingress.class: "gce"
 
+# ============================================
+# REPLICAS & AFFINITY
+# ============================================
 indexer:
   replicas: 1
   additionalAnnotations:
@@ -47,20 +56,6 @@ worker_integration:
               matchLabels:
                 app-group: '{{ include "common.names.fullname" $ }}-manager'
 
-worker_agentless:
-  replicaCount: 1
-  additionalAnnotations:
-    app-group: '{{ include "common.names.fullname" $ }}-manager'
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            topologyKey: kubernetes.io/hostname
-            labelSelector:
-              matchLabels:
-                app-group: '{{ include "common.names.fullname" $ }}-manager'
-
 master:
   replicaCount: 1
   additionalAnnotations:
@@ -74,3 +69,83 @@ master:
             labelSelector:
               matchLabels:
                 app-group: '{{ include "common.names.fullname" $ }}-manager'
+
+# ============================================
+# SERVICES
+# ============================================
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    type: ClusterIP
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: false
+    type: ClusterIP
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
+  # External LoadBalancer for agent connections (optional)
+  '{{ include "common.names.fullname" $ }}-ext':
+    enabled: false
+    type: LoadBalancer
+    annotations:
+      cloud.google.com/neg: |
+        {
+          "ingress": true
+        }
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+    ports:
+      - name: agents-events
+        port: 1514
+        protocol: TCP
+        targetPort: agents-events
+      - name: registration
+        port: 1515
+        protocol: TCP
+        targetPort: registration
+
+# ============================================
+# STORAGE (GKE Persistent Disk + Filestore)
+# ============================================
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    allowVolumeExpansion: true
+    parameters:
+      type: pd-balanced
+    provisioner: pd.csi.storage.gke.io
+    reclaimPolicy: Delete
+    volumeBindingMode: WaitForFirstConsumer
+  # Filestore for shared volumes (ReadWriteMany)
+  '{{ include "common.names.fullname" $ }}-rwx':
+    parameters:
+      tier: standard
+      network: <YOUR-VPC-NAME>  # Replace with your VPC name
+    enabled: true
+    provisioner: filestore.csi.storage.gke.io
+    reclaimPolicy: Delete
+    volumeBindingMode: WaitForFirstConsumer
+    allowVolumeExpansion: true
+
+extraVolumeConfigs:
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    storageClassName: '{{ include "common.names.fullname" $ }}-rwx'
+    accessModes:
+      - ReadWriteMany
+
+# ============================================
+# GKE AUTOPILOT (uncomment if using Autopilot)
+# ============================================
+# # Autopilot doesn't allow privileged containers
+# indexer:
+#   initContainers:
+#     increase-the-vm-max-map-count: null
+#
+# master:
+#   securityContext: null
+#
+# worker:
+#   securityContext: null
+#
+# worker_integration:
+#   securityContext: null

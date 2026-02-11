@@ -30,6 +30,7 @@ spec:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/manager/configmap.yaml") $ | sha256sum }}
+        checksum/filebeat-config: {{ include (print $.Template.BasePath "/manager/configmap.filebeat.yaml") $ | sha256sum }}
 
         {{ with $.Values.cluster -}}{{- if .secret.enabled -}}
         checksum/secret: {{ include (print $.Template.BasePath "/manager/secret.manager-common.yaml") $ | sha256sum }}
@@ -65,6 +66,9 @@ spec:
           configMap:
             name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
         {{- end }}
+        - name: filebeat-config
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-filebeat-config
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -115,8 +119,21 @@ spec:
                 sed -i '/\${JIRA_CONFIG}/r /tmp/jira.xml' /processed/ossec.conf
                 sed -i '/\${JIRA_CONFIG}/d' /processed/ossec.conf
               fi
+              # Replace GITHUB_CONFIGS if set
+              if [ ! -z "$GITHUB_CONFIGS" ]; then
+                # Write GitHub config to temp file with proper indentation (4 spaces)
+                echo "$GITHUB_CONFIGS" | sed 's/^/    /' > /tmp/github.xml
+                # Use sed to replace placeholder with file content
+                sed -i '/\${GITHUB_CONFIGS}/r /tmp/github.xml' /processed/ossec.conf
+                sed -i '/\${GITHUB_CONFIGS}/d' /processed/ossec.conf
+              fi
               # Replace other variables with envsubst
               envsubst < /processed/ossec.conf > /tmp/ossec.conf.tmp && mv /tmp/ossec.conf.tmp /processed/ossec.conf
+              # Create authd.pass file for password-based agent registration
+              if [ ! -z "$AUTHD_PASS" ]; then
+                echo "$AUTHD_PASS" > /processed/authd.pass
+                chmod 640 /processed/authd.pass
+              fi
           ##
           ##
           env:
@@ -145,13 +162,7 @@ spec:
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
-            {{- end }}
-
-            {{ with .wazuhInit }}
-            {{ with .envFrom -}}
-            {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
-            {{- end }}
-            {{ end }}
+            {{- end }}  
           ##
           ##
           volumeMounts:
@@ -161,6 +172,24 @@ spec:
               readOnly: true
             - name: wazuh-config-temp
               mountPath: /processed
+        # Copy Filebeat config from ConfigMap to PVC on startup
+        - name: filebeat-config-init
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Copying Filebeat config from ConfigMap..."
+              cp /filebeat-template/filebeat.yml /etc/filebeat/filebeat.yml
+              echo "Filebeat config copied successfully"
+              cat /etc/filebeat/filebeat.yml | grep -A1 archives:
+          volumeMounts:
+            - name: filebeat-config
+              mountPath: /filebeat-template
+              readOnly: true
+            - name: {{ $name }}
+              mountPath: /etc/filebeat
+              subPath: filebeat/etc/filebeat
         {{ range $k, $v := .initContainers }}
         {{ if $v }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
@@ -168,7 +197,7 @@ spec:
         {{ end }}   
         {{- end }}   
       securityContext:
-        fsGroup: 1000
+        fsGroup: 999
       containers:
         - name: wazuh-manager
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -179,6 +208,43 @@ spec:
           {{- with .securityContext }}
           securityContext: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
           {{- end }}
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    # Wait for container init scripts to complete and filebeat to start
+                    sleep 10
+                    # Copy filebeat config from ConfigMap template (overrides container-generated config)
+                    if [ -f /filebeat-template/filebeat.yml ]; then
+                      cp /filebeat-template/filebeat.yml /etc/filebeat/filebeat.yml
+                      # Restart filebeat to apply new config
+                      pkill -HUP filebeat 2>/dev/null || pkill filebeat 2>/dev/null
+                      sleep 2
+                      # Filebeat should auto-restart via supervisor
+                    fi
+
+                    # Enable OS-specific SCA policies
+                    cd /var/ossec/ruleset/sca 2>/dev/null || exit 0
+                    # Ubuntu policies
+                    for f in cis_ubuntu22-04 cis_ubuntu24-04; do
+                      [ -f "${f}.yml.disabled" ] && mv "${f}.yml.disabled" "${f}.yml"
+                    done
+                    # Debian policies
+                    for f in cis_debian11 cis_debian12; do
+                      [ -f "${f}.yml.disabled" ] && mv "${f}.yml.disabled" "${f}.yml"
+                    done
+                    # Windows policies
+                    for f in cis_win11_enterprise; do
+                      [ -f "${f}.yml.disabled" ] && mv "${f}.yml.disabled" "${f}.yml"
+                    done
+                    # macOS policies
+                    for f in cis_apple_macOS_13.x cis_apple_macOS_14.x cis_apple_macOS_15.x cis_apple_macOS_26.x; do
+                      [ -f "${f}.yml.disabled" ] && mv "${f}.yml.disabled" "${f}.yml"
+                    done
+                    exit 0
           volumeMounts:
             - name: {{ $name }}
               mountPath: /var/ossec/api/configuration
@@ -210,6 +276,9 @@ spec:
             - name: {{ $name }}
               mountPath: /etc/filebeat
               subPath: filebeat/etc/filebeat
+            - name: filebeat-config
+              mountPath: /filebeat-template
+              readOnly: true
             - name: {{ $name }}
               mountPath: /var/lib/filebeat
               subPath: filebeat/var/lib/filebeat
@@ -222,6 +291,12 @@ spec:
               mountPath: /wazuh-config-mount/etc/ossec.conf
               subPath: ossec.conf
               readOnly: true
+            {{- if $.Values.cluster.auth.usePassword }}
+            - name: wazuh-config-temp
+              mountPath: /wazuh-config-mount/etc/authd.pass
+              subPath: authd.pass
+              readOnly: true
+            {{- end }}
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
@@ -252,16 +327,6 @@ spec:
               readOnly: true
 
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/7006-macos-syslog.xml
-              subPath: 7006-macos-syslog.xml
-              readOnly: true
-
-            - name: config
-              mountPath: /wazuh-config-mount/etc/rules/7006-macos-auth.xml
-              subPath: 7006-macos-auth.xml
-              readOnly: true
-
-            - name: config
               mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
               subPath: 7007-fim-linux.xml
               readOnly: true
@@ -274,21 +339,58 @@ spec:
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml
               subPath: 7009-fim-windows.xml
-              readOnly: true        
-
-            - name: config
-              mountPath: /wazuh-config-mount/etc/rules/7010-custom-suricata.xml
-              subPath: 7010-custom-suricata.xml
-              readOnly: true  
-
-            - name: config
-              mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
-              subPath: 7011-lotl-detection.xml
               readOnly: true
 
             - name: config
-              mountPath: /var/ossec/etc/shared/dlp/agent.conf
-              subPath: dlp.xml
+              mountPath: /wazuh-config-mount/etc/rules/7010-app-blacklist.xml
+              subPath: 7010-app-blacklist.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7011-dns-monitoring.xml
+              subPath: 7011-dns-monitoring.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7012-suricata-custom.xml
+              subPath: 7012-suricata-custom.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7013-adguard.xml
+              subPath: 7013-adguard.xml
+              readOnly: true
+
+            # Default group (common settings only)
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/default/agent.conf
+              subPath: agent-common.conf
+              readOnly: true
+
+            # Linux group
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/linux/agent.conf
+              subPath: agent-linux.conf
+              readOnly: true
+
+            # macOS group
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/macos/agent.conf
+              subPath: agent-macos.conf
+              readOnly: true
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/macos/cis_apple_macOS_26.x.yml
+              subPath: cis_apple_macOS_26.x.yml
+              readOnly: true
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/macos/sync_sca_policies.sh
+              subPath: sync_sca_policies.sh
+              readOnly: true
+
+            # Windows group
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/windows/agent.conf
+              subPath: agent-windows.conf
               readOnly: true
 
             {{ range $k, $v := $.Values.cluster.decoders -}}
@@ -330,10 +432,6 @@ spec:
               name: agents-events
             - containerPort: 1516
               name: cluster
-
-            # We can keep this, even if it's not used. Check @values-syslog.yaml to see how to activate it.
-            - containerPort: 11514
-              name: syslog
           env:
             - name: FILEBEAT_SSL_VERIFICATION_MODE
               value: 'full'

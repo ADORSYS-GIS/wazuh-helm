@@ -1,0 +1,92 @@
+# Malicious/Suspicious Domains Blacklist
+# Format: domain:category
+# Categories: malware, phishing, c2, cryptomining, adware, suspicious
+#
+# This list is checked against DNS queries from all agents
+# Add domains without http:// or www prefix
+#
+# ===== KNOWN MALWARE DOMAINS =====
+# These are examples - add your threat intel feeds here
+malware.example.com:malware
+evil-domain.com:malware
+badsite.net:malware
+
+# ===== COMMAND & CONTROL (C2) =====
+cobaltstrike.com:c2
+metasploit.com:c2
+
+# ===== CRYPTOMINING POOLS =====
+pool.minergate.com:cryptomining
+xmrpool.eu:cryptomining
+pool.supportxmr.com:cryptomining
+mine.moneropool.com:cryptomining
+monerohash.com:cryptomining
+minexmr.com:cryptomining
+nanopool.org:cryptomining
+hashvault.pro:cryptomining
+2miners.com:cryptomining
+f2pool.com:cryptomining
+antpool.com:cryptomining
+poolin.com:cryptomining
+viabtc.com:cryptomining
+nicehash.com:cryptomining
+unmineable.com:cryptomining
+ethermine.org:cryptomining
+flypool.org:cryptomining
+sparkpool.com:cryptomining
+hiveon.net:cryptomining
+crazypool.org:cryptomining
+herominers.com:cryptomining
+woolypooly.com:cryptomining
+ravenminer.com:cryptomining
+zergpool.com:cryptomining
+prohashing.com:cryptomining
+
+# ===== PHISHING INDICATORS =====
+# Common phishing patterns (partial matches)
+login-verify:phishing
+account-confirm:phishing
+secure-login:phishing
+update-billing:phishing
+verify-account:phishing
+
+# ===== TOR EXIT NODES / ANONYMIZERS =====
+torproject.org:anonymizer
+onion.to:anonymizer
+onion.link:anonymizer
+tor2web.org:anonymizer
+
+# ===== KNOWN BAD FILE HOSTING =====
+anonfiles.com:filehosting
+mega.nz:filehosting
+sendspace.com:filehosting
+mediafire.com:filehosting
+
+# ===== DYNAMIC DNS (often abused) =====
+duckdns.org:dyndns
+no-ip.com:dyndns
+dynu.com:dyndns
+freedns.afraid.org:dyndns
+hopto.org:dyndns
+zapto.org:dyndns
+sytes.net:dyndns
+ddns.net:dyndns
+
+# ===== PASTEBIN SERVICES (data exfil) =====
+pastebin.com:pastebin
+paste.ee:pastebin
+hastebin.com:pastebin
+ghostbin.com:pastebin
+privatebin.net:pastebin
+
+# ===== SUSPICIOUS TLDs =====
+# Domains ending in these TLDs are often malicious
+# (handled by regex rules, not this list)
+
+# ===== ADD YOUR THREAT INTEL HERE =====
+# Integrate with threat feeds like:
+# - AlienVault OTX
+# - Abuse.ch
+# - PhishTank
+# - OpenPhish
+# - SANS ISC

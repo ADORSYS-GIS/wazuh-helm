@@ -1,4 +1,4 @@
-name: Build EnvSubst Docker image
+name: Build Docker image
 
 on:
   push:

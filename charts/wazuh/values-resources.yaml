@@ -1,51 +1,135 @@
+# Resource Profiles for Wazuh Deployment
+# Usage: helm install wazuh . -f values-resources.yaml
+# Uncomment the profile that matches your cluster capacity
+
+# ============================================
+# MINIMAL - For development/testing (2-4GB nodes)
+# ============================================
+# dashboard:
+#   resources:
+#     requests:
+#       cpu: 200m
+#       memory: 512Mi
+#     limits:
+#       cpu: 400m
+#       memory: 1Gi
+# master:
+#   resources:
+#     requests:
+#       cpu: 500m
+#       memory: 1Gi
+#     limits:
+#       cpu: 1
+#       memory: 2Gi
+# worker:
+#   resources:
+#     requests:
+#       cpu: 100m
+#       memory: 256Mi
+#     limits:
+#       cpu: 500m
+#       memory: 512Mi
+# worker_integration:
+#   resources:
+#     requests:
+#       cpu: 100m
+#       memory: 256Mi
+#     limits:
+#       cpu: 500m
+#       memory: 512Mi
+# indexer:
+#   resources:
+#     requests:
+#       cpu: 500m
+#       memory: 1Gi
+#     limits:
+#       cpu: 1
+#       memory: 2Gi
+
+# ============================================
+# STANDARD - For small production (8GB nodes)
+# ============================================
 dashboard:
   resources:
     requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 400m
+      cpu: 500m
       memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
 master:
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
       cpu: 1
       memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
 worker:
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 1
+      memory: 2Gi
     limits:
-      cpu: 500m
-      memory: 512Mi
-
+      cpu: 2
+      memory: 4Gi
 worker_integration:
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 1
+      memory: 2Gi
     limits:
-      cpu: 500m
-      memory: 512Mi
-
-worker_agentless:
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
+      cpu: 2
+      memory: 4Gi
 indexer:
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
       cpu: 1
       memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# ============================================
+# HIGH - For larger production (16GB+ nodes)
+# ============================================
+# dashboard:
+#   resources:
+#     requests:
+#       cpu: 500m
+#       memory: 1Gi
+#     limits:
+#       cpu: 1
+#       memory: 2Gi
+# master:
+#   resources:
+#     requests:
+#       cpu: 2
+#       memory: 4Gi
+#     limits:
+#       cpu: 3
+#       memory: 6Gi
+# worker:
+#   resources:
+#     requests:
+#       cpu: 2
+#       memory: 4Gi
+#     limits:
+#       cpu: 3
+#       memory: 6Gi
+# worker_integration:
+#   resources:
+#     requests:
+#       cpu: 2
+#       memory: 4Gi
+#     limits:
+#       cpu: 3
+#       memory: 6Gi
+# indexer:
+#   resources:
+#     requests:
+#       cpu: 2
+#       memory: 4Gi
+#     limits:
+#       cpu: 3
+#       memory: 6Gi

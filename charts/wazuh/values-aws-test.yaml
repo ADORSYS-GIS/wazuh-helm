@@ -1,0 +1,280 @@
+global:
+  domain: 'aws-test.dev.wazuh.adorsys.team'
+  storageClassName: "gp2" # Default EBS storage
+  imageRegistry: "917848404243.dkr.ecr.eu-central-1.amazonaws.com"
+# Disable storage class creation (we’ll reuse gp2)
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    enabled: false
+# ───────────────────────────────────────────────
+# INDEXER
+# ───────────────────────────────────────────────
+indexer:
+  replicas: 1
+  persistence:
+    enabled: false # Ephemeral for test
+  image:
+    repository: wazuh/wazuh-indexer
+  initContainers:
+    volume-mount-hack: null
+    increase-the-vm-max-map-count: null
+  keycloak:
+    enabled: false # Disable Keycloak for test
+# ───────────────────────────────────────────────
+# NOTIFICATIONS & INTEGRATIONS
+# ───────────────────────────────────────────────
+notification:
+  slack:
+    enabled: true
+    webhookUrl: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+integration:
+  jira:
+    enabled: true
+    webhookUrl: https://api-private.atlassian.com/automation/webhooks/jira/a/733c3615-bad8-48c5-86e8-b7c9245d41a7/019913a6-3a34-7a78-b1ce-7b8efd4cfa98
+    apikey: 5bd41055821446ec4a716ac8c82b9f1fbb8d9a41
+  azure:
+    tenantDomain: "gisudm.onmicrosoft.com"
+    auth:
+      log:
+        application_id: "5aba2a68-e1c3-4e99-929b-be07238d64a6"
+        application_key: ""  # Set via --set
+      graph:
+        application_id: "5aba2a68-e1c3-4e99-929b-be07238d64a6"
+        application_key: ""  # Set via --set
+    logAnalytics:
+      enabled: true
+      workspace: "248c8ee2-fc28-4299-80a3-9bdb2be0fc0c"
+      queries:
+        # Azure Activity Logs (already enabled and working)
+        - query: "AzureActivity"
+          tag: "AzureActivity"
+          timeOffset: "1d"
+        
+        # Filtered AzureActivity queries for security-relevant operations (no additional setup needed)
+        - query: "AzureActivity | where OperationName in~ ('Create or Update Virtual Machine', 'Delete Virtual Machine', 'Start Virtual Machine', 'Deallocate Virtual Machine')"
+          tag: "AzureActivity-VM-Operations"
+          timeOffset: "1d"
+        
+        - query: "AzureActivity | where OperationName in~ ('Create or Update Key Vault', 'Delete Key Vault', 'Set Secret', 'Delete Secret')"
+          tag: "AzureActivity-KeyVault-Operations"
+          timeOffset: "1d"
+        
+        - query: "AzureActivity | where OperationName in~ ('Create or Update Storage Account', 'Delete Storage Account', 'Create or Update Blob Service', 'Delete Blob Service')"
+          tag: "AzureActivity-Storage-Operations"
+          timeOffset: "1d"
+        
+        - query: "AzureActivity | where OperationName in~ ('Create or Update SQL Server', 'Delete SQL Server', 'Create or Update SQL Database', 'Delete SQL Database')"
+          tag: "AzureActivity-SQL-Operations"
+          timeOffset: "1d"
+        
+        - query: "AzureActivity | where ActivityStatus == 'Failed'"
+          tag: "AzureActivity-Failed-Operations"
+          timeOffset: "1d"
+        
+        # Azure Defender/Security Center Vulnerability Events
+        # Requires: Microsoft Defender for Cloud enabled (Standard tier)
+        # Setup: az security pricing create --name VirtualMachines --tier standard
+        # Then enable continuous export to Log Analytics workspace
+        - query: "SecurityAlert | where AlertSeverity in~ ('High', 'Critical')"
+          tag: "SecurityAlert-High-Critical"
+          timeOffset: "1d"
+        
+        - query: "SecurityAlert | where AlertSeverity in~ ('Medium', 'Low')"
+          tag: "SecurityAlert-Medium-Low"
+          timeOffset: "1d"
+        
+        - query: "SecurityRecommendation | where RecommendationSeverity in~ ('High', 'Critical')"
+          tag: "SecurityRecommendation-High-Critical"
+          timeOffset: "1d"
+        
+        - query: "SecurityRecommendation | where RecommendationState == 'Active'"
+          tag: "SecurityRecommendation-Active"
+          timeOffset: "1d"
+        
+        # Azure AD Identity Protection (if available)
+        # Requires: Azure AD Premium P2 license
+        # - query: "AADIdentityProtection"
+        #   tag: "AAD-IdentityProtection"
+        #   timeOffset: "1d"
+        
+        # Risky Sign-ins (if SigninLogs table exists)
+        # - query: "SigninLogs | where RiskLevel in~ ('high', 'medium')"
+        #   tag: "SigninLogs-Risky"
+        #   timeOffset: "1d"
+          
+    graph:
+      enabled: true
+      queries:
+        - query: "auditLogs/directoryAudits"
+          timeOffset: "1d"
+        # Note: auditLogs/signIns requires Azure AD Premium P1 or P2 license
+        # - query: "auditLogs/signIns"
+        #   timeOffset: "1d"
+    storage:
+      enabled: false
+      # containers:
+      #   - name: "insights-activity-logs"
+      #     blobs: ".json"
+      #     contentType: "json_inline"
+      #     timeOffset: "24h"
+  aws:
+    enable: true
+    profile: main # Use the 'main' profile from AWS config
+    #roleArn: "arn:aws:iam::020980146275:role/Wazuh-IAM-Role"
+    awsOrganizationId: "o-rse1nyh5qe"
+    secrets:
+      create: false
+      existingSecret: "ext-wazuh-aws-secrets"
+    cloudtrail:
+      enabled: true
+      bucketName: "wazuh-cloudtrail-020980146275"
+      interval: 1m
+    config:
+      enabled: true
+      bucketName: "wazuh-config-020980146275"
+      # Multi-account support: Comma-separated list of AWS account IDs to monitor
+      awsAccountIds: "020980146275,564357927993,590183746717,191844718867,471112655819,571075516563,982081049921,984270176785"
+    securityHub:
+      enabled: true
+      sqsName: "wazuh-securityhub-sqs"
+      interval: "1m"
+    guardduty:
+      enabled: true
+      bucketName: "adorsys-guardduty-findings-020980146275"
+      # Multi-account support: Comma-separated list of AWS account IDs to monitor
+      awsAccountIds: "020980146275,564357927993,590183746717,191844718867,471112655819,571075516563,982081049921,984270176785"
+# ───────────────────────────────────────────────
+# WAZUH WORKER INTEGRATION
+# ───────────────────────────────────────────────
+worker_integration:
+  enabled: true
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 50Gi
+  image:
+    registry: docker.io
+    repository: wazuh/wazuh-manager
+  podSecurityContext:
+    fsGroup: 999
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app: '{{ include "common.names.fullname" $ }}-manager'
+                node-type: worker
+# ───────────────────────────────────────────────
+# WAZUH WORKER
+# ───────────────────────────────────────────────
+worker:
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 50Gi
+  image:
+    repository: wazuh/wazuh-manager
+  podSecurityContext:
+    fsGroup: 999
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app: '{{ include "common.names.fullname" $ }}-manager'
+                node-type: worker
+# ───────────────────────────────────────────────
+# WAZUH MASTER (MANAGER)
+# ───────────────────────────────────────────────
+master:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 50Gi
+  image:
+    repository: wazuh/wazuh-manager
+  podSecurityContext:
+    fsGroup: 999
+  # Enable API explicitly
+  api:
+    enabled: true
+    port: 55000
+    https: true
+# ───────────────────────────────────────────────
+# CLUSTER CONFIG
+# ───────────────────────────────────────────────
+cluster:
+  auth:
+    key: "e5936685316e99525aff962141335960"
+  rootCaSecretName: "ext-wazuh-root-ca-secrets" # Use same CA secret for test
+  secret:
+    enabled: true
+# ───────────────────────────────────────────────
+# SERVICES (API + AGENT CONNECTIONS)
+# ───────────────────────────────────────────────
+svcs:
+  '{{ include "common.names.fullname" $ }}':
+    enabled: true
+    type: ClusterIP
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: master
+    ports:
+      - name: api
+        port: 55000
+        targetPort: api
+        protocol: TCP
+      - name: registration
+        port: 1515
+        targetPort: registration
+        protocol: TCP
+  '{{ include "common.names.fullname" $ }}-worker':
+    enabled: true
+    type: ClusterIP
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: worker
+    ports:
+      - name: agents
+        port: 1514
+        targetPort: agents
+        protocol: TCP
+# ───────────────────────────────────────────────
+# DASHBOARD
+# ───────────────────────────────────────────────
+dashboard:
+  image:
+    repository: wazuh/wazuh-dashboard
+  api:
+    insecure: true # Allow self-signed certs (disable in prod)
+  ingress:
+    enabled: false
+  authSecret: "ext-wazuh-dashboard-secrets"
+# ───────────────────────────────────────────────
+# API CREDENTIALS SECRET
+# ───────────────────────────────────────────────
+apiCred:
+  # Let the chart create the API credentials secret used by both manager and dashboard
+  auth:
+    username: "wazuh-wui"
+    password: "WazuhWui-TempP@ss-2025"
+  authSecret: ~
+# ───────────────────────────────────────────────
+# SECRET JOB (One-time job to create certificates)
+# ───────────────────────────────────────────────
+secretjob:
+  enabled: true
+  image:
+    registry: ""
+    repository: docker.io/alpine
+    tag: latest
+  secretImage:
+    registry: ""
+    repository: docker.io/bitnami/kubectl
+    tag: latest

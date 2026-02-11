@@ -1,5 +1,0 @@
-storageClasses:
-  '{{ include "wazuh.storageClassName" $ }}':
-    provisioner: driver.longhorn.io
-    volumeBindingMode: Immediate
-    allowVolumeExpansion: true

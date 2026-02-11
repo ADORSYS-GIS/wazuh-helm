@@ -1,0 +1,12 @@
+<!--
+  AdGuard Home DNS Query Log Decoder
+  Parses JSON logs from AdGuard Home DNS server
+-->
+<decoder name="adguard">
+  <prematch>^{"T":"</prematch>
+</decoder>
+
+<decoder name="adguard-fields">
+  <parent>adguard</parent>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>

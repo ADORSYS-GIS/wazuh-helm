@@ -1,4 +1,4 @@
-{{ with .Values.dashboard }}
+{{- with .Values.dashboard }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,96 +6,96 @@ metadata:
   annotations:
     {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 4 }}
   labels:
-    {{ include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
+    {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 4 }}
     app: {{ include "common.names.fullname" $ }}-dashboard
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{ include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 6 }}
+      {{- include "common.labels.matchLabels" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 6 }}
       app: {{ include "common.names.fullname" $ }}-dashboard
   template:
     metadata:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/dashboard/configmap.yaml") $ | sha256sum }}
-        {{ with $.Values.dashboard.auth -}}
+        {{- with $.Values.dashboard.auth }}
         checksum/secret: {{ include (print $.Template.BasePath "/dashboard/secret.yaml") $ | sha256sum }}
         {{- end }}
-        {{ with $.Values.indexer.auth -}}
+        {{- with $.Values.indexer.auth }}
         checksum/secret.indexer: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
         {{- end }}
       labels:
-        {{ include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
+        {{- include "common.labels.standard" ( dict "customLabels" .additionalLabels "context" $ ) | nindent 8 }}
         app: {{ include "common.names.fullname" $ }}-dashboard
       name: {{ include "common.names.fullname" $ }}-dashboard
     spec:
       volumes:
-      - name: certs
-        secret:
-          secretName: {{ include "wazuh.cert_secret_name" $ }}
-      - name: root-certs
-        secret:
-          secretName: {{ include "wazuh.cert_root_name" $ }}
-      - name: config
-        configMap:
-          name: '{{ include "common.names.fullname" $ }}-dashboard-conf'
-      {{ with .volumes }}
-      {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 6}}
-      {{ end }}
+        - name: certs
+          secret:
+            secretName: {{ include "wazuh.cert_secret_name" $ }}
+        - name: root-certs
+          secret:
+            secretName: {{ include "wazuh.cert_root_name" $ }}
+        - name: config
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-dashboard-conf
+        {{- with .volumes }}
+        {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}
       containers:
         - name: wazuh-dashboard
-          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
-          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
-          {{ with .resources -}}
+          image: {{ include "common.tplvalues.render" (dict "value" (include "common.images.image" (dict "imageRoot" .image "global" $.Values.global)) "context" $) | quote }}
+          {{- with .resources }}
           resources:
-          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
           volumeMounts:
-          - name: root-certs
-            mountPath: /usr/share/wazuh-dashboard/certs/root-ca.pem
-            subPath: root-ca.pem
-            readOnly: true
-          - name: certs
-            mountPath: /usr/share/wazuh-dashboard/certs/dashboard-key.pem
-            readOnly: true
-            subPath: dashboard-key.pem
-          - name: certs
-            mountPath: /usr/share/wazuh-dashboard/certs/dashboard.pem
-            readOnly: true
-            subPath: dashboard.pem
-          - name: config
-            mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
-            subPath: opensearch_dashboards.yml
-            readOnly: false
-          {{ with .volumeMounts -}}
-          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 10}}
-          {{- end }}
-          {{ with .ports -}}
-          ports: {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+            - name: root-certs
+              mountPath: /usr/share/wazuh-dashboard/certs/root-ca.pem
+              subPath: root-ca.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-dashboard/certs/dashboard-key.pem
+              subPath: dashboard-key.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-dashboard/certs/dashboard.pem
+              subPath: dashboard.pem
+              readOnly: true
+            - name: config
+              mountPath: /usr/share/wazuh-dashboard/config/opensearch_dashboards.yml
+              subPath: opensearch_dashboards.yml
+              readOnly: false
+            {{- with .volumeMounts }}
+            {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
+          {{- with .ports }}
+          ports:
+            {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
           {{- end }}
           env:
             - name: INDEXER_URL
-              value: 'https://{{ include "common.names.fullname" $ }}-indexer-api:9200'
+              value: https://{{ include "common.names.fullname" $ }}-indexer-api:9200
             - name: WAZUH_API_URL
-              value: 'https://{{ include "common.names.fullname" $ }}'
+              value: https://{{ include "common.names.fullname" $ }}
             - name: SERVER_SSL_ENABLED
               value: "true"
             - name: SERVER_SSL_CERTIFICATE
               value: /usr/share/wazuh-dashboard/certs/dashboard.pem
             - name: SERVER_SSL_KEY
               value: /usr/share/wazuh-dashboard/certs/dashboard-key.pem
-          {{ with .env -}}
-          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
-          {{- end }}
+            {{- with .env }}
+            {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
           envFrom:
             - secretRef:
-                name: '{{ include "secret.indexer-auth" $ }}'
+                name: {{ include "secret.indexer-auth" $ }}
             - secretRef:
-                name: '{{ include "secret.api-auth" $ }}'
+                name: {{ include "secret.api-auth" $ }}
             - secretRef:
-                name: '{{ include "secret.dashboard-auth" $ }}'
-          {{ with .envFrom -}}
-          {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
-          {{- end }}
-{{ end }}
+                name: {{ include "secret.dashboard-auth" $ }}
+            {{- with .envFrom }}
+            {{- include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12 }}
+            {{- end }}
+{{- end }}

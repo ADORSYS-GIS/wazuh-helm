@@ -1,337 +1,161 @@
+# =============================================================================
+# WAZUH HELM CHART - DEFAULT VALUES
+# =============================================================================
+# Documentation: https://documentation.wazuh.com/current/deployment-options/deploying-with-kubernetes/
+# For quick start, only modify sections marked with [REQUIRED] or [RECOMMENDED]
+# =============================================================================
+
+
+# =============================================================================
+# SECTION 1: GLOBAL SETTINGS
+# =============================================================================
+
 global:
-  ##
-  ##
+  # [REQUIRED] Your domain for accessing Wazuh Dashboard
   domain: wazuh.example.com
-  ##
-  ##
-  version: "4.14.2"
-  ##
-  ##
+
+  # [RECOMMENDED] Wazuh version to deploy
+  version: "4.13.1"
+
+  # Container registry (leave empty for Docker Hub)
   imageRegistry: ""
-  ## E.g.
-  ## imagePullSecrets:
-  ##   - myRegistryKeySecretName
-  ##
-  imagePullSecrets: [ ]
-  ## @param storageClass Default StorageClass for persistent volume claims
-  ##
+  imagePullSecrets: []
+
+  # Default StorageClass (null = cluster default)
   storageClassName: ~
 
-## @param kubeVersion Override Kubernetes version
-##
-kubeVersion: ""
-## @param nameOverride String to partially override common.names.fullname template (will maintain the release name)
-##
+# Override chart name in resource names
 nameOverride: ""
-## @param fullnameOverride String to fully override common.names.fullname template
-##
 fullnameOverride: ""
-## @param commonLabels Labels to add to all deployed resources
-##
-commonLabels: { }
-## @param commonAnnotations Annotations to add to all deployed resources
-##
+
+# Labels/annotations added to ALL resources
+commonLabels: {}
 commonAnnotations:
   "kubernetes.io/description": '{{ include "common.names.fullname" $ }} cluster'
 
-##
-##
+
+# =============================================================================
+# SECTION 2: STORAGE CONFIGURATION
+# =============================================================================
+# See values-storage-examples.yaml for provider-specific configurations.
+
 storageClasses:
   '{{ include "wazuh.storageClassName" $ }}':
-    ##
-    ##
-    enabled: true
-    ##
-    ##
-    name: ""
-    ##
-    ##
-    additionalAnnotations: { }
-    ##
-    ##
-    additionalLabels: { }
-    ##
-    ##
+    enabled: false
     provisioner: ""
-    ##
-    ##
-    parameters: { }
-    ##
-    ##
+    parameters: {}
     volumeBindingMode: ""
-    ##
-    ##
     reclaimPolicy: Delete
 
-##
-##
-apiCred:
-  ##
-  ##
-  authSecret: ~
-  ##
-  ##
-  auth:
-    ##
-    ##
-    username: wazuh-wui
-    ##
-    ##
-    password: "9Y0m^%^Cx4zx@6=X"
-    
-  
-  
-##
-##
-oidc:
-  ##
-  ##
-  openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
-  ##
-  ##
-  client_id: ~
-  ##
-  ##
-  client_secret: ~
-  ##
-  ##
-  scope: ~
-  ##
-  ##
-  base_redirect_url: ~
 
-secretjob:
-  enabled: true
-  additionalAnnotations:
-    "helm.sh/hook": pre-install
-  additionalLabels: { }
-  image:
-    ##
-    ##
-    registry: docker.io
-    ##
-    ##
-    repository: alpine
-    ##
-    ##
-    tag: latest
-    ##
-    ##
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
-    pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
-  ##
-  ##
-  secretImage:
-    ##
-    ##
-    registry: docker.io
-    ##
-    ##
-    repository: bitnamilegacy/kubectl
-    ##
-    ##
-    tag: latest
-    ##
-    ##
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
-    pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
-  ##
-  ##
-  serviceAccount:
-    ##
-    ##
-    name: wazuh-certs
+# =============================================================================
+# SECTION 3: WAZUH INDEXER (OpenSearch)
+# =============================================================================
 
 indexer:
-  ##
-  ##
   replicas: 2
-  ##
-  ##
-  nameOverride: ""
-  ##
-  ##
-  image:
-    ##
-    ##
-    registry: docker.io
-    ##
-    ##
-    repository: wazuh/wazuh-indexer
-    ##
-    ##
-    tag: '{{ .Values.global.version }}'
-    ##
-    ##
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
-    pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
 
-  ##
-  ##
+  image:
+    registry: docker.io
+    repository: wazuh/wazuh-indexer
+    tag: '{{ .Values.global.version }}'
+    pullPolicy: IfNotPresent
+
+  # [RECOMMENDED] Change default credentials
+  auth:
+    username: admin
+    password: "rU40Fm%0GnK£iqQN"
   authSecret: ~
 
-  ##
-  ##
-  auth:
-    ##
-    ##
-    username: admin
-    ##
-    ##
-    password: "rU40Fm%0GnK£iqQN"
+  # --- Keycloak/OIDC Integration ---
+  keycloak:
+    enabled: true
+    roles_key: wazuh_roles
+    subject_key: preferred_username
+    openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
+    client_id: ~
+    client_secret: ~
+    roles_mapping: ~
+    roles: ~
+    tenants: ~
 
-  ##
-  ##
-  service:
-    ##
-    ##
-    api:
-      ##
-      ##
-      type: ClusterIP
-      ##
-      ##
-      annotations: { }
-    ##
-    ##
-    main:
-      ##
-      ##
-      type: ClusterIP
-      ##
-      ##
-      annotations: { }
-  ##
-  ##
+  # --- Persistence ---
   persistence:
-    ##
-    ##
     size: 500Mi
-    ##
-    ##
     storageClassName: ~
-    ##
-    ##
-    accessModes:
-      - ReadWriteOnce
-  ##
-  ##
-  updateStrategy:
-    ##
-    ##
-    type: RollingUpdate
-  ##
-  ##
-  envFrom: [ ]
-  ##
-  ##
+    accessModes: [ReadWriteOnce]
+
+  # --- Java Heap ---
   env:
     - name: OPENSEARCH_JAVA_OPTS
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
-  ##
-  ##
-  volumes: { }
-  ##
-  ##
-  volumeMounts: { }
-  ##
-  ##
-  resources: ~
 
-  ##
-  ##
+  resources: ~
   affinity: ~
 
-  ##
-  ##
+  # --- Index Lifecycle Management ---
+  lifecycle:
+    enabled: true
+    alerts:
+      warmAfterDays: 7
+      deleteAfterDays: 90
+    archives:
+      deleteAfterDays: 30
+    statistics:
+      deleteAfterDays: 56
+    monitoring:
+      deleteAfterDays: 28
+
+  # --- Alerting Monitors ---
+  alerting:
+    enabled: true
+    monitors:
+      unauthorizedApps:
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 30
+      criticalTools:
+        intervalMinutes: 1
+        lookbackMinutes: 2
+        throttleMinutes: 5
+      remoteAccess:
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 15
+      securityRemoval:
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 5
+
+  # --- Init Containers ---
   initContainers:
     volume-mount-hack:
       image: busybox
-      resources:
-        requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          cpu: 100m
-          memory: 256Mi
-      command:
-        - sh
-        - '-c'
-        - 'chown -R 1000:1000 /var/lib/wazuh-indexer'
+      command: ['sh', '-c', 'chown -R 1000:1000 /var/lib/wazuh-indexer']
       volumeMounts:
         - name: '{{ include "common.names.fullname" $ }}-indexer'
           mountPath: /var/lib/wazuh-indexer
     increase-the-vm-max-map-count:
       image: busybox
-      command:
-        - sysctl
-        - -w
-        - vm.max_map_count=262144
+      command: ['sysctl', '-w', 'vm.max_map_count=262144']
       securityContext:
         privileged: true
     config-init:
-      ##
       image: ghcr.io/adorsys-gis/envsubt:main-7917c58
-      ##
-      imagePullPolicy: IfNotPresent
-      ##
-      ##
       command:
         - /bin/sh
         - -c
         - |
           set -e
           apk add --update --no-cache libintl gettext apache2-utils
-
           export INDEXER_PASSWORD_BCRYPT=$(htpasswd -bnBC 12 "" $INDEXER_PASSWORD | tr -d ':\n')
           export DASHBOARD_USERNAME_BCRYPT=$(htpasswd -bnBC 12 "" $DASHBOARD_PASSWORD | tr -d ':\n')
           envsubst < /workdir/internal_users.yml > /processed/internal_users.yml
-
-      ##
-      ##
       envFrom:
         - secretRef:
             name: '{{ include "secret.indexer-auth" $ }}'
         - secretRef:
             name: '{{ include "secret.dashboard-auth" $ }}'
-      ##
-      ##
       volumeMounts:
         - name: indexer-conf
           mountPath: /workdir/internal_users.yml
@@ -340,611 +164,214 @@ indexer:
         - name: wazuh-config-temp
           mountPath: /processed
 
-    
-##
-##
-worker:
-  ##
-  ##
-  additionalAnnotations: { }
-  ##
-  ##
-  additionalLabels: { }
-  ##
-  ##
-  replicaCount: 2
-  ##
-  ##
-  updateStrategy:
-    type: RollingUpdate
-  ##
-  ##
-  nameOverride: ""
-  ##
-  ##
-  image:
-    ##
-    ##
-    registry: docker.io
-    ##
-    ##
-    repository: wazuh/wazuh-manager
-    ##
-    ##
-    tag: '{{ .Values.global.version }}'
-    ##
-    ##
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
-    pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
 
-  ##
-  ##
-  volumeMounts: [ ]
-
-  ##
-  ##
-  initContainers: { }
-  ##
-  ##
-  env: [ ]
-  ##
-  ##
-  envFrom: [ ]
-  ##
-  ##
-  volumes:
-    - name: manager-backup
-      persistentVolumeClaim:
-        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
-  ##
-  ##
-  podManagementPolicy: Parallel
-
-  ##
-  ##
-  persistence:
-    ##
-    ##
-    size: 200Mi
-    ##
-    ##
-    storageClassName: ~
-    ##
-    ##
-    accessModes:
-      - ReadWriteOnce
-
-  resources: ~
-
-  ##
-  ##
-  affinity: ~
-  
-  ##
-  ##
-  securityContext:
-    capabilities:
-      add: [ "SYS_CHROOT" ]
-    privileged: true
-
-##
-##
-worker_integration:
-  ##
-  ##
-  enabled: false
-  ##
-  ##
-  additionalAnnotations: { }
-  ##
-  ##
-  additionalLabels: { }
-  ##
-  ##
-  replicaCount: 1
-  ##
-  ##
-  updateStrategy:
-    type: RollingUpdate
-  ##
-  ##
-  nameOverride: ""
-  ##
-  ##
-  image:
-    ##
-    ##
-    registry: docker.io
-    ##
-    ##
-    repository: wazuh/wazuh-manager
-    ##
-    ##
-    tag: '{{ .Values.global.version }}'
-    ##
-    ##
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
-    pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
-
-  ##
-  ##
-  volumeMounts: [ ]
-
-  ##
-  ##
-  initContainers: { }
-  ##
-  ##
-  env: [ ]
-  ##
-  ##
-  envFrom: [ ]
-  ##
-  ##
-  volumes:
-    - name: manager-backup
-      persistentVolumeClaim:
-        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
-  ##
-  ##
-  podManagementPolicy: Parallel
-
-  ##
-  ##
-  persistence:
-    ##
-    ##
-    size: 200Mi
-    ##
-    ##
-    storageClassName: ~
-    ##
-    ##
-    accessModes:
-      - ReadWriteOnce
-
-  resources: ~
-
-  ##
-  ##
-  affinity: ~
-  
-  ##
-  ##
-  securityContext:
-    capabilities:
-      add: [ "SYS_CHROOT" ]
-    privileged: true
-
-##
-##
-worker_agentless:
-  ##
-  ##
-  enabled: false
-  ##
-  ##
-  additionalAnnotations: { }
-  ##
-  ##
-  additionalLabels: { }
-  ##
-  ##
-  replicaCount: 1
-  ##
-  ##
-  updateStrategy:
-    type: RollingUpdate
-  ##
-  ##
-  nameOverride: ""
-  ##
-  ##
-  image:
-    ##
-    ##
-    registry: ghcr.io
-    ##
-    ##
-    repository: adorsys-gis/wazuh-manager-agentless
-    ##
-    ##
-    tag: '{{ .Values.global.version }}'
-    ##
-    ##
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
-    pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
-
-  ##
-  ##
-  volumeMounts: [ ]
-
-  ##
-  ##
-  initContainers: { }
-  ##
-  ##
-  env: [ ]
-  ##
-  ##
-  envFrom: [ ]
-  ##
-  ##
-  volumes:
-    - name: manager-backup
-      persistentVolumeClaim:
-        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
-  ##
-  ##
-  podManagementPolicy: Parallel
-
-  ##
-  ##
-  persistence:
-    ##
-    ##
-    size: 200Mi
-    ##
-    ##
-    storageClassName: ~
-    ##
-    ##
-    accessModes:
-      - ReadWriteOnce
-
-  resources: ~
-
-  ##
-  ##
-  affinity: ~
-
-  ##
-  ##
-  securityContext: ~
-
+# =============================================================================
+# SECTION 4: WAZUH MANAGER - MASTER
+# =============================================================================
 
 master:
   replicaCount: 1
-  ##
-  ##
-  nameOverride: ""
-  ##
-  ##
+
   image:
     registry: docker.io
     repository: wazuh/wazuh-manager
     tag: '{{ .Values.global.version }}'
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
     pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
-  ##
-  ##
-  additionalAnnotations: { }
-  ##
-  ##
-  additionalLabels: { }
 
-  ##
-  ##
   ingress:
-    ##
-    ##
     enabled: false
-    ##
-    ##
-    name: "wazuh-master"
-    ##
-    ##
     className: ""
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
     host: "{{ .Values.global.domain }}"
-    ##
-    ##
     tls: true
 
-    additionalLabels: { }
+  initContainers: {}
+  env: []
+  envFrom: []
 
-  ##
-  ##
-  podManagementPolicy: Parallel
-
-  ##
-  ##
-  updateStrategy:
-    type: RollingUpdate
-  ##
-  initContainers: { }
-  ##
-  ##
-  env: [ ]
-  ##
-  ##
-  envFrom: [ ]
-  ##
-  ##
   volumes:
     - name: manager-backup
       persistentVolumeClaim:
         claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
-    - name: snort-alerts
-      persistentVolumeClaim:
-        claimName: snort-alerts
-    - name: owasp-zap-alerts
-      persistentVolumeClaim:
-        claimName: owasp-zap-alerts
 
-  volumeMounts:
-    - name: snort-alerts
-      mountPath: /var/log/snort/
-    - name: owasp-zap-alerts
-      mountPath: /var/log/owasp-zap/
-
-  resources: ~
+  volumeMounts: []
 
   persistence:
-    ##
-    ##
-    size: 10Gi
-    ##
-    ##
+    size: 50Gi
     storageClassName: ~
-    ##
-    ##
-    accessModes:
-      - ReadWriteOnce
+    accessModes: [ReadWriteOnce]
 
-  ##
-  ##
+  resources: ~
   affinity: ~
-  
-  ##
-  ##
+
   securityContext:
     capabilities:
-      add: [ "SYS_CHROOT" ]
+      add: ["SYS_CHROOT"]
     privileged: true
 
-##
-##
-extraVolumeConfigs:
-  '{{ include "common.names.fullname" $ }}-manager-backup':
-    enabled: true
-    additionalAnnotations: { }
-    additionalLabels: { }
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 500Mi
-    storageClassName: ~
-    dataSource: ~
-    volumeName: ~
-    volumeMode: ~
-    volumeAttributesClassName: ~
-    dataSourceRef: ~
-    selector: ~
-  snort-alerts:
-    storageClassName: ~
-    enabled: true
-    additionalAnnotations: { }
-    additionalLabels: { }
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 200Mi
-  owasp-zap-alerts:
-    storageClassName: ~
-    enabled: true
-    additionalAnnotations: { }
-    additionalLabels: { }
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 200Mi
 
-##
-##
-dashboard:
-  ##
-  ##
-  nameOverride: ""
-  ##
-  ##
+# =============================================================================
+# SECTION 5: WAZUH MANAGER - WORKER
+# =============================================================================
+
+worker:
+  replicaCount: 2
+
   image:
-    ##
-    ##
     registry: docker.io
-    ##
-    ##
+    repository: wazuh/wazuh-manager
+    tag: '{{ .Values.global.version }}'
+    pullPolicy: IfNotPresent
+
+  initContainers: {}
+  env: []
+  envFrom: []
+
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+
+  volumeMounts: []
+
+  persistence:
+    size: 50Gi
+    storageClassName: ~
+    accessModes: [ReadWriteOnce]
+
+  resources: ~
+  affinity: ~
+
+  securityContext:
+    capabilities:
+      add: ["SYS_CHROOT"]
+    privileged: true
+
+
+# =============================================================================
+# SECTION 6: WAZUH MANAGER - WORKER INTEGRATION
+# =============================================================================
+# Dedicated worker for cloud integrations (AWS, Azure, GitHub).
+
+worker_integration:
+  enabled: false
+  replicaCount: 1
+
+  image:
+    registry: docker.io
+    repository: wazuh/wazuh-manager
+    tag: '{{ .Values.global.version }}'
+    pullPolicy: IfNotPresent
+
+  initContainers: {}
+  env: []
+  envFrom: []
+
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+
+  volumeMounts: []
+
+  persistence:
+    size: 50Gi
+    storageClassName: ~
+    accessModes: [ReadWriteOnce]
+
+  resources: ~
+  affinity: ~
+
+  securityContext:
+    capabilities:
+      add: ["SYS_CHROOT"]
+    privileged: true
+
+
+# =============================================================================
+# SECTION 7: WAZUH DASHBOARD
+# =============================================================================
+
+dashboard:
+  image:
+    registry: docker.io
     repository: wazuh/wazuh-dashboard
     tag: '{{ .Values.global.version }}'
-    digest: ""
-    ## Specify a imagePullPolicy
-    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
-    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
-    ##
     pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## e.g:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
 
-  ##
-  ##
-  additionalAnnotations: { }
-  additionalLabels: { }
-  resources: ~
-
-  ##
-  ##
-  authSecret: ~
-  ##
-  ##
   auth:
-    ##
-    ##
     username: kibanaserver
-    ##
-    ##
     password: "mS05mw_0a?-nMGfM"
-  ##
-  ##
-  ingress:
-    ##
-    ##
-    additionalLabels: { }
-    ##
-    ##
+  authSecret: ~
+
+  # Enable/disable sidebar modules
+  modules:
+    pci: true
+    gdpr: true
+    hipaa: true
+    nist: true
+    tsc: true
+    audit: true
+    oscap: false
+    ciscat: false
+    aws: false
+    gcp: false
+    azure: false
+    virustotal: false
+    osquery: false
+    docker: false
+
+  # Create index patterns for Discover tab
+  indexPatterns:
     enabled: false
-    ##
-    ##
-    tls:
-      ##
-      ##
+    archives:
       enabled: true
-      ##
-      ##
-      useSecret: false 
-    ##
-    ##
-    name: "wazuh-dashboard"
-    ##
-    ##
+    alerts:
+      enabled: false
+    monitoring:
+      enabled: false
+    statistics:
+      enabled: false
+
+  ingress:
+    enabled: false
     className: ""
-    ##
-    ##
-    annotations: { }
-    ##
-    ##
     host: "{{ .Values.global.domain }}"
-    ##
-    ##
     port: 5601
-  ports:
-    - containerPort: 5601
-      name: dashboard
-  volumes: [ ]
-  volumeMounts: [ ]
+    tls:
+      enabled: true
+      useSecret: false
+
   env:
     - name: OPENSEARCH_JAVA_OPTS
       value: '-Xms1g -Xmx1g -Dlog4j2.formatMsgNoLookups=true'
-  envFrom: [ ]
-  ## @branding more at https://opensearch.org/docs/latest/dashboards/branding/
-  ## 
+
+  volumes: []
+  volumeMounts: []
+  resources: ~
+
   branding:
     logo:
       defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
-    #  darkModeUrl: "https://example.com/dark-mode-sample.svg"
     mark:
       defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
-    #   darkModeUrl: ""
     loadingLogo:
       defaultUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
-    #   darkModeUrl: ""
     faviconUrl: "https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/images/favicon-dark.svg"
     applicationTitle: "Wazuh | Adorsys"
-    useExpandedHeader: false
 
+
+# =============================================================================
+# SECTION 9: SERVICES
+# =============================================================================
 
 svcs:
-  ##
-  ##
+  # Master: API (55000) + Registration (1515)
   '{{ include "common.names.fullname" $ }}':
-    ##
-    ##
     enabled: true
-
-    ##
-    ##
     type: LoadBalancer
-
-    ##
-    ##
-    additionalLabels: { }
-
-    ##
-    ##
-    annotations: { }
-
-    ##
-    ##
-    loadBalancerClass: ""
-
-    ##
-    ##
-    clusterIP: ~
-
-    ##
-    ##
-    loadBalancerIP: ~
-
-    ##
-    ##
-    allocateLoadBalancerNodePorts: ~
-
-    ##
-    ##
     selector:
       app: '{{ include "common.names.fullname" $ }}-manager'
       node-type: master
-
     ports:
       - name: api
         port: 55000
@@ -955,389 +382,237 @@ svcs:
         targetPort: registration
         protocol: TCP
 
-  ##
-  ##
+  # Worker: Agent events (1514)
   '{{ include "common.names.fullname" $ }}-worker':
-    ##
-    ##
     enabled: true
-
-    ##
-    ##
     type: LoadBalancer
-
-    ##
-    ##
-    additionalLabels: { }
-
-    ##
-    ##
-    annotations: { }
-
-    ##
-    ##
-    loadBalancerClass: ""
-
-    ##
-    ##
+    selector:
+      app: '{{ include "common.names.fullname" $ }}-manager'
+      node-type: worker
     ports:
       - name: agents-events
         port: 1514
         targetPort: agents-events
         protocol: TCP
 
-    ##
-    ##
-    selector:
-      app: '{{ include "common.names.fullname" $ }}-manager'
-      node-type: worker
-
-  ##
-  ##
+  # Cluster: Internal communication
   '{{ include "common.names.fullname" $ }}-cluster':
-    ##
-    ##
     enabled: true
-
-    ##
-    ##
     type: ClusterIP
-
-    ##
-    ##
-    additionalLabels: { }
-
-    ##
-    ##
-    annotations: { }
-
-    ##
-    ##
-    loadBalancerClass: ""
-
-    ##
-    ##
+    clusterIP: None
     selector:
       app: '{{ include "common.names.fullname" $ }}-manager'
-
-    ##
-    ##
-    clusterIP: None
-
-    ##
-    ##
     ports:
       - name: cluster
         port: 1516
         protocol: TCP
         targetPort: cluster
 
-  ##
-  ##
+  # Dashboard: Web UI (5601)
   '{{ include "common.names.fullname" $ }}-dashboard':
-    ##
-    ##
     enabled: true
-
-    ##
-    ##
     type: ClusterIP
-
-    ##
-    ##
-    additionalLabels: { }
-
-    ##
-    ##
-    annotations: { }
-
-    ##
-    ##
-    loadBalancerClass: ""
-
-    ##
-    ##
     selector:
-      ##
-      ##
       app: '{{ include "common.names.fullname" $ }}-dashboard'
-
-    ##
-    ##
-    clusterIP: ~
-
-    ##
-    ##
     ports:
       - name: dashboard
         port: 5601
         protocol: TCP
         targetPort: 5601
 
-##
-##
+
+# =============================================================================
+# SECTION 10: CLUSTER & SECURITY
+# =============================================================================
+
 cluster:
-  ##
-  ##
   secret:
-    ##
-    ##
     enabled: true
-  
-  ##
-  ##
   secretName: ~
-  ##
-  ##
+
+  # [REQUIRED] Root CA secret name for TLS
   rootCaSecretName: "example-secret-name"
-  ##
-  ##
+
   auth:
-    ##
-    ##
+    # [REQUIRED] Cluster key (generate with: openssl rand -hex 16)
     key: "dfbb2c1b9d679c39af94d5c1c821c952"
-  
-  ##
-  ##
+    # Password-based agent registration (simpler for homelab)
+    usePassword: false
+    agentPassword: ""
+
   config:
-    ##
-    ##
     smtp:
-      ##
-      ##
       server: smtp.example.wazuh.com
-      ##
-      ##
       from: ossecm@example.wazuh.com
-      ##
-      ##
       to: recipient@example.wazuh.com
-      ##
-      ##
       max_per_hour: 12
-  
-  ##
-  ##
-  ## rules:
-  ##    "rules.miaou.xml": |
-  ##      <group name="miaou,">
-  ##        <rule id="100000" level="3">
-  ##          <decoded_as>miaou</decoded_as>
-  ##          <description>miaou</description>
-  ##          <field name="program">miaou</field>
-  ##        </rule>
-  ##      </group>
-  rules: { }
-  
-  ##
-  ##
-  ## decoders:
-  ##    "decoder.miaou.xml": |
-  ##      <decoder name="miaou">
-  ##          <prematch>^{\s*"@programName"\s*:\s*"ZAP"</prematch>
-  ##          <plugin_decoder>JSON_Decoder</plugin_decoder>
-  ##      </decoder>
-  ##      
-  ##      <decoder name="miaou">
-  ##          <parent>miaou</parent>
-  ##          <regex type="pcre2">\"riskcode\".*?:.*?\"(.*?)\"</regex>
-  ##          <order>riskcode</order>
-  ##      </decoder>
-  decoders: { }
+
+  logging:
+    maxSize: "50M"
+    compress: true
+    rotatedLogsToKeep: 7
+
+  cleanup:
+    enabled: true
+    vdFeedRetentionDays: 7
+    fimDiffRetentionDays: 14
+    alertsRetentionDays: 30
+
+  # Custom rules and decoders (inline YAML)
+  rules: {}
+  decoders: {}
 
 
-##
-##
-configmaps: { }
+# =============================================================================
+# SECTION 11: API CREDENTIALS
+# =============================================================================
 
-##
-##
-secrets: { }
+apiCred:
+  authSecret: ~
+  auth:
+    username: wazuh-wui
+    password: "9Y0m^%^Cx4zx@6=X"
 
 
-##
-##
+# =============================================================================
+# SECTION 12: NOTIFICATIONS
+# =============================================================================
+
 notification:
-  ##
-  ##
   slack:
-    ##
-    ##
     enabled: false
-    ##
-    ##
-    webhookUrl: https://<example1>.slack.com/services/hooks/<example2>
-    ##
-    ##
+    webhookUrl: https://<example>.slack.com/services/hooks/<webhook>
     externalSecret: ~
 
+  email:
+    enabled: false
+    accountName: "wazuh-smtp-account"
+    host: "smtp.gmail.com"
+    port: 587
+    method: "starttls"
+    from: "wazuh-alerts@example.com"
+    username: ""
+    password: ""
+    existingSecret: ~
+    recipients:
+      - "security-team@example.com"
 
-##
-##
+  # GitHub Issues notification - creates tickets for security alerts
+  github:
+    enabled: false
+    owner: ""           # GitHub org or user (e.g., "skyengpro")
+    repo: ""            # Repository name (e.g., "security-alerts")
+    token: ""           # GitHub PAT with repo:write scope
+    labels:             # Labels to add to created issues
+      - "security-alert"
+      - "wazuh"
+
+
+# =============================================================================
+# SECTION 13: INTEGRATIONS
+# =============================================================================
+
 integration:
-  ##
-  ## Azure integrations for Log Analytics, Graph API, and Storage
-  ## https://documentation.wazuh.com/current/cloud-security/azure/index.html
-  azure:
-    ## Azure tenant domain (e.g., company.onmicrosoft.com)
-    tenantDomain: ~
+  jira:
+    enabled: false
+    webhookUrl: https://<example>.jira.com/services/hooks/<webhook>
+    apikey: ""
+    projectKey: WAZUH
+    externalSecret: ~
 
-    ## Credentials stored in Kubernetes secrets
-    ## Create secret with:
-    ##   kubectl create secret generic wazuh-azure-secrets \
-    ##     --from-literal=log_analytics_credentials='{"application_id":"xxx","application_key":"yyy"}' \
-    ##     --from-literal=graph_credentials='{"application_id":"xxx","application_key":"yyy"}' \
-    ##     --from-literal=storage_credentials='{"account_name":"xxx","account_key":"yyy"}' \
-    ##     -n <namespace>
+  github: []
+  # Example:
+  #   - secret: <GitHub PAT>
+  #     orgs: [myorg1, myorg2]
+
+  azure:
+    tenantDomain: ~
     secrets:
       create: false
-      existingSecret: ~  # Name of existing secret (e.g., "wazuh-azure-secrets")
-
-    ## Azure Log Analytics integration
+      existingSecret: ~
     logAnalytics:
       enabled: false
-      workspace: ~  # Default workspace ID (optional, can be overridden per query)
-      ## Multiple queries support
-      ## queries:
-      ##   - query: "AzureActivity"
-      ##     workspace: "workspace-id-1"  # Optional, defaults to top-level workspace
-      ##     timeOffset: "1d"              # Optional, defaults to "1d"
-      ##   - query: "SecurityEvent"
-      ##     workspace: "workspace-id-2"
-      ##     timeOffset: "12h"
+      workspace: ~
       queries: []
-
-    ## Azure Graph API integration (Microsoft Entra ID / Azure AD)
     graph:
       enabled: false
-      ## Multiple queries support
-      ## queries:
-      ##   - query: "auditLogs/directoryAudits"
-      ##     timeOffset: "1d"
-      ##   - query: "auditLogs/signIns"
-      ##     timeOffset: "12h"
       queries: []
-
-    ## Azure Storage integration
     storage:
       enabled: false
-      ## Multiple containers support
-      ## containers:
-      ##   - name: "insights-activity-logs"
-      ##     blobs: ".json"
-      ##     contentType: "json_inline"
-      ##     timeOffset: "24h"
-      ##   - name: "insights-logs-audit"
-      ##     blobs: ".json"
-      ##     contentType: "json_inline"
-      ##     timeOffset: "12h"
       containers: []
 
-
-  ##
-  ## https://documentation.wazuh.com/current/cloud-security/azure/storage.html
-  github: [ ]
-#    - ##
-#      ##
-#      secret: <PAT>
-#      ##
-#      ##
-#      orgs:
-#        - <ORG1>
-#        - <ORG2>
-  ##
-  ## https://documentation.wazuh.com/current/user-manual/manager/integration-with-external-apis.html
-  jira:
-    ##
-    ##
-    enabled: true
-    ##
-    ##
-    webhookUrl: https://<example1>.jira.com/services/hooks/<example2>
-    ##
-    ##
-    apikey: 101010
-    ##
-    ##
-    projectKey: WAZUH
-    ##
-    ##
-    externalSecret: ~
-
-  ##
-  ## AWS integrations for CloudTrail and Security Hub
   aws:
     enable: false
-    ## top-level defaults reused by both blocks
     profile: ~
     roleArn: ~
     awsOrganizationId: ~
-    ## Optional k8s Secret to mount to /root/.aws containing credentials and/or config
     secrets:
       create: false
-      # name: "wazuh-aws"
       existingSecret: "ext-wazuh-aws-secrets"
-      additionalAnnotations: {}
-      additionalLabels: {}
-      ## Inline contents if creating the secret:
-      ## credentials: |
-      ##   [default]
-      ##   aws_access_key_id=...
-      ##   aws_secret_access_key=...
       credentials: ~
-      ## config: |
-      ##   [profile main]
-      ##   region=eu-central-1
-      ##   role_arn=arn:aws:iam::123456789012:role/Wazuh-IAM-Role
-      ##   source_profile=default
       config: ~
-    ## CloudTrail from S3 bucket
     cloudtrail:
       enabled: false
       bucketName: ~
-      interval: 1m
-    ## AWS Config from S3 bucket
+      interval: 30m
+      onlyLogsAfter: ~
     config:
       enabled: false
       bucketName: ~
-      ## Multi-account support: Comma-separated list of AWS account IDs
-      ## Example: "020980146275,564357927993,590183746717"
-      ## Wazuh will automatically look for Config data in the format:
-      ##   s3://bucketName/AWSLogs/{accountId}/Config/...
       awsAccountIds: ~
-    ## Security Hub via SQS
     securityHub:
       enabled: false
       sqsName: ~
       interval: 1h
+    guardduty:
+      enabled: false
+      bucketName: ~
+      awsAccountIds: ~
+      onlyLogsAfter: ~
 
-initJobs:
-  '{{ include "common.names.fullname" $ }}-dummy':
-    enable: false
-    additionalLabels: ~
-    image:
-      registry: docker.io
-      repository: bash
-      tag: 'latest'
-      digest: ""
-      pullPolicy: IfNotPresent
-      pullSecrets: [ ]
-    restartPolicy: OnFailure
-    resources: ~
-    command: [ "/bin/bash","-lc" ]
-    args:
-      - |
-        #!/bin/bash
-        
-        echo "Dummy job task"
-    
 
-    volumeMounts: ~
+# =============================================================================
+# SECTION 14: EXTRA VOLUMES (PVCs)
+# =============================================================================
 
-    env: ~
+extraVolumeConfigs:
+  '{{ include "common.names.fullname" $ }}-manager-backup':
+    enabled: true
+    accessModes: [ReadWriteOnce]
+    resources:
+      requests:
+        storage: 500Mi
+    storageClassName: ~
 
-    envFrom: ~
 
-    volumes: ~
+# =============================================================================
+# SECTION 15: ADDITIONAL RESOURCES
+# =============================================================================
 
-    initContainers: ~
+configmaps: {}
+secrets: {}
+
+
+# =============================================================================
+# SECTION 16: CERTIFICATE JOB
+# =============================================================================
+
+secretjob:
+  enabled: true
+  additionalAnnotations:
+    "helm.sh/hook": pre-install
+
+  image:
+    registry: docker.io
+    repository: alpine
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  secretImage:
+    registry: docker.io
+    repository: bitnamilegacy/kubectl
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  serviceAccount:
+    name: wazuh-certs

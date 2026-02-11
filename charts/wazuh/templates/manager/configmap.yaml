@@ -9,42 +9,44 @@ metadata:
 data:
   {{ $template := $.Files.Get "files/configs/template.config.conf.xml" -}}
   "template.config.xml": |
-    {{ include "common.tplvalues.render" (dict "value" $template "context" $) | nindent 6 }}
+    {{- include "common.tplvalues.render" (dict "value" $template "context" $) | nindent 4 }}
   "0004-custom-decoder.xml":  |
-    {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/decoder.santa.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoders/decoder.trivy.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoders/decoder.yara.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoders/decoder.adguard.xml" | nindent 6 }}
   
   "7005-audit-mitre_rules.xml":  |
-    {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.audit-mitre.xml" | nindent 6 }}
 
   "7006-fim-macos.xml":  |
-    {{ $.Files.Get "files/configs/rules.FIM-MacOS.xml" | nindent 6 }}
-
-  "7006-macos-syslog.xml":  |
-    {{ $.Files.Get "files/configs/rules.MacOS-Syslog.xml" | nindent 6 }}
-
-  "7006-macos-auth.xml":  |
-    {{ $.Files.Get "files/configs/rules.MacOS-Auth.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.FIM-MacOS.xml" | nindent 6 }}
 
   "7007-fim-linux.xml":  |
-    {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.FIM-Linux.xml" | nindent 6 }}
 
   "7008-custom-yara.xml":  |
-    {{ $.Files.Get "files/configs/rules.custom-yara.xml" | nindent 6 }}  
+    {{ $.Files.Get "files/configs/rules/rules.custom-yara.xml" | nindent 6 }}  
 
   "7009-fim-windows.xml":  |
-    {{ $.Files.Get "files/configs/rules.custom-windows.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.custom-windows.xml" | nindent 6 }}
 
-  "7010-custom-suricata.xml":  |
-    {{ $.Files.Get "files/configs/rules.suricata.xml" | nindent 6 }}      
+  "7010-app-blacklist.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.app-blacklist.xml" | nindent 6 }}
 
-  "7011-lotl-detection.xml":  |
-    {{ $.Files.Get "files/configs/lotl-detection.xml" | nindent 6 }}
+  "7011-dns-monitoring.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.dns-monitoring.xml" | nindent 6 }}
 
-  "dlp.xml": |
-    {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}
+  "7012-suricata-custom.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.suricata-custom.xml" | nindent 6 }}
+
+  "7013-adguard.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.adguard.xml" | nindent 6 }}
+
+  "blacklist-apps.txt":  |
+    {{ $.Files.Get "files/configs/lists/blacklist-apps.txt" | nindent 4 }}
+
+  "blacklist-domains.txt":  |
+    {{ $.Files.Get "files/configs/lists/blacklist-domains.txt" | nindent 4 }}
 
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
@@ -52,12 +54,35 @@ data:
     {{ include "common.tplvalues.render" (dict "value" $f "context" $) | nindent 6 }}
   {{- end }}
   
+  # Default group - common settings for agents not in a platform-specific group
+  "agent.conf":  |
+    {{ $.Files.Get "files/configs/agents/agent-common.conf" | nindent 4 }}
+
+  "agent-linux.conf":  |
+    {{ $.Files.Get "files/configs/agents/agent-linux.conf" | nindent 4 }}
+
+  "agent-macos.conf":  |
+    {{ $.Files.Get "files/configs/agents/agent-macos.conf" | nindent 4 }}
+
+  "agent-windows.conf":  |
+    {{ $.Files.Get "files/configs/agents/agent-windows.conf" | nindent 4 }}
+
+  "agent-docker.conf":  |
+    {{ $.Files.Get "files/configs/agents/agent-docker.conf" | nindent 4 }}
+
+  # SCA Policies
+  "cis_apple_macOS_26.x.yml":  |
+    {{ $.Files.Get "files/configs/sca/cis_apple_macOS_26.x.yml" | nindent 4 }}
+
+  # SCA Policy Sync Script for macOS agents
+  "sync_sca_policies.sh":  |
+    {{ $.Files.Get "files/configs/sync_sca_policies.sh" | nindent 4 }}
+
   "local_rules.xml":  |
-    {{ $.Files.Get "files/configs/rules.snort.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/rules.syscheck.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/rules.trivy.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/rules.false-positive.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/rules.overwrite.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.syscheck.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.trivy.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.false-positive.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.overwrite.xml" | nindent 6 }}
     
   {{ range $k, $v := $.Values.cluster.rules }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}

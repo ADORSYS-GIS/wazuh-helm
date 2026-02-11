@@ -4,12 +4,7 @@ updates:
   directory: "/utils/packages/envsubt"
   schedule:
     interval: daily
-  open-pull-requests-limit: 5
-- package-ecosystem: docker
-  directory: "/utils/packages/wazuh-manager-agentless"
-  schedule:
-    interval: daily
-  open-pull-requests-limit: 5
+  open-pull-requests-limit: 10
 - package-ecosystem: github-actions
   directory: "/"
   schedule:
