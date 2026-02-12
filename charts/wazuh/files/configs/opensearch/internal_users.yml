@@ -8,16 +8,16 @@ _meta:
 #
 # Define your internal users here
 #
-## Demo users
+## System users (required)
 #
 ${INDEXER_USERNAME}:
   hash: "${INDEXER_PASSWORD_BCRYPT}"
   reserved: true
   backend_roles:
     - "admin"
-  description: "Demo admin user"
+  description: "Admin user"
 #
 ${DASHBOARD_USERNAME}:
   hash: "${DASHBOARD_USERNAME_BCRYPT}"
   reserved: true
-  description: "Demo kibanaserver user"
+  description: "Dashboard server user"
