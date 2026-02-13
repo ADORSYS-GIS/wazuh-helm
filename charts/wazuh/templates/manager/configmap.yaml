@@ -83,6 +83,10 @@ data:
     {{ $.Files.Get "files/configs/rules/rules.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules/rules.false-positive.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules/rules.overwrite.xml" | nindent 6 }}
+
+  # Internal options for performance tuning
+  "local_internal_options.conf":  |
+    {{ $.Files.Get "files/configs/local_internal_options.conf" | nindent 4 }}
     
   {{ range $k, $v := $.Values.cluster.rules }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}

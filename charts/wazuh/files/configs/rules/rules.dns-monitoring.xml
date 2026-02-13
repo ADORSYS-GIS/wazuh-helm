@@ -161,4 +161,89 @@
     <group>suspicious_tld,dns_query,suspicious,</group>
   </rule>
 
+  <!-- ================================================== -->
+  <!-- PHISHING DETECTION                                 -->
+  <!-- ================================================== -->
+
+  <!-- Windows Sysmon - Phishing domain patterns -->
+  <rule id="760020" level="12">
+    <if_sid>760001</if_sid>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)login-verify|account-confirm|secure-login|update-billing|verify-account|password-reset|account-suspended|security-alert|signin-verify|account-update</field>
+    <description>PHISHING: Suspicious phishing domain pattern detected - $(win.eventdata.queryName)</description>
+    <mitre>
+      <id>T1566</id>
+    </mitre>
+    <group>phishing,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- Windows Sysmon - Brand impersonation phishing -->
+  <rule id="760021" level="12">
+    <if_sid>760001</if_sid>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)(paypal|microsoft|apple|google|amazon|netflix|facebook|instagram|linkedin|dropbox|adobe|office365|outlook|onedrive|icloud|chase|wellsfargo|bankofamerica)[^a-z].*\.(tk|ml|ga|cf|gq|xyz|pw|top|work|click|link|live|icu|buzz)</field>
+    <description>PHISHING: Brand impersonation detected - $(win.eventdata.queryName)</description>
+    <mitre>
+      <id>T1566.002</id>
+    </mitre>
+    <group>phishing,brand_impersonation,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- Linux - Phishing domain patterns -->
+  <rule id="760033" level="12">
+    <if_sid>760030,760031</if_sid>
+    <match type="pcre2">(?i)login-verify|account-confirm|secure-login|update-billing|verify-account|password-reset|account-suspended|security-alert</match>
+    <description>PHISHING: Linux - Suspicious phishing domain pattern detected</description>
+    <mitre>
+      <id>T1566</id>
+    </mitre>
+    <group>phishing,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- tcpdump capture - Phishing domain patterns -->
+  <rule id="760055" level="12">
+    <if_sid>760050</if_sid>
+    <match type="pcre2">(?i)login-verify|account-confirm|secure-login|update-billing|verify-account|password-reset|account-suspended|security-alert|signin-verify|account-update</match>
+    <description>PHISHING: Suspicious phishing domain pattern detected</description>
+    <mitre>
+      <id>T1566</id>
+    </mitre>
+    <group>phishing,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- tcpdump capture - Brand impersonation phishing -->
+  <rule id="760056" level="12">
+    <if_sid>760050</if_sid>
+    <match type="pcre2">(?i)(paypal|microsoft|apple|google|amazon|netflix|facebook|instagram|linkedin|dropbox|adobe|office365|outlook|onedrive|icloud|chase|wellsfargo|bankofamerica)[^a-z].*\.(tk|ml|ga|cf|gq|xyz|pw|top|work|click|link|live|icu|buzz)</match>
+    <description>PHISHING: Brand impersonation detected - potential credential theft</description>
+    <mitre>
+      <id>T1566.002</id>
+    </mitre>
+    <group>phishing,brand_impersonation,dns_query,threat_detected,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- PASTEBIN / DATA EXFILTRATION                       -->
+  <!-- ================================================== -->
+
+  <!-- Windows Sysmon - Pastebin services (data exfil risk) -->
+  <rule id="760022" level="8">
+    <if_sid>760001</if_sid>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)pastebin\.com|paste\.ee|hastebin\.com|ghostbin\.com|privatebin\.net|justpaste\.it|controlc\.com</field>
+    <description>Data Exfiltration Risk: Pastebin service access - $(win.eventdata.queryName)</description>
+    <mitre>
+      <id>T1567</id>
+    </mitre>
+    <group>data_exfiltration,pastebin,dns_query,suspicious,</group>
+  </rule>
+
+  <!-- tcpdump capture - Pastebin services -->
+  <rule id="760057" level="8">
+    <if_sid>760050</if_sid>
+    <match type="pcre2">(?i)pastebin\.com|paste\.ee|hastebin\.com|ghostbin\.com|privatebin\.net|justpaste\.it|controlc\.com</match>
+    <description>Data Exfiltration Risk: Pastebin service access detected</description>
+    <mitre>
+      <id>T1567</id>
+    </mitre>
+    <group>data_exfiltration,pastebin,dns_query,suspicious,</group>
+  </rule>
+
 </group>
