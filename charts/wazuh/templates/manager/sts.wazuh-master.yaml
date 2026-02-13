@@ -298,6 +298,10 @@ spec:
               mountPath: /wazuh-config-mount/etc/decoders/0004-custom-decoder.xml
               subPath: 0004-custom-decoder.xml
               readOnly: true
+            - name: config
+              mountPath: /wazuh-config-mount/etc/local_internal_options.conf
+              subPath: local_internal_options.conf
+              readOnly: true
 
             {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
             - name: jira-conf

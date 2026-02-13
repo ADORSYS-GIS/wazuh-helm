@@ -1751,7 +1751,19 @@ data:
                     {"bool": {"must": [{"term": {"os.platform": "centos"}}, {"terms": {"os.major": ["5", "6", "7", "8"]}}]}},
                     {"bool": {"must": [{"term": {"os.platform": "rhel"}}, {"terms": {"os.major": ["5", "6", "7"]}}]}},
                     {"bool": {"must": [{"term": {"os.platform": "debian"}}, {"terms": {"os.major": ["7", "8", "9", "10"]}}]}},
-                    {"bool": {"must": [{"term": {"os.platform": "amzn"}}, {"terms": {"os.version": ["1", "2", "2018.03"]}}]}}
+                    {"bool": {"must": [{"term": {"os.platform": "amzn"}}, {"terms": {"os.version": ["1", "2", "2018.03"]}}]}},
+                    {"bool": {"must": [{"term": {"os.platform": "darwin"}}, {"bool": {"should": [
+                      {"terms": {"os.major": ["10", "11", "12"]}},
+                      {"wildcard": {"os.name": "*Mavericks*"}},
+                      {"wildcard": {"os.name": "*Yosemite*"}},
+                      {"wildcard": {"os.name": "*El Capitan*"}},
+                      {"wildcard": {"os.name": "*Sierra*"}},
+                      {"wildcard": {"os.name": "*High Sierra*"}},
+                      {"wildcard": {"os.name": "*Mojave*"}},
+                      {"wildcard": {"os.name": "*Catalina*"}},
+                      {"wildcard": {"os.name": "*Big Sur*"}},
+                      {"wildcard": {"os.name": "*Monterey*"}}
+                    ]}}]}}
                   ],
                   "minimum_should_match": 1
                 }
@@ -1810,6 +1822,534 @@ data:
     create_monitor "Daily System Health - Deprecated OS" "$DEPRECATED_OS_MONITOR"
     {{- end }}
 
+    # ================================================================
+    # MONITOR 14: Phishing Detection
+    # Detects DNS queries to known phishing patterns and brand impersonation
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.phishingDetection.enabled }}
+
+    PHISHING_MONITOR='{
+      "name": "Phishing Detection Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.phishingDetection.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 100,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.phishingDetection.lookbackMinutes | default 10 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["phishing"]}},
+                          {"terms": {"rule.groups": ["brand_impersonation"]}},
+                          {"range": {"rule.id": {"gte": 760020, "lte": 760025}}},
+                          {"range": {"rule.id": {"gte": 760055, "lte": 760056}}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {"field": "agent.name", "size": 20},
+                  "aggs": {
+                    "domains": {
+                      "terms": {"field": "data.win.eventdata.queryName", "size": 10}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "query_level_trigger": {
+            "id": "phishing_trigger",
+            "name": "Phishing Domain Detected",
+            "severity": "2",
+            "condition": {
+              "script": {
+                "source": "ctx.results[0].hits.total.value > 0",
+                "lang": "painless"
+              }
+            },
+            "actions": [
+              {{- if .Values.notification.slack.enabled }}
+              {
+                "id": "phishing_slack_action",
+                "name": "Notify Slack",
+                "destination_id": "",
+                "message_template": {
+                  "source": "🎣 *PHISHING ALERT*\n\n*Phishing domain access detected!*\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\n*Affected Systems:*\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n• {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n⚠️ *Action Required:* Investigate potential credential theft attempt",
+                  "lang": "mustache"
+                },
+                "throttle_enabled": true,
+                "throttle": {
+                  "value": {{ .Values.indexer.alerting.monitors.phishingDetection.throttleMinutes | default 15 }},
+                  "unit": "MINUTES"
+                },
+                "action_execution_policy": {
+                  "action_execution_scope": {
+                    "per_alert": {
+                      "actionable_alerts": []
+                    }
+                  }
+                }
+              }
+              {{- end }}
+              {{- if and .Values.notification.email .Values.notification.email.enabled }}
+              {{- if .Values.notification.slack.enabled }},{{- end }}
+              {
+                "id": "phishing_email_action",
+                "name": "Notify Email",
+                "destination_id": "",
+                "message_template": {
+                  "source": "WAZUH PHISHING ALERT\n\nPhishing domain access detected!\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\nAffected Systems:\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\nAction Required: Investigate potential credential theft attempt\n\n---\nGenerated by Wazuh Alerting",
+                  "lang": "mustache"
+                }
+              }
+              {{- end }}
+            ]
+          }
+        }
+      ]
+    }'
+    create_monitor "Phishing Detection Monitor" "$PHISHING_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 15: Anonymizer/Tor Detection
+    # Detects DNS queries to Tor, anonymizers, and VPN services
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.anonymizerTorDetection.enabled }}
+
+    ANONYMIZER_MONITOR='{
+      "name": "Anonymizer Tor Detection Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.anonymizerTorDetection.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 100,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.anonymizerTorDetection.lookbackMinutes | default 10 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["anonymizer"]}},
+                          {"terms": {"rule.groups": ["vpn"]}},
+                          {"match": {"rule.description": "Tor"}},
+                          {"match": {"rule.description": "Anonymizer"}},
+                          {"term": {"rule.id": "760011"}},
+                          {"term": {"rule.id": "760052"}},
+                          {"term": {"rule.id": "750050"}},
+                          {"term": {"rule.id": "750074"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {"field": "agent.name", "size": 20},
+                  "aggs": {
+                    "by_type": {
+                      "terms": {"field": "rule.groups", "size": 5}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "query_level_trigger": {
+            "id": "anonymizer_trigger",
+            "name": "Anonymizer Tor Usage Detected",
+            "severity": "2",
+            "condition": {
+              "script": {
+                "source": "ctx.results[0].hits.total.value > 0",
+                "lang": "painless"
+              }
+            },
+            "actions": [
+              {{- if .Values.notification.slack.enabled }}
+              {
+                "id": "anonymizer_slack_action",
+                "name": "Notify Slack",
+                "destination_id": "",
+                "message_template": {
+                  "source": "🧅 *ANONYMIZER/TOR ALERT*\n\n*Tor or anonymization service usage detected!*\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\n*Affected Systems:*\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n• {{`{{key}}`}}: {{`{{doc_count}}`}} events\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n⚠️ *Policy Violation:* Anonymization tools violate security policy",
+                  "lang": "mustache"
+                },
+                "throttle_enabled": true,
+                "throttle": {
+                  "value": {{ .Values.indexer.alerting.monitors.anonymizerTorDetection.throttleMinutes | default 30 }},
+                  "unit": "MINUTES"
+                },
+                "action_execution_policy": {
+                  "action_execution_scope": {
+                    "per_alert": {
+                      "actionable_alerts": []
+                    }
+                  }
+                }
+              }
+              {{- end }}
+              {{- if and .Values.notification.email .Values.notification.email.enabled }}
+              {{- if .Values.notification.slack.enabled }},{{- end }}
+              {
+                "id": "anonymizer_email_action",
+                "name": "Notify Email",
+                "destination_id": "",
+                "message_template": {
+                  "source": "WAZUH ANONYMIZER/TOR ALERT\n\nTor or anonymization service usage detected!\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\nAffected Systems:\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} events\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\nPolicy Violation: Anonymization tools violate security policy\n\n---\nGenerated by Wazuh Alerting",
+                  "lang": "mustache"
+                }
+              }
+              {{- end }}
+            ]
+          }
+        }
+      ]
+    }'
+    create_monitor "Anonymizer Tor Detection Monitor" "$ANONYMIZER_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 16: Cryptomining DNS Detection
+    # Detects DNS queries to known cryptomining pools
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.cryptominingDns.enabled }}
+
+    CRYPTOMINING_DNS_MONITOR='{
+      "name": "Cryptomining DNS Detection Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.cryptominingDns.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 100,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.cryptominingDns.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["cryptomining"]}},
+                          {"term": {"rule.id": "760010"}},
+                          {"term": {"rule.id": "760032"}},
+                          {"term": {"rule.id": "760042"}},
+                          {"term": {"rule.id": "760051"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {"field": "agent.name", "size": 20},
+                  "aggs": {
+                    "pools": {
+                      "terms": {"field": "data.win.eventdata.queryName", "size": 10}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "query_level_trigger": {
+            "id": "cryptomining_dns_trigger",
+            "name": "Cryptomining Pool DNS Detected",
+            "severity": "1",
+            "condition": {
+              "script": {
+                "source": "ctx.results[0].hits.total.value > 0",
+                "lang": "painless"
+              }
+            },
+            "actions": [
+              {{- if .Values.notification.slack.enabled }}
+              {
+                "id": "cryptomining_dns_slack_action",
+                "name": "Notify Slack",
+                "destination_id": "",
+                "message_template": {
+                  "source": "⛏️ *CRITICAL: CRYPTOMINING DETECTED*\n\n*Mining pool DNS query detected!*\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\n*Compromised Systems:*\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n• {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n🚨 *IMMEDIATE ACTION REQUIRED:*\n1. Isolate affected systems\n2. Investigate for malware\n3. Check for unauthorized processes",
+                  "lang": "mustache"
+                },
+                "throttle_enabled": true,
+                "throttle": {
+                  "value": {{ .Values.indexer.alerting.monitors.cryptominingDns.throttleMinutes | default 5 }},
+                  "unit": "MINUTES"
+                },
+                "action_execution_policy": {
+                  "action_execution_scope": {
+                    "per_alert": {
+                      "actionable_alerts": []
+                    }
+                  }
+                }
+              }
+              {{- end }}
+              {{- if and .Values.notification.email .Values.notification.email.enabled }}
+              {{- if .Values.notification.slack.enabled }},{{- end }}
+              {
+                "id": "cryptomining_dns_email_action",
+                "name": "Notify Email",
+                "destination_id": "",
+                "message_template": {
+                  "source": "WAZUH CRITICAL ALERT - CRYPTOMINING DETECTED\n\nMining pool DNS query detected!\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\nCompromised Systems:\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\nIMMEDIATE ACTION REQUIRED:\n1. Isolate affected systems\n2. Investigate for malware\n3. Check for unauthorized processes\n\n---\nGenerated by Wazuh Alerting",
+                  "lang": "mustache"
+                }
+              }
+              {{- end }}
+            ]
+          }
+        }
+      ]
+    }'
+    create_monitor "Cryptomining DNS Detection Monitor" "$CRYPTOMINING_DNS_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 17: Daily Unauthorized Apps Report
+    # Sends daily report of all unauthorized apps detected with agent IDs
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.enabled }}
+
+    DAILY_UNAUTHORIZED_APPS_MONITOR='{
+      "name": "Daily Unauthorized Apps Report",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "cron": {
+          "expression": "{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleMinute | default 0 }} {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleHour | default 8 }} * * *",
+          "timezone": "{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleTimezone | default "UTC" }}"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "rule.id": {
+                          "gte": 750010,
+                          "lte": 750099
+                        }
+                      }
+                    },
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-24h",
+                          "lte": "now"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "total_violations": {
+                  "value_count": {
+                    "field": "rule.id"
+                  }
+                },
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 100
+                  },
+                  "aggs": {
+                    "agent_id": {
+                      "terms": {
+                        "field": "agent.id",
+                        "size": 1
+                      }
+                    },
+                    "agent_ip": {
+                      "terms": {
+                        "field": "agent.ip",
+                        "size": 1
+                      }
+                    },
+                    "by_app": {
+                      "terms": {
+                        "field": "data.program.name",
+                        "size": 20
+                      }
+                    },
+                    "by_category": {
+                      "terms": {
+                        "field": "rule.groups",
+                        "size": 10
+                      }
+                    },
+                    "by_severity": {
+                      "terms": {
+                        "field": "rule.level",
+                        "size": 5
+                      }
+                    }
+                  }
+                },
+                "by_category": {
+                  "terms": {
+                    "field": "rule.groups",
+                    "size": 10
+                  }
+                },
+                "by_application": {
+                  "terms": {
+                    "field": "data.program.name",
+                    "size": 50
+                  }
+                },
+                "critical_violations": {
+                  "filter": {
+                    "range": {
+                      "rule.level": {
+                        "gte": 12
+                      }
+                    }
+                  }
+                },
+                "high_violations": {
+                  "filter": {
+                    "range": {
+                      "rule.level": {
+                        "gte": 10,
+                        "lt": 12
+                      }
+                    }
+                  }
+                },
+                "medium_violations": {
+                  "filter": {
+                    "range": {
+                      "rule.level": {
+                        "gte": 6,
+                        "lt": 10
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Daily Unauthorized Apps Trigger",
+          "severity": "4",
+          "condition": {
+            "script": {
+              "source": "return true",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email - Daily Unauthorized Apps",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": false,
+              "subject_template": {
+                "source": "[WAZUH] Daily Unauthorized Apps Report - {{`{{ctx.periodEnd}}`}}",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "=====================================\nWAZUH DAILY UNAUTHORIZED APPS REPORT\n=====================================\nReport Period: Last 24 Hours\nGenerated: {{`{{ctx.periodEnd}}`}}\n\n=====================================\nSUMMARY\n=====================================\n\nTotal Violations: {{`{{ctx.results.0.aggregations.total_violations.value}}`}}\nCritical (Level 12+): {{`{{ctx.results.0.aggregations.critical_violations.doc_count}}`}}\nHigh (Level 10-11): {{`{{ctx.results.0.aggregations.high_violations.doc_count}}`}}\nMedium (Level 6-9): {{`{{ctx.results.0.aggregations.medium_violations.doc_count}}`}}\n\n=====================================\nVIOLATIONS BY CATEGORY\n=====================================\n{{`{{#ctx.results.0.aggregations.by_category.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} events\n{{`{{/ctx.results.0.aggregations.by_category.buckets}}`}}\n\n=====================================\nTOP UNAUTHORIZED APPLICATIONS\n=====================================\n{{`{{#ctx.results.0.aggregations.by_application.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} detections\n{{`{{/ctx.results.0.aggregations.by_application.buckets}}`}}\n\n=====================================\nAFFECTED AGENTS (WITH IDs)\n=====================================\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n--- Agent: {{`{{key}}`}} ---\nAgent ID: {{`{{#agent_id.buckets}}`}}{{`{{key}}`}}{{`{{/agent_id.buckets}}`}}\nIP Address: {{`{{#agent_ip.buckets}}`}}{{`{{key}}`}}{{`{{/agent_ip.buckets}}`}}\nTotal Violations: {{`{{doc_count}}`}}\n\nApplications Detected:\n{{`{{#by_app.buckets}}`}}\n  - {{`{{key}}`}}: {{`{{doc_count}}`}} times\n{{`{{/by_app.buckets}}`}}\n\nViolation Categories:\n{{`{{#by_category.buckets}}`}}\n  - {{`{{key}}`}}: {{`{{doc_count}}`}}\n{{`{{/by_category.buckets}}`}}\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n=====================================\nRECOMMENDED ACTIONS\n=====================================\n1. Review agents with CRITICAL violations immediately\n2. Contact asset owners for HIGH severity violations\n3. Schedule remediation for MEDIUM violations\n4. Update software policies if false positives detected\n5. Review IRP-UnauthorizedApps playbook for guidance\n\n=====================================\nPLAYBOOK REFERENCE\n=====================================\nFollow the Unauthorized Apps Incident Response Playbook:\n- Rule IDs: 750010-750099\n- Categories: Remote Access, P2P, Hacking Tools, Crypto Miners, VPN/Proxy, Gaming\n- Escalation: Critical/High -> SOC Lead, Medium -> SOC L1, Low -> IT Help Desk\n\nFor detailed investigation, please visit the Wazuh Dashboard.\n\n---\nGenerated by Wazuh Alerting\nDaily Report Schedule: {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleHour | default 8 }}:{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleMinute | default "00" }} {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleTimezone | default "UTC" }}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Daily Unauthorized Apps Report" "$DAILY_UNAUTHORIZED_APPS_MONITOR"
+    {{- end }}
+
     echo ""
     echo "========================================"
     echo "Alerting monitors setup completed!"
@@ -1846,6 +2386,18 @@ data:
     {{- end }}
     {{- if .Values.indexer.alerting.monitors.deprecatedOsReport.enabled }}
     echo "  13. Deprecated OS Report ({{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleHour | default 8 }}:0{{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleMinute | default 1 }} {{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleTimezone | default "UTC" }})"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.phishingDetection.enabled }}
+    echo "  14. Phishing Detection Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.anonymizerTorDetection.enabled }}
+    echo "  15. Anonymizer/Tor Detection Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.cryptominingDns.enabled }}
+    echo "  16. Cryptomining DNS Detection Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.enabled }}
+    echo "  17. Daily Unauthorized Apps Report ({{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleHour | default 8 }}:0{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleMinute | default 0 }} {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleTimezone | default "UTC" }})"
     {{- end }}
     echo ""
 {{- end }}
