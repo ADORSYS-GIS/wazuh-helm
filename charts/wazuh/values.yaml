@@ -755,6 +755,31 @@ master:
       add: [ "SYS_CHROOT" ]
     privileged: true
 
+  auth:
+    enrollment:
+      enabled: true
+      # Enrollment method. Can be 'certificates', 'password', or 'apikey'.
+      # If 'apikey' is selected, agent enrollment via ossec-authd will be disabled.
+      # Agent registration must then be performed via the Wazuh API.
+      method: "certificates"
+      # Password to use for agent enrollment if method is 'password'.
+      password: ""
+      passwordSecret:
+        enabled: false
+        name: "wazuh-enrollment-password"
+        key: "password"
+      force:
+        enabled: true
+        key_mismatch: true
+        disconnected_time:
+          enabled: true
+          value: "1800h"
+        after_registration_time: "1h"
+      purge: false
+      use_source_ip: false
+      ssl_verify_host: false
+      ssl_auto_negotiate: false
+
 ##
 ##
 extraVolumeConfigs:

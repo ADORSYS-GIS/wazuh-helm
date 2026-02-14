@@ -1,6 +1,10 @@
-master: 
+master:
   replicaCount: 1
   resources: ~
+  auth:
+    enrollment:
+      method: "password"
+      password: "j60B6_e`jmQ_3z!z"
   
 worker: 
   replicaCount: 1
