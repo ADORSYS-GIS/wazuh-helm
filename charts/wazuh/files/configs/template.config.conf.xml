@@ -408,6 +408,108 @@
         <rules_id>100302,100304</rules_id>
     </active-response>
 
+    <!-- ================================================== -->
+    <!-- USB DLP - Data Loss Prevention Active Response     -->
+    <!-- Prevents data exfiltration via USB mass storage    -->
+    <!-- Detects BadUSB/Rubber Ducky HID attacks            -->
+    <!-- MITRE ATT&CK: T1052.001, T1200                     -->
+    <!-- ================================================== -->
+
+    <!-- Windows: Disable USB Mass Storage -->
+    <command>
+        <name>disable-usb-storage-windows</name>
+        <executable>disable-usb-storage.ps1</executable>
+        <timeout_allowed>yes</timeout_allowed>
+    </command>
+
+    <!-- Windows: Alert on USB HID (potential BadUSB) -->
+    <command>
+        <name>alert-usb-hid-windows</name>
+        <executable>alert-usb-hid.ps1</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
+
+    <!-- Linux: Disable USB Mass Storage -->
+    <command>
+        <name>disable-usb-storage-linux</name>
+        <executable>disable-usb-storage.sh</executable>
+        <timeout_allowed>yes</timeout_allowed>
+    </command>
+
+    <!-- macOS: Disable USB Mass Storage -->
+    <command>
+        <name>disable-usb-storage-macos</name>
+        <executable>disable-usb-storage-macos.sh</executable>
+        <timeout_allowed>yes</timeout_allowed>
+    </command>
+
+    <!-- Linux/macOS: Alert on USB HID (potential BadUSB) -->
+    <command>
+        <name>alert-usb-hid</name>
+        <executable>alert-usb-hid.sh</executable>
+        <timeout_allowed>no</timeout_allowed>
+    </command>
+
+    <!-- Active Response: Windows USB Mass Storage -->
+    <active-response>
+        <disabled>no</disabled>
+        <command>disable-usb-storage-windows</command>
+        <location>local</location>
+        <rules_id>800131,800132,800133</rules_id>
+        <timeout>3600</timeout>
+    </active-response>
+
+    <!-- Active Response: Windows USB HID Alert -->
+    <active-response>
+        <disabled>no</disabled>
+        <command>alert-usb-hid-windows</command>
+        <location>local</location>
+        <rules_id>800140,800141,800142</rules_id>
+    </active-response>
+
+    <!-- Active Response: Linux USB Mass Storage -->
+    <active-response>
+        <disabled>no</disabled>
+        <command>disable-usb-storage-linux</command>
+        <location>local</location>
+        <rules_id>800151,800152,800153,800154</rules_id>
+        <timeout>3600</timeout>
+    </active-response>
+
+    <!-- Active Response: macOS USB Mass Storage -->
+    <active-response>
+        <disabled>no</disabled>
+        <command>disable-usb-storage-macos</command>
+        <location>local</location>
+        <rules_id>800161,800162,800163</rules_id>
+        <timeout>3600</timeout>
+    </active-response>
+
+    <!-- Active Response: Linux/macOS USB HID Alert -->
+    <active-response>
+        <disabled>no</disabled>
+        <command>alert-usb-hid</command>
+        <location>local</location>
+        <rules_id>800155,800156,800165,800166</rules_id>
+    </active-response>
+
+    <!-- Active Response: Cross-platform USB Storage Critical -->
+    <active-response>
+        <disabled>no</disabled>
+        <command>disable-usb-storage-linux</command>
+        <location>local</location>
+        <rules_id>800170</rules_id>
+        <timeout>3600</timeout>
+    </active-response>
+
+    <!-- Active Response: Cross-platform USB HID Critical -->
+    <active-response>
+        <disabled>no</disabled>
+        <command>alert-usb-hid</command>
+        <location>local</location>
+        <rules_id>800171</rules_id>
+    </active-response>
+
     <!-- AWS configurations -->
     ${AWS_CONFIGS}
 

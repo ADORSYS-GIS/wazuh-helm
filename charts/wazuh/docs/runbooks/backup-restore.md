@@ -11,12 +11,12 @@ Complete backup and restore procedures for the Wazuh Helm deployment on Kubernet
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│               BACKUP/RESTORE ARCHITECTURE                     │
+│               BACKUP/RESTORE ARCHITECTURE                    │
 └──────────────────────────────────────────────────────────────┘
 
     ┌─────────────────────────────────────────────────────┐
-    │                  WAZUH COMPONENTS                    │
-    │                                                      │
+    │                  WAZUH COMPONENTS                   │
+    │                                                     │
     │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐│
     │  │   Indexer    │  │   Manager    │  │  Secrets   ││
     │  │   Data       │  │   Config     │  │  & Certs   ││
