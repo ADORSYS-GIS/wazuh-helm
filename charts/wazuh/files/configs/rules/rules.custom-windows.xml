@@ -275,15 +275,126 @@
     <group>firewall,backdoor,high_risk</group>
   </rule>
 
-  <!-- USB DEVICE MONITORING -->
-  
-  <!-- USB Device Connection -->
+  <!-- ================================================== -->
+  <!-- USB DEVICE MONITORING & DLP                        -->
+  <!-- Rule IDs: 800130-800149                            -->
+  <!-- ================================================== -->
+
+  <!-- USB Device Connection (Base rule) -->
   <rule id="800130" level="4">
     <if_sid>60009</if_sid>
     <field name="win.system.providerName">Microsoft-Windows-Kernel-PnP</field>
     <field name="win.system.eventID">^400$</field>
     <description>USB device connected</description>
     <group>usb,device,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- DLP: USB MASS STORAGE DETECTION                    -->
+  <!-- Detects USB storage devices (flash drives, HDDs)   -->
+  <!-- MITRE ATT&CK: T1052 (Exfiltration Over Physical)   -->
+  <!-- ================================================== -->
+
+  <!-- USB Mass Storage Device Connected (Event ID 6416 - Kernel PnP) -->
+  <rule id="800131" level="12">
+    <if_sid>60009</if_sid>
+    <field name="win.system.providerName">Microsoft-Windows-Kernel-PnP</field>
+    <field name="win.system.eventID">^400$|^410$</field>
+    <field name="win.eventdata.deviceInstanceId" type="pcre2">(?i)USBSTOR|USB\\VID.*PID.*\\.*</field>
+    <description>DLP ALERT: USB Mass Storage device connected - potential data exfiltration risk</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,data_exfiltration,pci_dss_10.2.7,gdpr_IV_35.7.d,</group>
+  </rule>
+
+  <!-- USB Storage via Security-Auditing (Event ID 6416) -->
+  <rule id="800132" level="12">
+    <if_sid>60010</if_sid>
+    <field name="win.system.eventID">^6416$</field>
+    <field name="win.eventdata.className" type="pcre2">(?i)DiskDrive|USB|USBSTOR|WPD</field>
+    <description>DLP ALERT: USB Storage device detected via Security Audit - $(win.eventdata.deviceDescription)</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,data_exfiltration,pci_dss_10.2.7,gdpr_IV_35.7.d,</group>
+  </rule>
+
+  <!-- USB Removable Storage via WMI -->
+  <rule id="800133" level="10">
+    <if_sid>60009</if_sid>
+    <field name="win.system.providerName">Microsoft-Windows-DriverFrameworks-UserMode</field>
+    <field name="win.eventdata.deviceInstanceId" type="pcre2">(?i)USBSTOR</field>
+    <description>DLP: USB removable storage device activity detected</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- DLP: USB HID DEVICE DETECTION (BadUSB/Rubber Ducky)-->
+  <!-- Detects USB Human Interface Devices                -->
+  <!-- MITRE ATT&CK: T1200 (Hardware Additions)           -->
+  <!-- ================================================== -->
+
+  <!-- USB HID Device Connected - Potential Keystroke Injection -->
+  <rule id="800140" level="10">
+    <if_sid>60009</if_sid>
+    <field name="win.system.providerName">Microsoft-Windows-Kernel-PnP</field>
+    <field name="win.system.eventID">^400$|^410$</field>
+    <field name="win.eventdata.deviceInstanceId" type="pcre2">(?i)HID\\VID|USB\\VID.*&amp;MI_00|USB\\VID.*&amp;MI_01</field>
+    <description>SECURITY: USB HID device connected - potential keystroke injection attack (BadUSB/Rubber Ducky)</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+    <group>dlp,usb,hid,badusb,physical_attack,</group>
+  </rule>
+
+  <!-- USB HID Keyboard Device Specifically -->
+  <rule id="800141" level="12">
+    <if_sid>60010</if_sid>
+    <field name="win.system.eventID">^6416$</field>
+    <field name="win.eventdata.className" type="pcre2">(?i)Keyboard|HIDClass</field>
+    <description>CRITICAL: USB Keyboard/HID device connected - verify authorized device</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+    <group>dlp,usb,hid,keyboard,badusb,physical_attack,</group>
+  </rule>
+
+  <!-- Multiple USB HID devices in short timeframe (suspicious) -->
+  <rule id="800142" level="14" frequency="2" timeframe="60">
+    <if_matched_sid>800140,800141</if_matched_sid>
+    <description>CRITICAL: Multiple USB HID devices connected rapidly - possible attack in progress</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+    <group>dlp,usb,hid,badusb,attack_in_progress,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- USB AUDIT EVENTS (for compliance logging)          -->
+  <!-- ================================================== -->
+
+  <!-- USB Device Removal -->
+  <rule id="800145" level="3">
+    <if_sid>60009</if_sid>
+    <field name="win.system.providerName">Microsoft-Windows-Kernel-PnP</field>
+    <field name="win.system.eventID">^401$|^411$</field>
+    <field name="win.eventdata.deviceInstanceId" type="pcre2">(?i)USB</field>
+    <description>USB device removed</description>
+    <group>usb,device_removed,audit,</group>
+  </rule>
+
+  <!-- USB Device Driver Installation -->
+  <rule id="800146" level="8">
+    <if_sid>60009</if_sid>
+    <field name="win.system.providerName">Microsoft-Windows-Kernel-PnP</field>
+    <field name="win.system.eventID">^7045$</field>
+    <field name="win.eventdata.serviceName" type="pcre2">(?i)USBSTOR|USBHUB|HidUsb</field>
+    <description>USB device driver installed - new USB device type</description>
+    <group>usb,driver_install,audit,</group>
   </rule>
 
   <!-- FILE INTEGRITY MONITORING (FIM) RULES -->

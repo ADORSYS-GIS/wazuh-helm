@@ -1,0 +1,198 @@
+<!--
+  USB Device Monitoring and DLP Rules
+  Cross-platform USB detection for Windows, Linux, and macOS
+
+  Rule ID Range: 800150-800199 (Linux/macOS USB)
+  Windows rules are in rules.custom-windows.xml (800130-800149)
+
+  MITRE ATT&CK Coverage:
+  - T1052.001: Exfiltration Over Physical Medium (USB)
+  - T1200: Hardware Additions (BadUSB/Rubber Ducky)
+-->
+
+<group name="dlp,usb,">
+
+  <!-- ================================================== -->
+  <!-- LINUX USB MONITORING                               -->
+  <!-- Uses kernel messages, udev, and audit logs         -->
+  <!-- ================================================== -->
+
+  <!-- Base rule for Linux USB events (kernel/dmesg) -->
+  <rule id="800150" level="3">
+    <if_group>syslog</if_group>
+    <match>usb </match>
+    <description>Linux: USB device event detected</description>
+    <group>usb,linux,</group>
+  </rule>
+
+  <!-- Linux: USB Storage Device Connected -->
+  <rule id="800151" level="12">
+    <if_sid>800150</if_sid>
+    <match type="pcre2">usb-storage|mass.storage|SCSI.*emulation|new USB device.*storage</match>
+    <description>DLP ALERT: Linux - USB Mass Storage device connected</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,linux,data_exfiltration,</group>
+  </rule>
+
+  <!-- Linux: USB Storage via udev -->
+  <rule id="800152" level="12">
+    <if_group>syslog</if_group>
+    <program_name>systemd-udevd|udevd</program_name>
+    <match type="pcre2">ID_USB_DRIVER=usb-storage|ID_BUS=usb.*ID_TYPE=disk</match>
+    <description>DLP ALERT: Linux - USB Storage device detected via udev</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,linux,data_exfiltration,</group>
+  </rule>
+
+  <!-- Linux: USB Block Device Added (sd* device) -->
+  <rule id="800153" level="10">
+    <if_group>syslog</if_group>
+    <match type="pcre2">sd[a-z]+:.*removable|usb.*Attached SCSI removable disk</match>
+    <description>DLP: Linux - Removable USB disk attached</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,linux,</group>
+  </rule>
+
+  <!-- Linux: USB Device Mount (from audit or mount logs) -->
+  <rule id="800154" level="10">
+    <if_group>syslog</if_group>
+    <match type="pcre2">mount.*\/dev\/sd[a-z]+|mount.*\/media\/|mount.*\/mnt\/usb</match>
+    <description>DLP: Linux - USB device mounted</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mount,linux,</group>
+  </rule>
+
+  <!-- Linux: USB HID Device (potential BadUSB) -->
+  <rule id="800155" level="10">
+    <if_sid>800150</if_sid>
+    <match type="pcre2">input.*USB.*Keyboard|input.*HID|hid-generic.*input</match>
+    <description>SECURITY: Linux - USB HID/Keyboard device connected - verify authorized</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+    <group>dlp,usb,hid,linux,badusb,</group>
+  </rule>
+
+  <!-- Linux: Multiple USB HID devices rapidly (suspicious) -->
+  <rule id="800156" level="14" frequency="2" timeframe="60">
+    <if_matched_sid>800155</if_matched_sid>
+    <description>CRITICAL: Linux - Multiple USB HID devices connected rapidly - possible BadUSB attack</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+    <group>dlp,usb,hid,linux,badusb,attack_in_progress,</group>
+  </rule>
+
+  <!-- Linux: USB Device via Audit (auditd) -->
+  <rule id="800157" level="10">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">usb_monitor</field>
+    <description>DLP: Linux - USB device activity logged via auditd</description>
+    <group>dlp,usb,audit,linux,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- macOS USB MONITORING                               -->
+  <!-- Uses system.log, kernel, and IOKit events          -->
+  <!-- ================================================== -->
+
+  <!-- Base rule for macOS USB events -->
+  <rule id="800160" level="3">
+    <if_group>syslog</if_group>
+    <match type="pcre2">IOUSBHostDevice|USB.*attached|disk\d+s\d+</match>
+    <description>macOS: USB device event detected</description>
+    <group>usb,macos,</group>
+  </rule>
+
+  <!-- macOS: USB Storage Device Connected -->
+  <rule id="800161" level="12">
+    <if_group>syslog</if_group>
+    <match type="pcre2">disk\d+s\d+.*external|IOUSBMassStorageClass|USB.*Mass Storage</match>
+    <description>DLP ALERT: macOS - USB Mass Storage device connected</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,macos,data_exfiltration,</group>
+  </rule>
+
+  <!-- macOS: External Disk Mount -->
+  <rule id="800162" level="10">
+    <if_group>syslog</if_group>
+    <program_name>diskarbitrationd|diskutil</program_name>
+    <match type="pcre2">external.*mounted|Volumes.*USB|Mount.*external</match>
+    <description>DLP: macOS - External USB disk mounted</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mount,macos,</group>
+  </rule>
+
+  <!-- macOS: USB Device via kernel log -->
+  <rule id="800163" level="10">
+    <if_group>syslog</if_group>
+    <program_name>kernel</program_name>
+    <match type="pcre2">USB.*device.*configured|AppleUSB.*Mass.*Storage</match>
+    <description>DLP: macOS - USB device configured by kernel</description>
+    <mitre>
+      <id>T1052.001</id>
+    </mitre>
+    <group>dlp,usb,mass_storage,macos,</group>
+  </rule>
+
+  <!-- macOS: USB HID Device (potential BadUSB) -->
+  <rule id="800165" level="10">
+    <if_group>syslog</if_group>
+    <match type="pcre2">IOHIDDevice|USB.*Keyboard.*attached|AppleUSBHID</match>
+    <description>SECURITY: macOS - USB HID/Keyboard device connected - verify authorized</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+    <group>dlp,usb,hid,macos,badusb,</group>
+  </rule>
+
+  <!-- macOS: Multiple USB HID devices rapidly (suspicious) -->
+  <rule id="800166" level="14" frequency="2" timeframe="60">
+    <if_matched_sid>800165</if_matched_sid>
+    <description>CRITICAL: macOS - Multiple USB HID devices connected rapidly - possible BadUSB attack</description>
+    <mitre>
+      <id>T1200</id>
+    </mitre>
+    <group>dlp,usb,hid,macos,badusb,attack_in_progress,</group>
+  </rule>
+
+  <!-- macOS: Disk arbitration events -->
+  <rule id="800167" level="8">
+    <if_group>syslog</if_group>
+    <program_name>diskarbitrationd</program_name>
+    <match type="pcre2">DADiskMount|DADiskClaim|disk appeared</match>
+    <description>macOS: Disk arbitration event - external device activity</description>
+    <group>dlp,usb,macos,disk_arbitration,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- CROSS-PLATFORM ALERTS                              -->
+  <!-- ================================================== -->
+
+  <!-- High-severity: Any USB storage across platforms -->
+  <rule id="800170" level="12">
+    <if_sid>800131,800132,800133,800151,800152,800153,800161,800162,800163</if_sid>
+    <description>DLP CRITICAL: USB Storage device connected - data exfiltration risk</description>
+    <group>dlp,usb,mass_storage,critical,</group>
+  </rule>
+
+  <!-- High-severity: Any USB HID across platforms -->
+  <rule id="800171" level="10">
+    <if_sid>800140,800141,800155,800165</if_sid>
+    <description>SECURITY: USB HID device connected - potential physical attack vector</description>
+    <group>dlp,usb,hid,badusb,</group>
+  </rule>
+
+</group>
