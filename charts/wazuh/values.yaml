@@ -278,6 +278,19 @@ indexer:
   ##
   affinity: ~
 
+  ## S3 snapshot repository configuration
+  ## Requires a custom indexer image with the repository-s3 plugin installed.
+  ## See utils/packages/wazuh-indexer-s3/Dockerfile for building the image.
+  ##
+  s3Snapshot:
+    ## Enable S3 snapshot repository support
+    ##
+    enabled: true
+    ## Name of an existing Kubernetes Secret containing AWS credentials.
+    ## The secret must have keys: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+    ##
+    credentialsSecret: "aws-s3-credentials"
+
   ##
   ##
   initContainers:
