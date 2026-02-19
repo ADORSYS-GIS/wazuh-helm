@@ -145,7 +145,13 @@ spec:
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
-            {{- end }}  
+            {{- end }}
+
+            {{ with .wazuhInit }}
+            {{ with .envFrom -}}
+            {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+            {{- end }}
+            {{ end }}
           ##
           ##
           volumeMounts:
@@ -246,6 +252,16 @@ spec:
               readOnly: true
 
             - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7006-macos-syslog.xml
+              subPath: 7006-macos-syslog.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7006-macos-auth.xml
+              subPath: 7006-macos-auth.xml
+              readOnly: true
+
+            - name: config
               mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
               subPath: 7007-fim-linux.xml
               readOnly: true
@@ -260,7 +276,21 @@ spec:
               subPath: 7009-fim-windows.xml
               readOnly: true        
 
-              
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7010-custom-suricata.xml
+              subPath: 7010-custom-suricata.xml
+              readOnly: true  
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
+              subPath: 7011-lotl-detection.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /var/ossec/etc/shared/dlp/agent.conf
+              subPath: dlp.xml
+              readOnly: true
+
             {{ range $k, $v := $.Values.cluster.decoders -}}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
             {{- $n_k := printf "0003-%s" $k -}} 
@@ -300,6 +330,10 @@ spec:
               name: agents-events
             - containerPort: 1516
               name: cluster
+
+            # We can keep this, even if it's not used. Check @values-syslog.yaml to see how to activate it.
+            - containerPort: 11514
+              name: syslog
           env:
             - name: FILEBEAT_SSL_VERIFICATION_MODE
               value: 'full'

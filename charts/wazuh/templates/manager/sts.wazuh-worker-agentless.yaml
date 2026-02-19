@@ -1,6 +1,6 @@
-{{ with .Values.worker_integration }}
+{{ with .Values.worker_agentless }}
 {{- if and .enabled  -}}
-{{- $name := printf "%s-manager-worker-integration" (include "common.names.fullname" $) -}}
+{{- $name := printf "%s-manager-worker-agentless" (include "common.names.fullname" $) -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -52,15 +52,6 @@ spec:
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
-        {{- with $.Values.integration.aws }}
-        {{ if .enable }}
-        {{- if or (and .secrets .secrets.create) .secrets.existingSecret }}
-        - name: aws-credentials
-          secret:
-            secretName: {{ coalesce .secrets.existingSecret .secrets.name (printf "%s-aws" (include "secret.common" $)) }}
-        {{- end }}
-        {{- end }}
-        {{- end }}
         - name: config
           configMap:
             name: '{{ include "common.names.fullname" $ }}-wazuh-conf'
@@ -70,16 +61,6 @@ spec:
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
-        {{- if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled }}
-        - name: jira-conf
-          configMap:
-            name: {{ include "common.names.fullname" $ }}-wazuh-conf-jira
-        {{- end }}
-        {{- if eq (include "integration.azure.exists" $) "true" }}
-        - name: azure-auth
-          secret:
-            secretName: {{ include "secret.common" $ }}-azure
-        {{- end }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -170,7 +151,13 @@ spec:
             {{ if and $.Values.integration $.Values.integration.jira $.Values.integration.jira.enabled -}}
             - secretRef:
                 name: '{{ include "secret.integration-jira" $ }}'
-            {{- end }}  
+            {{- end }}
+
+            {{ with .wazuhInit }}
+            {{ with .envFrom -}}
+            {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 12}}
+            {{- end }}
+            {{ end }}
           ##
           ##
           volumeMounts:
@@ -297,7 +284,7 @@ spec:
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7010-custom-suricata.xml
               subPath: 7010-custom-suricata.xml
-              readOnly: true        
+              readOnly: true
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
