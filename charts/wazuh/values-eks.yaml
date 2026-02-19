@@ -31,6 +31,12 @@ indexer:
   replicas: 2
   persistence:
     size: 50Gi
+  image:
+    registry: ghcr.io
+    repository: adorsys-gis/wazuh-indexer-s3
+  s3Snapshot:
+    enabled: true
+    credentialsSecret: ext-wazuh-aws-s3-snapshot-credentials
 
 worker:
   replicaCount: 2

@@ -97,6 +97,8 @@ spec:
               echo "$AWS_SECRET_ACCESS_KEY" | /usr/share/wazuh-indexer/bin/opensearch-keystore add --stdin s3.client.default.secret_key
               cp /usr/share/wazuh-indexer/config/opensearch.keystore /keystore/opensearch.keystore
           env:
+            - name: OPENSEARCH_PATH_CONF
+              value: /usr/share/wazuh-indexer/config
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
