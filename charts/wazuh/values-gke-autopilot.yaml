@@ -10,3 +10,6 @@ worker:
 
 worker_integration:
   securityContext: null
+
+worker_agentless:
+  securityContext: null

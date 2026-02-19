@@ -16,14 +16,13 @@ type: application
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
 # Fixed securityContext to use hard-coded values like rc.19 instead of templating
-
-version: 0.6.1-rc.10
+version: 0.8.1-rc.2
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: "4.13.1"
+appVersion: "4.14.2"
 
 dependencies:
   - name: common

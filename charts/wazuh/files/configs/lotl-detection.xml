@@ -1,0 +1,116 @@
+<group name="windows, lolt, exfiltration">
+    <rule id="100530" level="0">
+        <if_sid>60009</if_sid>
+        <field name="win.system.providerName">^Microsoft-Windows-PowerShell$</field>
+        <description>Powershell Information EventLog</description>
+    </rule>
+
+    <rule id="100531" level="0">
+        <if_sid>61603</if_sid>
+        <field name="win.eventdata.originalFileName" type="pcre2">(?i)curl\.exe|wget\.exe|pscp(?:\.exe)?</field>
+        <description>LOLT binary execution detected.</description>
+    </rule>
+
+    <rule id="100532" level="12">
+        <if_sid>100530</if_sid>
+        <field name="win.system.eventID">4103</field>
+        <field name="win.eventdata.payload" type="pcre2">(?i)(Invoke-WebRequest|Invoke-RestMethod|Start-BitsTransfer)</field>
+        <field name="win.eventdata.payload" type="pcre2">(?i)(Post|Put|Upload|InFile|Body|Attachments)</field>
+        <description>Potential data exfiltration detected using PowerShell</description>
+        <mitre>
+            <id>T1059.001</id>
+            <id>T1041</id>
+            <id>T1567</id>
+        </mitre>
+    </rule>
+
+    <rule id="100533" level="12">
+        <if_sid>100531</if_sid>
+        <field name="win.eventdata.commandLine" type="pcre2">(?i)(--method=POST|--body-file=|--upload-file=|--post-file=|-F[\s"]|files=@|--data-binary=@|--data=@|-d[\s"]+@)</field>
+        <description>Possible Data Exfiltration via $(win.eventdata.originalFileName).</description>
+        <mitre>
+            <id>T1059.001</id>
+            <id>T1041</id>
+            <id>T1567</id>
+        </mitre>
+    </rule>
+
+    <rule id="100534" level="12">
+        <if_sid>100531</if_sid>
+        <field name="win.eventdata.originalFileName" type="pcre2">(?i)pscp(?:\.exe)?</field>
+        <field name="win.eventdata.commandLine" type="pcre2">(?i)\s+(?!-)(?:\"[^\"@]+\"|[^\s\"@]+)\s+(?:\"[^\"]*@[^\"]+:[^\"]*\"|[^\s\"]*@[^\s\"]+:[^\s\"]*)\s*$</field>
+        <description>Potential data exfiltration via PSCP to remote host</description>
+        <mitre>
+            <id>T1048</id>
+            <id>T1567</id>
+            <id>T1021.004</id>
+        </mitre>
+    </rule>
+</group>
+
+<group name="macos, lolt, exfiltration">
+    <rule id="100535" level="0">
+        <decoded_as>santa</decoded_as>
+        <regex type="pcre2">action=EXEC.*decision=ALLOW</regex>
+        <field name="path" type="pcre2">\/(?:usr\/bin|usr\/local\/bin|usr\/local\/Cellar\/[^\/]+\/[^\/]+\/bin|opt\/homebrew\/bin|bin|sbin)\/(curl|wget|scp|rsync|nc|netcat|ftp|sftp|telnet|python|python3|perl|ssh|tftp)$</field>
+        <description>LOTL binary executed: $(path)</description>
+    </rule>
+
+    <rule id="100536" level="12">
+        <if_sid>100535</if_sid>
+        <field name="path" type="pcre2">\/(?:usr\/bin|usr\/local\/bin|usr\/local\/Cellar\/[^\/]+\/[^\/]+\/bin|opt\/homebrew\/bin|bin|sbin)\/(curl|wget|nc|netcat|ftp|telnet)</field>
+        <field name="args" type="pcre2">(upload|POST|PUT|-T|-F|--data|--form|-d|--body-file)</field>
+        <description>Potential data exfiltration detected using LOTL binary: $(path)</description>
+        <mitre>
+            <id>T1048</id>
+            <id>T1567</id>
+        </mitre>
+    </rule>
+
+    <rule id="100537" level="12">
+        <if_sid>100535</if_sid>
+        <field name="path" type="pcre2">\/(?:usr\/bin|usr\/local\/bin|usr\/local\/Cellar\/[^\/]+\/[^\/]+\/bin|opt\/homebrew\/bin|bin|sbin)\/(scp|rsync|sftp)</field>
+        <field name="args" type="pcre2">(?i)\s(?![^"\s]*@[^"@\s]+:)(?!-)[^"\s]+\s+[^"\s]*@[^"@\s]+:[^"\s]+$</field>
+        <description>Potential data exfiltration via $(path) to remote host</description>
+        <mitre>
+            <id>T1048</id>
+            <id>T1567</id>
+            <id>T1021.004</id>
+        </mitre>
+    </rule>
+</group>
+
+<group name="linux, lolt, exfiltration">
+    <rule id="100538" level="0">
+        <if_sid>80700</if_sid>
+        <field name="audit.type">SYSCALL</field>
+        <field name="audit.key">exfil</field>
+        <field name="audit.command">curl|wget|scp|sftp|rsync|nc|netcat|ftp|tftp|python|python3|perl|ssh</field>
+        <description>LOTL binary executed: $(audit.exe)</description>
+        <mitre>
+            <id>T1105</id>
+        </mitre>
+    </rule>
+
+    <rule id="100539" level="12">
+        <if_sid>100538</if_sid>
+        <regex type="pcre2">(?i)type=EXECVE.*?(--method=POST|--body-file=|--upload-file=|--post-file=|-F[\s"]|files=@|--data-binary=@|--data=@|-d[\s"]+@)</regex>
+        <description>Potential data exfiltration via $(audit.exe) </description>
+        <mitre>
+            <id>T1048</id>
+            <id>T1567</id>
+        </mitre>
+    </rule>
+
+    <rule id="100540" level="12">
+        <if_sid>92603, 100538</if_sid>
+        <field name="audit.command" type="pcre2">(?i)^(scp|sftp|rsync)$</field>
+        <regex type="pcre2">type=EXECVE.*?a\d+="(?![^"]*@[^"@]+:)(?!-)[^"]*".*?a\d+="[^"]*@[^"@]+:[^"]*"(?!.*a\d+=)</regex>
+        <description>Potential data exfiltration via $(audit.command) to remote host</description>
+        <mitre>
+            <id>T1048</id>
+            <id>T1567</id>
+            <id>T1021.004</id>
+        </mitre>
+    </rule>
+</group>
