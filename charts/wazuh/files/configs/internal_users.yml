@@ -20,4 +20,6 @@ ${INDEXER_USERNAME}:
 ${DASHBOARD_USERNAME}:
   hash: "${DASHBOARD_USERNAME_BCRYPT}"
   reserved: true
+  backend_roles:
+    - "kibana_server"
   description: "Demo kibanaserver user"
