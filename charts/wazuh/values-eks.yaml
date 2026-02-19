@@ -34,6 +34,7 @@ indexer:
   image:
     registry: ghcr.io
     repository: adorsys-gis/wazuh-indexer-s3
+    tag: release-candidate-indexer-snapshots-c3dbb18
   s3Snapshot:
     enabled: true
     credentialsSecret: ext-wazuh-aws-s3-snapshot-credentials
