@@ -4,7 +4,7 @@ global:
   domain: wazuh.example.com
   ##
   ##
-  version: "4.13.1"
+  version: "4.14.2"
   ##
   ##
   imageRegistry: ""
@@ -277,6 +277,26 @@ indexer:
   ##
   ##
   affinity: ~
+
+  ## --- Index Lifecycle Management (ISM) ---
+  ## Controls automatic index retention policies applied via setup-ism.sh
+  ## Set lifecycle.enabled to false to skip ISM policy ConfigMap creation entirely
+  lifecycle:
+    enabled: true
+    alerts:
+      warmAfterDays: 7
+      deleteAfterDays: 90
+    archives:
+      deleteAfterDays: 30
+    statistics:
+      deleteAfterDays: 56
+    monitoring:
+      deleteAfterDays: 28
+    ## Optional: uncomment to manage wazuh-states-* indices
+    # states:
+    #   forceMergeAfterDays: 7
+    #   readOnlyAfterDays: 30
+    #   deleteAfterDays: 90
 
   ##
   ##
