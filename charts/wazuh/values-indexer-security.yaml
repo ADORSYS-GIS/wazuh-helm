@@ -1,0 +1,114 @@
+indexer:
+  volumeMounts:
+    '/etc/wazuh-indexer/opensearch-security/custom_roles.yml':
+      name: security-configurations
+      subPath: custom_roles.yml
+      readOnly: true
+    '/etc/wazuh-indexer/opensearch-security/custom_roles_mapping.yml':
+      name: security-configurations
+      subPath: custom_roles_mapping.yml
+      readOnly: true
+    '/etc/wazuh-indexer/opensearch-security/custom_tenants.yml':
+      name: security-configurations
+      subPath: custom_tenants.yml
+      readOnly: true
+    '/etc/wazuh-indexer/opensearch-security/custom_config.yml':
+      name: security-configurations
+      subPath: custom_config.yml
+      readOnly: true
+  
+  volumes:
+    security-configurations:
+      configMap:
+        name: '{{ include "common.names.fullname" $ }}-sec-conf'
+  
+initJobs:
+  '{{ include "common.names.fullname" $ }}-security-admin':
+    enable: true
+    additionalLabels: ~
+    additionalAnnotations:
+      "helm.sh/hook": post-install,post-upgrade
+      "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    image:
+      registry: docker.io
+      repository: wazuh/wazuh-indexer
+      tag: '{{ .Values.global.version }}'
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: [ ]
+    restartPolicy: OnFailure
+    resources: ~
+    command: [ "/bin/bash","-lc" ]
+    args:
+      - |
+        #!/bin/bash
+        
+        set -ex
+        
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/config.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/roles.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/roles_mapping.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
+        bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f /etc/wazuh-indexer/opensearch-security/custom_configs/tenants.yml -cn wazuh -key /usr/share/wazuh-indexer/certs/admin-key.pem -cert /usr/share/wazuh-indexer/certs/admin.pem -cacert /usr/share/wazuh-indexer/certs/root-ca.pem -nhnv -h $INDEXER_API_HOSTNAME -p 9200
+    
+    
+    volumeMounts:
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/config.yml':
+        name: security-configurations
+        subPath: custom_config.yml
+        readOnly: true
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/roles.yml':
+        name: security-configurations
+        subPath: custom_roles.yml
+        readOnly: true
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/roles_mapping.yml':
+        name: security-configurations
+        subPath: custom_roles_mapping.yml
+        readOnly: true
+      '/etc/wazuh-indexer/opensearch-security/custom_configs/tenants.yml':
+        name: security-configurations
+        subPath: custom_tenants.yml
+        readOnly: true
+      
+      '/usr/share/wazuh-indexer/certs/admin.pem':
+        name: certs
+        subPath: admin.pem
+        readOnly: true
+      '/usr/share/wazuh-indexer/certs/admin-key.pem':
+        name: certs
+        subPath: admin-key.pem
+        readOnly: true
+      '/usr/share/wazuh-indexer/certs/root-ca.pem':
+        name: root-certs
+        subPath: root-ca.pem
+        readOnly: true
+
+    env:
+      INDEXER_API_HOSTNAME:
+        value: '{{ include "common.names.fullname" $ }}-indexer-api'
+      JAVA_HOME:
+        value: '/usr/share/wazuh-indexer/jdk'
+        
+    envFrom: ~
+
+    volumes:
+      security-configurations:
+        configMap:
+          name: '{{ include "common.names.fullname" $ }}-sec-conf'
+      root-certs:
+        secret:
+          secretName: '{{ include "wazuh.cert_root_name" $ }}'
+      certs:
+        secret:
+          secretName: '{{ include "wazuh.cert_secret_name" $ }}'
+          
+    initContainers: ~
+
+configmaps:
+  '{{ include "common.names.fullname" $ }}-sec-conf':
+    data:
+      custom_roles.yml: '{{- $.Files.Get "files/configs/indexers/custom_roles.yml" }}'
+      custom_roles_mapping.yml: '{{- $.Files.Get "files/configs/indexers/custom_roles_mapping.yml" }}'
+      custom_tenants.yml: '{{- $.Files.Get "files/configs/indexers/custom_tenants.yml" }}'
+      custom_config.yml: '{{- $.Files.Get "files/configs/indexers/custom_config.yml" }}'
+        
+        

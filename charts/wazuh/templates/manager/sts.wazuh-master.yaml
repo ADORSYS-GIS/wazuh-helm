@@ -246,6 +246,16 @@ spec:
               readOnly: true
 
             - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7006-macos-syslog.xml
+              subPath: 7006-macos-syslog.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7006-macos-auth.xml
+              subPath: 7006-macos-auth.xml
+              readOnly: true
+
+            - name: config
               mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
               subPath: 7007-fim-linux.xml
               readOnly: true
@@ -259,6 +269,21 @@ spec:
               mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml
               subPath: 7009-fim-windows.xml
               readOnly: true      
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7010-custom-suricata.xml
+              subPath: 7010-custom-suricata.xml
+              readOnly: true        
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
+              subPath: 7011-lotl-detection.xml
+              readOnly: true
+
+            - name: config
+              mountPath: /var/ossec/etc/shared/dlp/agent.conf
+              subPath: dlp.xml
+              readOnly: true
 
             {{ range $k, $v := $.Values.cluster.decoders }}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}
