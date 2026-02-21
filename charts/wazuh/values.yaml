@@ -64,20 +64,54 @@ indexer:
   # [RECOMMENDED] Change default credentials
   auth:
     username: admin
-    password: "rU40Fm%0GnK£iqQN"
+    password: ""
   authSecret: ~
 
   # --- Keycloak/OIDC Integration ---
+  # For Keycloak setup instructions, see: docs/authentication/keycloak-setup.md
   keycloak:
-    enabled: true
-    roles_key: wazuh_roles
-    subject_key: preferred_username
+    enabled: false                    # Set to true to use Keycloak/OIDC authentication
+    roles_key: wazuh_roles           # OIDC claim key containing user roles
+    subject_key: preferred_username  # OIDC claim key for username
     openid_connect_url: "https://<keycloak-url>/realms/<realm>/.well-known/openid-configuration"
-    client_id: ~
-    client_secret: ~
+    client_id: ~                     # Keycloak client ID
+    client_secret: ~                 # Keycloak client secret
+    # Use existing secret for OIDC credentials (takes precedence over client_id/client_secret)
+    existingSecret: ~                # Name of existing secret containing credentials
+    existingSecretClientIdKey: "client_id"        # Key in secret for client_id
+    existingSecretClientSecretKey: "client_secret" # Key in secret for client_secret
+    scope: "openid profile email"    # OIDC scopes to request
+    base_redirect_url: ~             # Optional: Override redirect URL (useful behind proxy)
+    # Custom roles, role mappings, and tenants - see values-multitenancy.yaml for examples
     roles_mapping: ~
     roles: ~
     tenants: ~
+
+  # =============================================================================
+  # MULTI-TENANCY CONFIGURATION
+  # =============================================================================
+  # Country-based multi-tenancy with admin isolation per region.
+  # For full configuration, see: values-multitenancy.yaml
+  #
+  # Deploy with multi-tenancy:
+  #   helm install wazuh ./charts/wazuh \
+  #     -f values.yaml \
+  #     -f values-talos-ceph.yaml \
+  #     -f values-multitenancy.yaml
+  # =============================================================================
+  multiTenancy:
+    enabled: false          # Set to true in values-multitenancy.yaml
+    tenants: {}
+    internalUsers: {}
+    roles: {}
+    rolesMapping: {}
+
+  # --- Security Admin Job ---
+  # Applies security configuration (roles, tenants, users) after indexer starts
+  securityAdmin:
+    enabled: false          # Enabled automatically with multiTenancy
+    maxRetries: 30
+    retryInterval: 10
 
   # --- Persistence ---
   persistence:
@@ -166,6 +200,43 @@ indexer:
         scheduleHour: 8               # 8:00 AM
         scheduleMinute: 0
         scheduleTimezone: "Europe/Berlin"
+      deprecatedOsReport:
+        enabled: true
+        scheduleHour: 8               # 8:01 AM (1 min after daily summary)
+        scheduleMinute: 1
+        scheduleTimezone: "Europe/Berlin"
+        # Deprecated OS versions to check for
+        deprecatedVersions:
+          windows: ["Windows 7", "Windows 8", "Server 2008", "Server 2012", "Windows XP", "Windows Vista"]
+          ubuntu: ["14", "16", "18", "19", "21", "23"]
+          centos: ["5", "6", "7", "8"]
+          rhel: ["5", "6", "7"]
+          debian: ["7", "8", "9", "10"]
+          amazonLinux: ["1", "2", "2018.03"]
+          # macOS versions (10.x = deprecated, 11 Big Sur EOL Sep 2023, 12 Monterey EOL late 2024)
+          macOS: ["10.9", "10.10", "10.11", "10.12", "10.13", "10.14", "10.15", "11", "12"]
+      # Phishing and Anonymizer Detection
+      phishingDetection:
+        enabled: true
+        intervalMinutes: 5
+        lookbackMinutes: 10
+        throttleMinutes: 15
+      anonymizerTorDetection:
+        enabled: true
+        intervalMinutes: 5
+        lookbackMinutes: 10
+        throttleMinutes: 30
+      cryptominingDns:
+        enabled: true
+        intervalMinutes: 1            # Fast detection for crypto mining
+        lookbackMinutes: 5
+        throttleMinutes: 5
+      # Daily Unauthorized Apps Report - lists all unauthorized apps with agent IDs
+      dailyUnauthorizedAppsReport:
+        enabled: true
+        scheduleHour: 8               # 8:02 AM
+        scheduleMinute: 2
+        scheduleTimezone: "UTC"
 
   # --- Anomaly Detection ---
   anomalyDetection:
@@ -229,6 +300,17 @@ indexer:
           readOnly: true
         - name: wazuh-config-temp
           mountPath: /processed
+
+
+# =============================================================================
+# SECTION 3.5: FILEBEAT CONFIGURATION
+# =============================================================================
+
+filebeat:
+  archives:
+    enabled: false
+  ssl:
+    verification_mode: "full"
 
 
 # =============================================================================
@@ -502,6 +584,9 @@ cluster:
   auth:
     # [REQUIRED] Cluster key (generate with: openssl rand -hex 16)
     key: "dfbb2c1b9d679c39af94d5c1c821c952"
+    # Use existing secret for cluster auth key (takes precedence over key)
+    existingSecret: ~                # Name of existing secret containing auth key
+    existingSecretKeyName: "auth_key" # Key in secret for auth key
     # Password-based agent registration (simpler for homelab)
     usePassword: false
     agentPassword: ""
@@ -584,11 +669,18 @@ integration:
     webhookUrl: https://<example>.jira.com/services/hooks/<webhook>
     apikey: ""
     projectKey: WAZUH
-    externalSecret: ~
+    # Use existing secret for Jira credentials (takes precedence over webhookUrl/apikey)
+    existingSecret: ~              # Name of existing secret
+    existingSecretWebhookKey: "webhook_url"  # Key in secret for webhook URL
+    existingSecretApikeyKey: "apikey"        # Key in secret for API key
 
   github: []
-  # Example:
+  # Example with inline secret:
   #   - secret: <GitHub PAT>
+  #     orgs: [myorg1, myorg2]
+  # Example with existing secret:
+  #   - existingSecret: "my-github-secret"
+  #     existingSecretTokenKey: "token"
   #     orgs: [myorg1, myorg2]
 
   azure:
@@ -596,6 +688,17 @@ integration:
     secrets:
       create: false
       existingSecret: ~
+    # Azure auth credentials (used when secrets.existingSecret is not set)
+    auth:
+      log:
+        application_id: ~
+        application_key: ~
+      graph:
+        application_id: ~
+        application_key: ~
+      storage:
+        application_id: ~
+        application_key: ~
     logAnalytics:
       enabled: false
       workspace: ~
