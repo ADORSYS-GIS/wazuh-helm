@@ -26,8 +26,8 @@ data:
 
     output.elasticsearch:
       hosts: ['https://{{ include "common.names.fullname" $ }}-indexer-api:9200']
-      username: 'admin'
-      password: '{{ .Values.indexer.auth.password }}'
+      username: '${INDEXER_USERNAME:admin}'
+      password: '${INDEXER_PASSWORD:{{ if .Values.indexer.auth }}{{ .Values.indexer.auth.password }}{{ else }}changeme{{ end }}}'
       ssl.verification_mode: '{{ .Values.filebeat.ssl.verification_mode | default "full" }}'
       ssl.certificate_authorities: ['/etc/ssl/root-ca.pem']
       ssl.certificate: '/etc/ssl/filebeat.pem'
