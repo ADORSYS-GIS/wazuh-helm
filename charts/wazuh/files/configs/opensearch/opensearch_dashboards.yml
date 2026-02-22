@@ -24,12 +24,22 @@ opensearch_security.session.ttl: 900000
 opensearch_security.session.keepalive: true
   
 {{ with $.Values.indexer.keycloak -}}
-{{- if and .enabled .client_id .client_secret (not (contains "<keycloak-url>" .openid_connect_url)) -}}
+{{- if and .enabled (not (contains "<keycloak-url>" .openid_connect_url)) -}}
+{{- /* Check if we have direct credentials or existingSecret */ -}}
+{{- $hasDirectCreds := and .client_id .client_secret -}}
+{{- $hasExistingSecret := .existingSecret -}}
+{{- if or $hasDirectCreds $hasExistingSecret -}}
 
 opensearch_security.auth.type: "openid"
 opensearch_security.openid.connect_url: '{{ include "common.tplvalues.render" (dict "value" .openid_connect_url "context" $) }}'
+{{- if $hasDirectCreds }}
 opensearch_security.openid.client_id: '{{ include "common.tplvalues.render" (dict "value" .client_id "context" $) }}'
 opensearch_security.openid.client_secret: '{{ include "common.tplvalues.render" (dict "value" .client_secret "context" $) }}'
+{{- else }}
+# Credentials loaded from environment variables (existingSecret: {{ .existingSecret }})
+opensearch_security.openid.client_id: '${OIDC_CLIENT_ID}'
+opensearch_security.openid.client_secret: '${OIDC_CLIENT_SECRET}'
+{{- end }}
 {{ with .scope -}}
 opensearch_security.openid.scope: '{{ include "common.tplvalues.render" (dict "value" . "context" $) }}'
 {{- end }}
@@ -38,7 +48,11 @@ opensearch_security.openid.base_redirect_url: '{{ include "common.tplvalues.rend
 {{- end }}
 
 {{- else -}}
-# Basic authentication (Keycloak not configured or invalid)
+# Basic authentication (Keycloak credentials not configured)
+opensearch_security.auth.type: "basicauth"
+{{- end -}}
+{{- else -}}
+# Basic authentication (Keycloak not enabled or invalid URL)
 opensearch_security.auth.type: "basicauth"
 {{- end -}}
 {{- end }}
