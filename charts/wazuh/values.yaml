@@ -15,7 +15,7 @@ global:
   domain: wazuh.example.com
 
   # [RECOMMENDED] Wazuh version to deploy
-  version: "4.13.1"
+  version: "4.14.2"
 
   # Container registry (leave empty for Docker Hub)
   imageRegistry: ""
