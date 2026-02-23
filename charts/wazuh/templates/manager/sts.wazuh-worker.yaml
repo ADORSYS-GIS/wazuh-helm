@@ -69,6 +69,11 @@ spec:
         - name: filebeat-config
           configMap:
             name: {{ include "common.names.fullname" $ }}-filebeat-config
+        {{- if .backup.enabled }}
+        - name: manager-backup
+          persistentVolumeClaim:
+            claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+        {{- end }}
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -283,9 +288,11 @@ spec:
               mountPath: /var/lib/filebeat
               subPath: filebeat/var/lib/filebeat
 
+            {{- if .backup.enabled }}
             - name: manager-backup
               mountPath: /var/ossec/backup
               subPath: wazuh/var/ossec/backup
+            {{- end }}
 
             - name: wazuh-config-temp
               mountPath: /wazuh-config-mount/etc/ossec.conf
@@ -365,10 +372,21 @@ spec:
               subPath: 7013-adguard.xml
               readOnly: true
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7014-usb-dlp.xml
+              subPath: 7014-usb-dlp.xml
+              readOnly: true
+
+            # DLP Cloud/Email rules - re-enabled with increased memory (10Gi)
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7015-dlp-cloud-email.xml
+              subPath: 7015-dlp-cloud-email.xml
+              readOnly: true
+
             # Default group (common settings only)
             - name: config
               mountPath: /wazuh-config-mount/etc/shared/default/agent.conf
-              subPath: agent-common.conf
+              subPath: agent.conf
               readOnly: true
 
             # Linux group
