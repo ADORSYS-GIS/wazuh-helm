@@ -1,0 +1,205 @@
+{{- if and .Values.indexer.multiTenancy .Values.indexer.multiTenancy.enabled }}
+{{- $multiTenancy := .Values.indexer.multiTenancy }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-security-config
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  # =============================================================================
+  # SECURITY CONFIG (Authentication)
+  # =============================================================================
+  config.yml: |
+    _meta:
+      type: "config"
+      config_version: 2
+
+    config:
+      dynamic:
+        authc:
+          basic_internal_auth_domain:
+            http_enabled: true
+            transport_enabled: true
+            order: 0
+            http_authenticator:
+              type: basic
+              challenge: true
+            authentication_backend:
+              type: internal
+
+  # =============================================================================
+  # TENANTS CONFIGURATION
+  # =============================================================================
+  tenants.yml: |
+    _meta:
+      type: "tenants"
+      config_version: 2
+    {{- range $tenantName, $tenant := $multiTenancy.tenants }}
+    {{ $tenantName }}:
+      reserved: false
+      description: "{{ $tenant.description | default $tenantName }}"
+    {{- end }}
+
+  # =============================================================================
+  # ROLES CONFIGURATION
+  # =============================================================================
+  roles.yml: |
+    _meta:
+      type: "roles"
+      config_version: 2
+    {{- range $roleName, $role := $multiTenancy.roles }}
+    {{ $roleName }}:
+      reserved: {{ $role.reserved | default false }}
+      {{- if $role.cluster_permissions }}
+      cluster_permissions:
+        {{- range $role.cluster_permissions }}
+        - "{{ . }}"
+        {{- end }}
+      {{- end }}
+      {{- if $role.index_permissions }}
+      index_permissions:
+        {{- range $perm := $role.index_permissions }}
+        - index_patterns:
+            {{- range $perm.index_patterns }}
+            - "{{ . }}"
+            {{- end }}
+          {{- if $perm.dls }}
+          dls: {{ $perm.dls | quote }}
+          {{- end }}
+          allowed_actions:
+            {{- range $perm.allowed_actions }}
+            - "{{ . }}"
+            {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if $role.tenant_permissions }}
+      tenant_permissions:
+        {{- range $perm := $role.tenant_permissions }}
+        - tenant_patterns:
+            {{- range $perm.tenant_patterns }}
+            - "{{ . }}"
+            {{- end }}
+          allowed_actions:
+            {{- range $perm.allowed_actions }}
+            - "{{ . }}"
+            {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+  # =============================================================================
+  # ROLES MAPPING CONFIGURATION
+  # =============================================================================
+  roles_mapping.yml: |
+    _meta:
+      type: "rolesmapping"
+      config_version: 2
+
+    # System role mappings
+    all_access:
+      reserved: false
+      backend_roles:
+        - "admin"
+      description: "Maps admin to all_access"
+
+    kibana_server:
+      reserved: true
+      users:
+        - "kibanaserver"
+
+    kibana_user:
+      reserved: false
+      backend_roles:
+        - "kibanauser"
+
+    # Multi-tenancy role mappings
+    {{- range $roleName, $mapping := $multiTenancy.rolesMapping }}
+    {{ $roleName }}:
+      reserved: false
+      {{- if $mapping.backend_roles }}
+      backend_roles:
+        {{- range $mapping.backend_roles }}
+        - "{{ . }}"
+        {{- end }}
+      {{- end }}
+      {{- if $mapping.users }}
+      users:
+        {{- range $mapping.users }}
+        - "{{ . }}"
+        {{- end }}
+      {{- end }}
+      {{- if $mapping.hosts }}
+      hosts:
+        {{- range $mapping.hosts }}
+        - "{{ . }}"
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+  # =============================================================================
+  # INTERNAL USERS CONFIGURATION
+  # =============================================================================
+  # Note: Passwords are hashed by the init container before being applied
+  internal_users.yml: |
+    _meta:
+      type: "internalusers"
+      config_version: 2
+
+    # System admin user
+    admin:
+      hash: "${ADMIN_PASSWORD_HASH}"
+      reserved: true
+      backend_roles:
+        - "admin"
+      description: "System admin user"
+
+    # Dashboard server user
+    kibanaserver:
+      hash: "${KIBANA_PASSWORD_HASH}"
+      reserved: true
+      description: "Dashboard server user"
+
+    # Multi-tenancy users
+    {{- range $username, $user := $multiTenancy.internalUsers }}
+    {{- if $user.enabled }}
+    {{ $username }}:
+      hash: "${USER_{{ $username | upper }}_HASH}"
+      reserved: false
+      {{- if $user.backendRoles }}
+      backend_roles:
+        {{- range $user.backendRoles }}
+        - "{{ . }}"
+        {{- end }}
+      {{- end }}
+      description: "{{ $user.description | default $username }}"
+    {{- end }}
+    {{- end }}
+
+  # =============================================================================
+  # ACTION GROUPS CONFIGURATION
+  # =============================================================================
+  action_groups.yml: |
+    _meta:
+      type: "actiongroups"
+      config_version: 2
+
+  # =============================================================================
+  # NODES DN CONFIGURATION
+  # =============================================================================
+  nodes_dn.yml: |
+    _meta:
+      type: "nodesdn"
+      config_version: 2
+
+  # =============================================================================
+  # WHITELIST CONFIGURATION
+  # =============================================================================
+  whitelist.yml: |
+    _meta:
+      type: "whitelist"
+      config_version: 2
+{{- end }}
