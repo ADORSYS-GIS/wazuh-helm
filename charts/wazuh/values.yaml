@@ -332,14 +332,18 @@ master:
     host: "{{ .Values.global.domain }}"
     tls: true
 
+  # Backup volume configuration - when enabled, mounts PVC for /var/ossec/backup
+  backup:
+    enabled: true
+    # PVC name is auto-generated: {{ include "common.names.fullname" $ }}-manager-backup
+    # The PVC must be created via extraVolumeConfigs with enabled: true
+
   initContainers: {}
   env: []
   envFrom: []
 
-  volumes:
-    - name: manager-backup
-      persistentVolumeClaim:
-        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+  # Additional volumes (manager-backup is added automatically when backup.enabled=true)
+  volumes: []
 
   volumeMounts: []
 
@@ -370,14 +374,16 @@ worker:
     tag: '{{ .Values.global.version }}'
     pullPolicy: IfNotPresent
 
+  # Backup volume configuration - when enabled, mounts PVC for /var/ossec/backup
+  backup:
+    enabled: true
+
   initContainers: {}
   env: []
   envFrom: []
 
-  volumes:
-    - name: manager-backup
-      persistentVolumeClaim:
-        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+  # Additional volumes (manager-backup is added automatically when backup.enabled=true)
+  volumes: []
 
   volumeMounts: []
 
@@ -410,14 +416,16 @@ worker_integration:
     tag: '{{ .Values.global.version }}'
     pullPolicy: IfNotPresent
 
+  # Backup volume configuration - when enabled, mounts PVC for /var/ossec/backup
+  backup:
+    enabled: true
+
   initContainers: {}
   env: []
   envFrom: []
 
-  volumes:
-    - name: manager-backup
-      persistentVolumeClaim:
-        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+  # Additional volumes (manager-backup is added automatically when backup.enabled=true)
+  volumes: []
 
   volumeMounts: []
 
