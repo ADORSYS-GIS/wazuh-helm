@@ -383,6 +383,18 @@ spec:
               subPath: 7015-dlp-cloud-email.xml
               readOnly: true
 
+            # LOTL (Living Off The Land) detection rules
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7016-lotl-detection.xml
+              subPath: 7016-lotl-detection.xml
+              readOnly: true
+
+            # macOS Syslog monitoring rules
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7017-macos-syslog.xml
+              subPath: 7017-macos-syslog.xml
+              readOnly: true
+
             # DLP agent configuration (log collection for DLP monitoring)
             - name: config
               mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf

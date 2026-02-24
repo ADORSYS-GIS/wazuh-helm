@@ -1,0 +1,61 @@
+<!-- macOS Syslog Rules - Optimized for Performance -->
+<!-- File 2 of 3: Syslog monitoring only -->
+
+<group name="macos,syslog,system_monitoring">
+
+    <!-- ============================================== -->
+    <!-- KERNEL AND SYSTEM ERRORS                      -->
+    <!-- ============================================== -->
+
+    <rule id="860101" level="12">
+        <if_group>syslog</if_group>
+        <match>kernel</match>
+        <regex type="pcre2">(?!.*(critical section|thermal|cooling)).*(panic|kernel trap|fatal error)</regex>
+        <description>macOS: Critical kernel panic or fatal error detected</description>
+        <group>system_error,pci_dss_10.6.1,nist_800_53_SI.4</group>
+    </rule>
+
+    <rule id="860105" level="12">
+        <if_group>syslog</if_group>
+        <match>kernel</match>
+        <regex type="pcre2">(?!.*(SIP status|Xcode|Software Update)).*(System Integrity Protection|SIP violation)</regex>
+        <description>macOS: System Integrity Protection violation detected</description>
+        <group>system_error,pci_dss_10.6.1,nist_800_53_SI.7</group>
+    </rule>
+
+    <!-- ============================================== -->
+    <!-- SECURITY MONITORING                           -->
+    <!-- ============================================== -->
+
+    <rule id="860120" level="10">
+        <if_group>syslog</if_group>
+        <match>Gatekeeper</match>
+        <regex type="pcre2">(?!.*(Software Update|Jamf|Jamf)).*(bypass|disabled|override)</regex>
+        <description>macOS: Gatekeeper security bypass detected</description>
+        <group>system_error,pci_dss_10.6.1,nist_800_53_SI.3</group>
+    </rule>
+
+    <rule id="860130" level="10">
+        <if_group>syslog</if_group>
+        <match>syslogd</match>
+        <regex type="pcre2">(?!.*(newsyslog|logrotate)).*(log cleared|log rotated|log deleted)</regex>
+        <description>macOS: System log cleared or deleted</description>
+        <group>log_cleared,pci_dss_10.5.2,nist_800_53_AU.9</group>
+    </rule>
+
+    <rule id="860132" level="12" frequency="3" timeframe="300">
+        <if_matched_sid>860130</if_matched_sid>
+        <same_source_ip />
+        <description>macOS: Multiple log clearing events - possible log tampering</description>
+        <group>log_cleared,correlation,pci_dss_10.5.2,nist_800_53_AU.9</group>
+    </rule>
+
+    <rule id="860140" level="14">
+        <if_group>syslog</if_group>
+        <match>XProtect|fdesetup|FileVault</match>
+        <regex>malware|quarantine|disabled|turned off</regex>
+        <description>macOS: Critical security detection (Malware or FileVault disabled)</description>
+        <group>malware,system_error,pci_dss_10.6.1,pci_dss_3.4</group>
+    </rule>
+
+</group>
