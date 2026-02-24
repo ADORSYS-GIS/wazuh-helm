@@ -364,8 +364,10 @@
   </rule>
 
   <!-- Multiple USB HID devices in short timeframe (suspicious) -->
+  <!-- Note: Using if_matched_group for frequency rules (if_matched_sid only accepts single SID) -->
   <rule id="800142" level="14" frequency="2" timeframe="60">
-    <if_matched_sid>800140,800141</if_matched_sid>
+    <if_matched_group>badusb</if_matched_group>
+    <same_source_ip />
     <description>CRITICAL: Multiple USB HID devices connected rapidly - possible attack in progress</description>
     <mitre>
       <id>T1200</id>
