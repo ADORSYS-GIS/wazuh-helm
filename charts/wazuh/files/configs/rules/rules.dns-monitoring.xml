@@ -1,126 +1,78 @@
 <!--
   DNS Monitoring and Malicious Domain Detection Rules
-  Monitors DNS queries across Windows (Sysmon), macOS, and Linux
+  CONSOLIDATED VERSION - Reduces memory by using unified detection rules
 
   Rule IDs: 760000-760099
+
+  Architecture:
+  - Base rules (760001-760050): Capture DNS events from different sources
+  - Detection rules (760070-760099): Single rule per threat type, referencing all bases
 -->
 
 <group name="dns_monitoring,network,">
 
   <!-- ================================================== -->
-  <!-- WINDOWS - SYSMON DNS QUERIES (Event ID 22)         -->
+  <!-- BASE RULES - DNS SOURCE CAPTURE                    -->
+  <!-- These capture DNS events from different platforms  -->
   <!-- ================================================== -->
 
-  <!-- Base rule for Sysmon DNS events -->
-  <rule id="760001" level="3">
+  <!-- Windows - Sysmon DNS events (Event ID 22) -->
+  <rule id="760001" level="0">
     <if_sid>61650</if_sid>
     <field name="win.system.eventID">^22$</field>
     <description>Sysmon: DNS query - $(win.eventdata.queryName)</description>
-    <group>sysmon,dns_query,</group>
+    <group>sysmon,dns_query,dns_base,</group>
   </rule>
 
-  <!-- Cryptomining pool DNS queries -->
-  <rule id="760010" level="14">
-    <if_sid>760001</if_sid>
-    <field name="win.eventdata.queryName" type="pcre2">(?i)minergate|xmrpool|supportxmr|moneropool|nicehash|ethermine|2miners|nanopool</field>
-    <description>CRITICAL: Cryptomining pool DNS query - $(win.eventdata.queryName)</description>
-    <mitre>
-      <id>T1496</id>
-    </mitre>
-    <group>cryptomining,dns_query,threat_detected,</group>
-  </rule>
-
-  <!-- Tor/Anonymizer DNS queries -->
-  <rule id="760011" level="10">
-    <if_sid>760001</if_sid>
-    <field name="win.eventdata.queryName" type="pcre2">(?i)torproject\.org|\.onion\.</field>
-    <description>WARNING: Tor/Anonymizer DNS query - $(win.eventdata.queryName)</description>
-    <mitre>
-      <id>T1090.003</id>
-    </mitre>
-    <group>anonymizer,dns_query,policy_violation,</group>
-  </rule>
-
-  <!-- Dynamic DNS -->
-  <rule id="760012" level="8">
-    <if_sid>760001</if_sid>
-    <field name="win.eventdata.queryName" type="pcre2">(?i)duckdns\.org|no-ip\.com|dynu\.com|ddns\.net</field>
-    <description>Suspicious: Dynamic DNS query - $(win.eventdata.queryName)</description>
-    <mitre>
-      <id>T1568.002</id>
-    </mitre>
-    <group>dyndns,dns_query,suspicious,</group>
-  </rule>
-
-  <!-- ================================================== -->
-  <!-- LINUX - DNS QUERY MONITORING                        -->
-  <!-- ================================================== -->
-
-  <!-- systemd-resolved logs -->
-  <rule id="760030" level="3">
+  <!-- Linux - systemd-resolved logs -->
+  <rule id="760030" level="0">
     <if_group>syslog</if_group>
     <program_name>systemd-resolved</program_name>
     <description>Linux DNS query detected</description>
-    <group>linux_dns,dns_query,</group>
+    <group>linux_dns,dns_query,dns_base,</group>
   </rule>
 
-  <!-- dnsmasq logs -->
-  <rule id="760031" level="3">
+  <!-- Linux - dnsmasq logs -->
+  <rule id="760031" level="0">
     <if_group>syslog</if_group>
     <program_name>dnsmasq</program_name>
     <description>Linux dnsmasq DNS query</description>
-    <group>linux_dns,dns_query,dnsmasq,</group>
+    <group>linux_dns,dns_query,dnsmasq,dns_base,</group>
   </rule>
 
-  <!-- Linux - Cryptomining DNS -->
-  <rule id="760032" level="14">
-    <if_sid>760030,760031</if_sid>
-    <match>minergate|xmrpool|nicehash|ethermine</match>
-    <description>CRITICAL: Linux - Cryptomining pool DNS query</description>
-    <mitre>
-      <id>T1496</id>
-    </mitre>
-    <group>cryptomining,dns_query,threat_detected,</group>
-  </rule>
-
-  <!-- ================================================== -->
-  <!-- macOS - DNS QUERY MONITORING                       -->
-  <!-- ================================================== -->
-
-  <!-- mDNSResponder logs - silenced (level 0) to reduce noise -->
+  <!-- macOS - mDNSResponder logs (silenced base) -->
   <rule id="760040" level="0">
     <if_group>syslog</if_group>
     <program_name>mDNSResponder</program_name>
-    <description>macOS DNS query detected (silenced)</description>
-    <group>macos_dns,dns_query,</group>
+    <description>macOS DNS query detected</description>
+    <group>macos_dns,dns_query,dns_base,</group>
   </rule>
 
-  <!-- macOS - Cryptomining DNS -->
-  <rule id="760042" level="14">
-    <if_sid>760040</if_sid>
-    <match>minergate|xmrpool|nicehash|ethermine</match>
-    <description>CRITICAL: macOS - Cryptomining pool DNS query</description>
-    <mitre>
-      <id>T1496</id>
-    </mitre>
-    <group>cryptomining,dns_query,threat_detected,</group>
+  <!-- macOS - Active DNS Query Rule for unified logging -->
+  <rule id="760041" level="0">
+    <if_group>syslog</if_group>
+    <match>mDNSResponder</match>
+    <match type="pcre2">query|GetServerForQuestion|resolv</match>
+    <description>macOS: DNS query detected via unified logging</description>
+    <group>macos_dns,dns_query,dns_base,</group>
   </rule>
 
-  <!-- ================================================== -->
-  <!-- macOS/Linux - TCPDUMP DNS CAPTURE                  -->
-  <!-- ================================================== -->
-
-  <!-- Base rule for tcpdump DNS capture -->
-  <rule id="760050" level="3">
+  <!-- tcpdump/Generic DNS capture -->
+  <rule id="760050" level="0">
     <match>DNS_QUERY:</match>
-    <description>DNS query captured: $(dns.query)</description>
-    <group>dns_query,dns_capture,</group>
+    <description>DNS query captured via tcpdump</description>
+    <group>dns_query,dns_capture,dns_base,</group>
   </rule>
 
-  <!-- Cryptomining pool DNS queries via tcpdump -->
-  <rule id="760051" level="14">
-    <if_sid>760050</if_sid>
-    <match type="pcre2">(?i)minergate|xmrpool|supportxmr|moneropool|nicehash|ethermine|2miners|nanopool|coinhive</match>
+  <!-- ================================================== -->
+  <!-- UNIFIED DETECTION RULES                            -->
+  <!-- Single rule per threat type, references all bases  -->
+  <!-- ================================================== -->
+
+  <!-- CRYPTOMINING POOL DETECTION (UNIFIED) -->
+  <rule id="760070" level="14">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)minergate|xmrpool|supportxmr|moneropool|nicehash|ethermine|2miners|nanopool|coinhive|cryptoloot|hashvault|minexmr|f2pool\.com|poolin\.com|antpool\.com|viabtc\.com</match>
     <description>CRITICAL: Cryptomining pool DNS query detected</description>
     <mitre>
       <id>T1496</id>
@@ -128,10 +80,10 @@
     <group>cryptomining,dns_query,threat_detected,</group>
   </rule>
 
-  <!-- Tor/Anonymizer DNS queries via tcpdump -->
-  <rule id="760052" level="10">
-    <if_sid>760050</if_sid>
-    <match type="pcre2">(?i)torproject\.org|\.onion|tor2web</match>
+  <!-- TOR/ANONYMIZER DETECTION (UNIFIED) -->
+  <rule id="760071" level="10">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)torproject\.org|\.onion\.|tor2web|torsocks|onion\.to|onion\.link</match>
     <description>WARNING: Tor/Anonymizer DNS query detected</description>
     <mitre>
       <id>T1090.003</id>
@@ -139,10 +91,10 @@
     <group>anonymizer,dns_query,policy_violation,</group>
   </rule>
 
-  <!-- Dynamic DNS queries via tcpdump -->
-  <rule id="760053" level="8">
-    <if_sid>760050</if_sid>
-    <match type="pcre2">(?i)duckdns\.org|no-ip\.com|dynu\.com|ddns\.net|freedns|changeip</match>
+  <!-- DYNAMIC DNS DETECTION (UNIFIED) -->
+  <rule id="760072" level="8">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)duckdns\.org|no-ip\.com|dynu\.com|ddns\.net|freedns\.org|changeip\.com|hopto\.org|zapto\.org|sytes\.net|servequake\.com</match>
     <description>Suspicious: Dynamic DNS query detected</description>
     <mitre>
       <id>T1568.002</id>
@@ -150,58 +102,10 @@
     <group>dyndns,dns_query,suspicious,</group>
   </rule>
 
-  <!-- Malicious/Suspicious domain patterns -->
-  <rule id="760054" level="12">
-    <if_sid>760050</if_sid>
-    <match type="pcre2">(?i)\.tk$|\.ml$|\.ga$|\.cf$|\.gq$|\.top$|\.xyz$|\.pw$</match>
-    <description>Suspicious TLD in DNS query - potential malware C2</description>
-    <mitre>
-      <id>T1071.004</id>
-    </mitre>
-    <group>suspicious_tld,dns_query,suspicious,</group>
-  </rule>
-
-  <!-- ================================================== -->
-  <!-- PHISHING DETECTION                                 -->
-  <!-- ================================================== -->
-
-  <!-- Windows Sysmon - Phishing domain patterns -->
-  <rule id="760020" level="12">
-    <if_sid>760001</if_sid>
-    <field name="win.eventdata.queryName" type="pcre2">(?i)login-verify|account-confirm|secure-login|update-billing|verify-account|password-reset|account-suspended|security-alert|signin-verify|account-update</field>
-    <description>PHISHING: Suspicious phishing domain pattern detected - $(win.eventdata.queryName)</description>
-    <mitre>
-      <id>T1566</id>
-    </mitre>
-    <group>phishing,dns_query,threat_detected,</group>
-  </rule>
-
-  <!-- Windows Sysmon - Brand impersonation phishing -->
-  <rule id="760021" level="12">
-    <if_sid>760001</if_sid>
-    <field name="win.eventdata.queryName" type="pcre2">(?i)(paypal|microsoft|apple|google|amazon|netflix|facebook|instagram|linkedin|dropbox|adobe|office365|outlook|onedrive|icloud|chase|wellsfargo|bankofamerica)[^a-z].*\.(tk|ml|ga|cf|gq|xyz|pw|top|work|click|link|live|icu|buzz)</field>
-    <description>PHISHING: Brand impersonation detected - $(win.eventdata.queryName)</description>
-    <mitre>
-      <id>T1566.002</id>
-    </mitre>
-    <group>phishing,brand_impersonation,dns_query,threat_detected,</group>
-  </rule>
-
-  <!-- Linux - Phishing domain patterns -->
-  <rule id="760033" level="12">
-    <if_sid>760030,760031</if_sid>
-    <match type="pcre2">(?i)login-verify|account-confirm|secure-login|update-billing|verify-account|password-reset|account-suspended|security-alert</match>
-    <description>PHISHING: Linux - Suspicious phishing domain pattern detected</description>
-    <mitre>
-      <id>T1566</id>
-    </mitre>
-    <group>phishing,dns_query,threat_detected,</group>
-  </rule>
-
-  <!-- tcpdump capture - Phishing domain patterns -->
-  <rule id="760055" level="12">
-    <if_sid>760050</if_sid>
-    <match type="pcre2">(?i)login-verify|account-confirm|secure-login|update-billing|verify-account|password-reset|account-suspended|security-alert|signin-verify|account-update</match>
+  <!-- PHISHING DOMAIN PATTERNS (UNIFIED) -->
+  <rule id="760073" level="12">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)login-verify|account-confirm|secure-login|update-billing|verify-account|password-reset|account-suspended|security-alert|signin-verify|account-update|confirm-identity|unlock-account</match>
     <description>PHISHING: Suspicious phishing domain pattern detected</description>
     <mitre>
       <id>T1566</id>
@@ -209,10 +113,10 @@
     <group>phishing,dns_query,threat_detected,</group>
   </rule>
 
-  <!-- tcpdump capture - Brand impersonation phishing -->
-  <rule id="760056" level="12">
-    <if_sid>760050</if_sid>
-    <match type="pcre2">(?i)(paypal|microsoft|apple|google|amazon|netflix|facebook|instagram|linkedin|dropbox|adobe|office365|outlook|onedrive|icloud|chase|wellsfargo|bankofamerica)[^a-z].*\.(tk|ml|ga|cf|gq|xyz|pw|top|work|click|link|live|icu|buzz)</match>
+  <!-- BRAND IMPERSONATION PHISHING (UNIFIED) -->
+  <rule id="760074" level="12">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)(paypal|microsoft|apple|google|amazon|netflix|facebook|instagram|linkedin|dropbox|adobe|office365|outlook|onedrive|icloud|chase|wellsfargo|bankofamerica|citibank|capitalone)[^a-z0-9].*\.(tk|ml|ga|cf|gq|xyz|pw|top|work|click|link|live|icu|buzz|online|site)</match>
     <description>PHISHING: Brand impersonation detected - potential credential theft</description>
     <mitre>
       <id>T1566.002</id>
@@ -220,30 +124,49 @@
     <group>phishing,brand_impersonation,dns_query,threat_detected,</group>
   </rule>
 
-  <!-- ================================================== -->
-  <!-- PASTEBIN / DATA EXFILTRATION                       -->
-  <!-- ================================================== -->
+  <!-- SUSPICIOUS TLD DETECTION (UNIFIED) -->
+  <rule id="760075" level="10">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)\.(tk|ml|ga|cf|gq|top|xyz|pw|buzz|loan|work|click|icu)$</match>
+    <description>Suspicious TLD in DNS query - potential malware C2</description>
+    <mitre>
+      <id>T1071.004</id>
+    </mitre>
+    <group>suspicious_tld,dns_query,suspicious,</group>
+  </rule>
 
-  <!-- Windows Sysmon - Pastebin services (data exfil risk) -->
-  <rule id="760022" level="8">
-    <if_sid>760001</if_sid>
-    <field name="win.eventdata.queryName" type="pcre2">(?i)pastebin\.com|paste\.ee|hastebin\.com|ghostbin\.com|privatebin\.net|justpaste\.it|controlc\.com</field>
-    <description>Data Exfiltration Risk: Pastebin service access - $(win.eventdata.queryName)</description>
+  <!-- PASTEBIN/DATA EXFIL SERVICES (UNIFIED) -->
+  <rule id="760076" level="8">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)pastebin\.com|paste\.ee|hastebin\.com|ghostbin\.com|privatebin\.net|justpaste\.it|controlc\.com|dpaste\.com|ix\.io|sprunge\.us</match>
+    <description>Data Exfiltration Risk: Pastebin service access detected</description>
     <mitre>
       <id>T1567</id>
     </mitre>
     <group>data_exfiltration,pastebin,dns_query,suspicious,</group>
   </rule>
 
-  <!-- tcpdump capture - Pastebin services -->
-  <rule id="760057" level="8">
-    <if_sid>760050</if_sid>
-    <match type="pcre2">(?i)pastebin\.com|paste\.ee|hastebin\.com|ghostbin\.com|privatebin\.net|justpaste\.it|controlc\.com</match>
-    <description>Data Exfiltration Risk: Pastebin service access detected</description>
+  <!-- VPN SERVICE DETECTION (UNIFIED) -->
+  <rule id="760077" level="6">
+    <if_sid>760001,760030,760031,760040,760041,760050</if_sid>
+    <match type="pcre2">(?i)nordvpn\.com|expressvpn\.com|surfshark\.com|protonvpn\.com|cyberghostvpn\.com|privateinternetaccess\.com|tunnelbear\.com|windscribe\.com</match>
+    <description>VPN service DNS query detected</description>
     <mitre>
-      <id>T1567</id>
+      <id>T1090</id>
     </mitre>
-    <group>data_exfiltration,pastebin,dns_query,suspicious,</group>
+    <group>vpn,dns_query,policy_violation,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- macOS SPECIFIC - CLOUD SERVICE MONITORING          -->
+  <!-- ================================================== -->
+
+  <!-- macOS - Cloud service network connections (nsurlsessiond/cloudd) -->
+  <rule id="760060" level="0">
+    <if_group>syslog</if_group>
+    <match type="pcre2">nsurlsessiond|cloudd</match>
+    <description>macOS: Cloud service network activity detected</description>
+    <group>macos_dns,cloud_network,</group>
   </rule>
 
 </group>

@@ -1,6 +1,11 @@
 <!--
   Application Blacklist Rules
-  Detects unauthorized software installations across all platforms
+  CONSOLIDATED VERSION - Reduced memory footprint
+
+  Architecture:
+  - Category definitions with shared regex patterns
+  - Detection rules grouped by source type
+  - Avoid duplicate pattern matching across vectors
 
   Rule IDs: 750000-750099
 -->
@@ -8,56 +13,48 @@
 <group name="app_blacklist,software_inventory,">
 
   <!-- ================================================== -->
-  <!-- TRACK ALL NEW SOFTWARE INSTALLATIONS               -->
+  <!-- CATEGORY: CRYPTOCURRENCY MINERS (CRITICAL - Level 14) -->
+  <!-- Pattern: xmrig|nicehash|minergate|claymore|phoenixminer|nbminer|trex|gminer|lolminer|ethminer|cgminer|bfgminer|cpuminer|cryptotab|minerd|xmr-stak -->
   <!-- ================================================== -->
 
-  <!-- Linux: New package installed - silenced (only blacklisted apps alert) -->
-  <rule id="750001" level="0">
+  <!-- Via software inventory -->
+  <rule id="750040" level="14">
     <if_sid>221</if_sid>
-    <description>Software installed: $(data.program.name) v$(data.program.version)</description>
-    <group>software_installed,pci_dss_6.2,gdpr_IV_35.7.d,</group>
-  </rule>
-
-  <!-- Windows: New program detected in inventory -->
-  <rule id="750002" level="5">
-    <if_sid>221</if_sid>
-    <field name="data.program.vendor">\.+</field>
-    <description>Windows software installed: $(data.program.name) by $(data.program.vendor)</description>
-    <group>software_installed,pci_dss_6.2,gdpr_IV_35.7.d,</group>
-  </rule>
-
-  <!-- ================================================== -->
-  <!-- REMOTE ACCESS TOOLS (High Risk)                    -->
-  <!-- ================================================== -->
-
-  <rule id="750010" level="12">
-    <if_sid>221</if_sid>
-    <field name="data.program.name" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|gotomypc|screenconnect|connectwise|bomgar|dameware|radmin|ultraviewer|atera|meshcentral</field>
-    <description>UNAUTHORIZED: Remote access tool installed - $(data.program.name)</description>
+    <field name="data.program.name" type="pcre2">(?i)xmrig|nicehash|minergate|claymore|phoenixminer|nbminer|t-?rex|gminer|lolminer|ethminer|cgminer|bfgminer|cpuminer|cryptotab|minerd|xmr-?stak</field>
+    <description>CRITICAL: Cryptocurrency miner installed - $(data.program.name)</description>
     <mitre>
-      <id>T1219</id>
+      <id>T1496</id>
     </mitre>
-    <group>unauthorized_software,remote_access,pci_dss_10.6.1,gdpr_IV_35.7.d,hipaa_164.312.b,</group>
+    <group>unauthorized_software,cryptominer,malware,pci_dss_10.6.1,</group>
   </rule>
 
-  <!-- ================================================== -->
-  <!-- P2P / TORRENT CLIENTS                              -->
-  <!-- ================================================== -->
-
-  <rule id="750020" level="10">
-    <if_sid>221</if_sid>
-    <field name="data.program.name" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent</field>
-    <description>UNAUTHORIZED: P2P/Torrent client installed - $(data.program.name)</description>
+  <!-- Via auditd execve -->
+  <rule id="750041" level="14">
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)xmrig|nicehash|minergate|claymore|phoenixminer|nbminer|t-?rex|gminer|lolminer|ethminer|cgminer|bfgminer|cpuminer|cryptotab|minerd|xmr-?stak</field>
+    <description>CRITICAL: Cryptocurrency miner executed - $(audit.execve.a0)</description>
     <mitre>
-      <id>T1048</id>
+      <id>T1496</id>
     </mitre>
-    <group>unauthorized_software,p2p,policy_violation,</group>
+    <group>unauthorized_software,unauthorized_process,cryptominer,</group>
+  </rule>
+
+  <!-- Via dpkg/apt -->
+  <rule id="750042" level="14">
+    <if_sid>2902</if_sid>
+    <match type="pcre2">(?i)xmrig|minergate|cpuminer|cgminer|bfgminer|ethminer</match>
+    <description>CRITICAL: Cryptocurrency miner installed via apt/dpkg</description>
+    <mitre>
+      <id>T1496</id>
+    </mitre>
+    <group>unauthorized_software,dpkg,cryptominer,</group>
   </rule>
 
   <!-- ================================================== -->
-  <!-- HACKING / PENTESTING TOOLS                         -->
+  <!-- CATEGORY: HACKING/PENTESTING TOOLS (CRITICAL - Level 14) -->
   <!-- ================================================== -->
 
+  <!-- Via software inventory -->
   <rule id="750030" level="14">
     <if_sid>221</if_sid>
     <field name="data.program.name" type="pcre2">(?i)nmap|wireshark|metasploit|burpsuite|sqlmap|john|hashcat|hydra|aircrack|ettercap|cain|mimikatz|cobaltstrike|bloodhound|responder|impacket|crackmapexec|lazagne|rubeus|kali</field>
@@ -68,24 +65,107 @@
     <group>unauthorized_software,hacking_tool,pci_dss_10.6.1,gdpr_IV_35.7.d,</group>
   </rule>
 
-  <!-- ================================================== -->
-  <!-- CRYPTOCURRENCY MINERS                              -->
-  <!-- ================================================== -->
-
-  <rule id="750040" level="14">
-    <if_sid>221</if_sid>
-    <field name="data.program.name" type="pcre2">(?i)xmrig|nicehash|minergate|claymore|phoenixminer|nbminer|trex|gminer|lolminer|ethminer|cgminer|bfgminer|cpuminer|cryptotab|miner</field>
-    <description>CRITICAL: Cryptocurrency miner installed - $(data.program.name)</description>
+  <!-- Via auditd execve -->
+  <rule id="750031" level="14">
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)^nmap$|^wireshark$|^tshark$|^metasploit$|^msfconsole$|^msfvenom$|^burpsuite$|^sqlmap$|^john$|^hashcat$|^hydra$|^aircrack|^airmon|^ettercap$|^mimikatz$|^cobaltstrike$|^bloodhound$|^responder$|^crackmapexec$|^lazagne$|^rubeus$|^powersploit$|^empire$</field>
+    <description>CRITICAL: Hacking/pentesting tool executed - $(audit.execve.a0)</description>
     <mitre>
-      <id>T1496</id>
+      <id>T1588.002</id>
     </mitre>
-    <group>unauthorized_software,cryptominer,malware,pci_dss_10.6.1,</group>
+    <group>unauthorized_software,unauthorized_process,hacking_tool,</group>
+  </rule>
+
+  <!-- Via dpkg/apt -->
+  <rule id="750032" level="14">
+    <if_sid>2902</if_sid>
+    <match type="pcre2">(?i)nmap|wireshark|tshark|metasploit|sqlmap|john|hashcat|hydra|aircrack|ettercap|nikto|gobuster|dirb|burpsuite|zaproxy</match>
+    <description>CRITICAL: Hacking/network tool installed via apt/dpkg</description>
+    <mitre>
+      <id>T1588.002</id>
+    </mitre>
+    <group>unauthorized_software,dpkg,hacking_tool,</group>
   </rule>
 
   <!-- ================================================== -->
-  <!-- UNAUTHORIZED VPN CLIENTS                           -->
+  <!-- CATEGORY: REMOTE ACCESS TOOLS (HIGH - Level 12)    -->
   <!-- ================================================== -->
 
+  <!-- Via software inventory -->
+  <rule id="750010" level="12">
+    <if_sid>221</if_sid>
+    <field name="data.program.name" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|gotomypc|screenconnect|connectwise|bomgar|dameware|radmin|ultraviewer|atera|meshcentral</field>
+    <description>UNAUTHORIZED: Remote access tool installed - $(data.program.name)</description>
+    <mitre>
+      <id>T1219</id>
+    </mitre>
+    <group>unauthorized_software,remote_access,pci_dss_10.6.1,gdpr_IV_35.7.d,hipaa_164.312.b,</group>
+  </rule>
+
+  <!-- Via auditd execve -->
+  <rule id="750011" level="12">
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|gotomypc|screenconnect|connectwise|bomgar|dameware|radmin|ultraviewer|atera|meshcentral|vnc|tightvnc|ultravnc|realvnc</field>
+    <description>ALERT: Remote access tool executed - $(audit.execve.a0)</description>
+    <mitre>
+      <id>T1219</id>
+    </mitre>
+    <group>unauthorized_software,unauthorized_process,remote_access,</group>
+  </rule>
+
+  <!-- Via dpkg/apt -->
+  <rule id="750012" level="12">
+    <if_sid>2902</if_sid>
+    <match type="pcre2">(?i)anydesk|teamviewer|rustdesk|remmina|xrdp|x11vnc|tigervnc|tightvnc|realvnc</match>
+    <description>ALERT: Remote access tool installed via apt/dpkg</description>
+    <mitre>
+      <id>T1219</id>
+    </mitre>
+    <group>unauthorized_software,dpkg,remote_access,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- CATEGORY: P2P/TORRENT CLIENTS (MEDIUM - Level 10)  -->
+  <!-- ================================================== -->
+
+  <!-- Via software inventory -->
+  <rule id="750020" level="10">
+    <if_sid>221</if_sid>
+    <field name="data.program.name" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent</field>
+    <description>UNAUTHORIZED: P2P/Torrent client installed - $(data.program.name)</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>unauthorized_software,p2p,policy_violation,</group>
+  </rule>
+
+  <!-- Via auditd execve -->
+  <rule id="750021" level="10">
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent|aria2</field>
+    <description>ALERT: P2P/Torrent client executed - $(audit.execve.a0)</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>unauthorized_software,unauthorized_process,p2p,</group>
+  </rule>
+
+  <!-- Via dpkg/apt -->
+  <rule id="750022" level="10">
+    <if_sid>2902</if_sid>
+    <match type="pcre2">(?i)transmission|deluge|qbittorrent|rtorrent|aria2</match>
+    <description>ALERT: P2P/Torrent client installed via apt/dpkg</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>unauthorized_software,dpkg,p2p,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- CATEGORY: VPN/PROXY SOFTWARE (MEDIUM - Level 8)    -->
+  <!-- ================================================== -->
+
+  <!-- Via software inventory -->
   <rule id="750050" level="8">
     <if_sid>221</if_sid>
     <field name="data.program.name" type="pcre2">(?i)nordvpn|expressvpn|surfshark|protonvpn|cyberghost|privateinternetaccess|tunnelbear|windscribe|hotspotshield|hola|psiphon|ultrasurf|torbrowser|torproject</field>
@@ -96,69 +176,8 @@
     <group>unauthorized_software,vpn,policy_violation,</group>
   </rule>
 
-  <!-- ================================================== -->
-  <!-- GAMING SOFTWARE                                    -->
-  <!-- ================================================== -->
-
-  <rule id="750060" level="6">
-    <if_sid>221</if_sid>
-    <field name="data.program.name" type="pcre2">(?i)^steam$|^steam\.exe|epicgames|^origin$|battlenet|battle\.net|riotclient|riot games|^gog$|uplay|ubisoft|xbox|playnite</field>
-    <description>Policy Violation: Gaming software installed - $(data.program.name)</description>
-    <group>unauthorized_software,gaming,policy_violation,</group>
-  </rule>
-
-  <!-- ================================================== -->
-  <!-- RUNNING PROCESS DETECTION (Linux Audit-based)      -->
-  <!-- Catches apps when executed via auditd monitoring   -->
-  <!-- Requires auditd with execve rules on Linux agents  -->
-  <!-- ================================================== -->
-
-  <!-- CRITICAL: Crypto miners executed (Level 14) -->
-  <rule id="750070" level="14">
-    <if_group>audit</if_group>
-    <field name="audit.execve.a0" type="pcre2">(?i)xmrig|nicehash|minergate|claymore|phoenixminer|nbminer|t-rex|gminer|lolminer|ethminer|cgminer|bfgminer|cpuminer|cryptotab|minerd|xmr-stak</field>
-    <description>CRITICAL: Cryptocurrency miner executed - $(audit.execve.a0)</description>
-    <mitre>
-      <id>T1496</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,cryptominer,</group>
-  </rule>
-
-  <!-- CRITICAL: Hacking tools executed (Level 14) -->
-  <rule id="750071" level="14">
-    <if_group>audit</if_group>
-    <field name="audit.execve.a0" type="pcre2">(?i)^nmap$|^wireshark$|^tshark$|^tcpdump$|^metasploit$|^msfconsole$|^msfvenom$|^burpsuite$|^sqlmap$|^john$|^hashcat$|^hydra$|^aircrack|^airmon|^ettercap$|^mimikatz$|^cobaltstrike$|^bloodhound$|^responder$|^crackmapexec$|^lazagne$|^rubeus$|^powersploit$|^empire$</field>
-    <description>CRITICAL: Hacking/pentesting tool executed - $(audit.execve.a0)</description>
-    <mitre>
-      <id>T1588.002</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,hacking_tool,</group>
-  </rule>
-
-  <!-- HIGH: Remote access tools executed (Level 12) -->
-  <rule id="750072" level="12">
-    <if_group>audit</if_group>
-    <field name="audit.execve.a0" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|gotomypc|screenconnect|connectwise|bomgar|dameware|radmin|ultraviewer|atera|meshcentral|vnc|tightvnc|ultravnc|realvnc</field>
-    <description>ALERT: Remote access tool executed - $(audit.execve.a0)</description>
-    <mitre>
-      <id>T1219</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,remote_access,</group>
-  </rule>
-
-  <!-- MEDIUM: P2P/Torrent clients executed (Level 10) -->
-  <rule id="750073" level="10">
-    <if_group>audit</if_group>
-    <field name="audit.execve.a0" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent|aria2</field>
-    <description>ALERT: P2P/Torrent client executed - $(audit.execve.a0)</description>
-    <mitre>
-      <id>T1048</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,p2p,</group>
-  </rule>
-
-  <!-- MEDIUM: VPN/Proxy tools executed (Level 8) -->
-  <rule id="750074" level="8">
+  <!-- Via auditd execve -->
+  <rule id="750051" level="8">
     <if_group>audit</if_group>
     <field name="audit.execve.a0" type="pcre2">(?i)nordvpn|expressvpn|surfshark|protonvpn|cyberghost|pia|tunnelbear|windscribe|hotspotshield|hola|psiphon|ultrasurf|^tor$|torbrowser|openvpn|wireguard</field>
     <description>ALERT: VPN/Proxy tool executed - $(audit.execve.a0)</description>
@@ -168,8 +187,20 @@
     <group>unauthorized_software,unauthorized_process,vpn,</group>
   </rule>
 
-  <!-- LOW: Gaming software executed (Level 6) -->
-  <rule id="750075" level="6">
+  <!-- ================================================== -->
+  <!-- CATEGORY: GAMING SOFTWARE (LOW - Level 6)          -->
+  <!-- ================================================== -->
+
+  <!-- Via software inventory -->
+  <rule id="750060" level="6">
+    <if_sid>221</if_sid>
+    <field name="data.program.name" type="pcre2">(?i)^steam$|^steam\.exe|epicgames|^origin$|battlenet|battle\.net|riotclient|riot games|^gog$|uplay|ubisoft|xbox|playnite</field>
+    <description>Policy Violation: Gaming software installed - $(data.program.name)</description>
+    <group>unauthorized_software,gaming,policy_violation,</group>
+  </rule>
+
+  <!-- Via auditd execve -->
+  <rule id="750061" level="6">
     <if_group>audit</if_group>
     <field name="audit.execve.a0" type="pcre2">(?i)^steam$|steamwebhelper|epicgameslauncher|^origin$|battlenet|battle\.net|riotclient|leagueclient|valorant|^gog$|uplay|ubisoft|xbox|playnite</field>
     <description>Policy Violation: Gaming software executed - $(audit.execve.a0)</description>
@@ -177,123 +208,18 @@
   </rule>
 
   <!-- ================================================== -->
-  <!-- COMMAND-BASED PROCESS DETECTION (macOS/Cross-platform) -->
-  <!-- Detects blacklisted processes via ps command monitoring -->
-  <!-- ================================================== -->
-
-  <!-- Base rule for blacklist process check command -->
-  <rule id="750095" level="0">
-    <decoded_as>ossec</decoded_as>
-    <match>^ossec: output: 'blacklist_process_check'</match>
-    <description>Blacklist process check command output</description>
-  </rule>
-
-  <!-- CRITICAL: Hacking tools detected via ps command -->
-  <rule id="750096" level="14">
-    <if_sid>750095</if_sid>
-    <match type="pcre2">(?i)wireshark|tshark|nmap|tcpdump|metasploit|burpsuite|sqlmap|hashcat|hydra|aircrack|ettercap|mimikatz</match>
-    <description>CRITICAL: Hacking/pentesting tool running - detected via process monitoring</description>
-    <mitre>
-      <id>T1588.002</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,hacking_tool,</group>
-  </rule>
-
-  <!-- HIGH: Remote access tools detected via ps command -->
-  <rule id="750097" level="12">
-    <if_sid>750095</if_sid>
-    <match type="pcre2">(?i)teamviewer|anydesk|rustdesk|parsec|splashtop|screenconnect|vnc</match>
-    <description>ALERT: Remote access tool running - detected via process monitoring</description>
-    <mitre>
-      <id>T1219</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,remote_access,</group>
-  </rule>
-
-  <!-- CRITICAL: Crypto miners detected via ps command -->
-  <rule id="750098" level="14">
-    <if_sid>750095</if_sid>
-    <match type="pcre2">(?i)xmrig|nicehash|minergate|phoenixminer|ethminer|cpuminer</match>
-    <description>CRITICAL: Cryptocurrency miner running - detected via process monitoring</description>
-    <mitre>
-      <id>T1496</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,cryptominer,</group>
-  </rule>
-
-  <!-- MEDIUM: P2P/Torrent detected via ps command -->
-  <rule id="750099" level="10">
-    <if_sid>750095</if_sid>
-    <match type="pcre2">(?i)utorrent|bittorrent|qbittorrent|transmission|deluge|vuze</match>
-    <description>ALERT: P2P/Torrent client running - detected via process monitoring</description>
-    <mitre>
-      <id>T1048</id>
-    </mitre>
-    <group>unauthorized_software,unauthorized_process,p2p,</group>
-  </rule>
-
-  <!-- ================================================== -->
-  <!-- LINUX DPKG-BASED DETECTION (Instant alerts)        -->
-  <!-- Triggers immediately when apt/dpkg installs apps   -->
-  <!-- ================================================== -->
-
-  <!-- CRITICAL: Hacking tools installed via dpkg (Level 14) -->
-  <rule id="750076" level="14">
-    <if_sid>2902</if_sid>
-    <match type="pcre2">(?i)nmap|wireshark|tshark|tcpdump|metasploit|sqlmap|john|hashcat|hydra|aircrack|ettercap|nikto|gobuster|dirb|burpsuite|zaproxy</match>
-    <description>CRITICAL: Hacking/network tool installed via apt/dpkg - $(@log)</description>
-    <mitre>
-      <id>T1588.002</id>
-    </mitre>
-    <group>unauthorized_software,dpkg,hacking_tool,</group>
-  </rule>
-
-  <!-- CRITICAL: Crypto miners installed via dpkg (Level 14) -->
-  <rule id="750077" level="14">
-    <if_sid>2902</if_sid>
-    <match type="pcre2">(?i)xmrig|minergate|cpuminer|cgminer|bfgminer|ethminer</match>
-    <description>CRITICAL: Cryptocurrency miner installed via apt/dpkg - $(@log)</description>
-    <mitre>
-      <id>T1496</id>
-    </mitre>
-    <group>unauthorized_software,dpkg,cryptominer,</group>
-  </rule>
-
-  <!-- HIGH: Remote access tools installed via dpkg (Level 12) -->
-  <rule id="750078" level="12">
-    <if_sid>2902</if_sid>
-    <match type="pcre2">(?i)anydesk|teamviewer|rustdesk|remmina|xrdp|x11vnc|tigervnc|tightvnc|realvnc</match>
-    <description>ALERT: Remote access tool installed via apt/dpkg - $(@log)</description>
-    <mitre>
-      <id>T1219</id>
-    </mitre>
-    <group>unauthorized_software,dpkg,remote_access,</group>
-  </rule>
-
-  <!-- MEDIUM: P2P/Torrent installed via dpkg (Level 10) -->
-  <rule id="750079" level="10">
-    <if_sid>2902</if_sid>
-    <match type="pcre2">(?i)transmission|deluge|qbittorrent|rtorrent|aria2</match>
-    <description>ALERT: P2P/Torrent client installed via apt/dpkg - $(@log)</description>
-    <mitre>
-      <id>T1048</id>
-    </mitre>
-    <group>unauthorized_software,dpkg,p2p,</group>
-  </rule>
-
-  <!-- ================================================== -->
-  <!-- WINDOWS SPECIFIC - NEW PROGRAM IN ADD/REMOVE       -->
+  <!-- WINDOWS SPECIFIC DETECTION                         -->
   <!-- ================================================== -->
 
   <!-- Windows installer events (Event ID 11707 - Installation success) -->
-  <rule id="750080" level="5">
+  <rule id="750080" level="0">
     <if_sid>60009</if_sid>
     <field name="win.system.eventID">^11707$</field>
     <description>Windows Installer: Program installed successfully</description>
     <group>software_installed,windows,</group>
   </rule>
 
-  <!-- Check if Windows installed program is blacklisted -->
+  <!-- Windows installed program - blacklisted (consolidated) -->
   <rule id="750081" level="12">
     <if_sid>750080</if_sid>
     <field name="win.eventdata.data" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|screenconnect|radmin|ultraviewer|utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|nmap|wireshark|metasploit|burpsuite|hashcat|hydra|mimikatz|xmrig|nicehash|minergate|phoenixminer|nordvpn|expressvpn|surfshark|protonvpn|cyberghost|tunnelbear|steam|epicgames|origin|battlenet|riotclient|uplay</field>
