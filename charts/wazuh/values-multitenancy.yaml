@@ -1,13 +1,46 @@
 # =============================================================================
-# MULTI-TENANCY CONFIGURATION
+# WAZUH HELM CHART - MULTI-TENANCY VALUES
 # =============================================================================
+# This values file provides country-based multi-tenancy configuration.
+#
+# Usage:
+#   helm install wazuh ./charts/wazuh \
+#     -f charts/wazuh/values.yaml \
+#     -f charts/wazuh/values-multitenancy.yaml
+#
+# Or with Keycloak:
+#   helm install wazuh ./charts/wazuh \
+#     -f charts/wazuh/values.yaml \
+#     -f charts/wazuh/values-multitenancy.yaml \
+#     --set indexer.keycloak.enabled=true \
+#     --set indexer.keycloak.client_id=wazuh \
+#     --set indexer.keycloak.client_secret=<secret> \
+#     --set indexer.keycloak.openid_connect_url=https://<keycloak>/realms/<realm>/.well-known/openid-configuration
+#
+# Tenants:
+#   - CM: Cameroon team
+#   - DE: Germany team
+#   - EXT: External actors (auditors, consultants)
+#
+# Authentication Options:
+#   1. OpenSearch Native Auth (default) - Uses internal users defined below
+#   2. Keycloak/OIDC - Uses external identity provider with role mapping
+#
+# For Keycloak setup, see: docs/authentication/keycloak-setup.md
+# =============================================================================
+
 indexer:
+  # =============================================================================
+  # MULTI-TENANCY CONFIGURATION
+  # =============================================================================
   multiTenancy:
     enabled: true
 
     # -------------------------------------------------------------------------
     # TENANT DEFINITIONS
     # -------------------------------------------------------------------------
+    # Each tenant provides isolated dashboard space for a country/team.
+    # Users can only access tenants they have permissions for.
     tenants:
       cm_tenant:
         description: "Tenant for Cameroon team"
@@ -19,12 +52,21 @@ indexer:
     # -------------------------------------------------------------------------
     # INTERNAL USERS (OpenSearch Native Authentication)
     # -------------------------------------------------------------------------
+    # These users are created when NOT using Keycloak.
+    # For production, change passwords and store in external secrets.
+    #
+    # To use external secrets instead:
+    #   1. Create a Kubernetes secret with user credentials
+    #   2. Set internalUsersSecret: <secret-name>
+    # -------------------------------------------------------------------------
     internalUsers:
+      # ----- CAMEROON -----
       cm_admin:
         enabled: true
         password: "CM_Admin_Ch@ng3M3!"
         backendRoles:
           - "wazuh_cm_admin"
+          - "kibanauser"
         description: "Cameroon country administrator"
 
       cm_user:
@@ -32,13 +74,16 @@ indexer:
         password: "CM_User_Ch@ng3M3!"
         backendRoles:
           - "wazuh_cm_user"
+          - "kibanauser"
         description: "Cameroon read-only user"
 
+      # ----- GERMANY -----
       de_admin:
         enabled: true
         password: "DE_Admin_Ch@ng3M3!"
         backendRoles:
           - "wazuh_de_admin"
+          - "kibanauser"
         description: "Germany country administrator"
 
       de_user:
@@ -46,13 +91,16 @@ indexer:
         password: "DE_User_Ch@ng3M3!"
         backendRoles:
           - "wazuh_de_user"
+          - "kibanauser"
         description: "Germany read-only user"
 
+      # ----- EXTERNAL (AUDITORS) -----
       ext_admin:
         enabled: true
         password: "EXT_Admin_Ch@ng3M3!"
         backendRoles:
           - "wazuh_ext_admin"
+          - "kibanauser"
         description: "External actors administrator (auditors)"
 
       ext_user:
@@ -60,10 +108,15 @@ indexer:
         password: "EXT_User_Ch@ng3M3!"
         backendRoles:
           - "wazuh_ext_user"
+          - "kibanauser"
         description: "External read-only user"
 
     # -------------------------------------------------------------------------
     # AGENT GROUPS
+    # -------------------------------------------------------------------------
+    # Define Wazuh agent groups that will be created automatically.
+    # Agents assigned to these groups will only be visible to users with
+    # matching tenant access (via Document-Level Security).
     # -------------------------------------------------------------------------
     agentGroups:
       - name: "CM"
@@ -76,7 +129,23 @@ indexer:
     # -------------------------------------------------------------------------
     # ROLE DEFINITIONS
     # -------------------------------------------------------------------------
+    # Roles define permissions for indices and tenants.
+    # Each country has:
+    #   - Admin role: Full read/write access to security data within their tenant
+    #   - User role: Read-only access to security data within their tenant
+    #
+    # IMPORTANT: Document-Level Security (DLS) filters alerts by agent.group
+    # so users only see data from agents in their assigned group.
+    #
+    # Required permissions for Wazuh Dashboard access:
+    #   - cluster_monitor: View cluster health
+    #   - Wazuh indices: wazuh-alerts-*, wazuh-archives-*, wazuh-monitoring-*, wazuh-statistics-*
+    #   - Wazuh config: .wazuh, .wazuh-version
+    #   - Dashboard: .kibana*, .opensearch_dashboards*
+    # -------------------------------------------------------------------------
     roles:
+      # ===== CAMEROON ROLES =====
+      # Admin: Full access to CM agents data, can manage dashboards in cm_tenant
       wazuh_cm_admin:
         reserved: false
         cluster_permissions:
@@ -87,6 +156,7 @@ indexer:
           - "indices:admin/template/*"
           - "indices:data/read/scroll*"
         index_permissions:
+          # Wazuh data indices - DLS filters to CM group only
           - index_patterns:
               - "wazuh-alerts-*"
               - "wazuh-archives-*"
@@ -95,6 +165,7 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Monitoring - filter by group
           - index_patterns:
               - "wazuh-monitoring-*"
             dls: '{"bool":{"should":[{"match":{"group":"CM"}},{"bool":{"must_not":{"exists":{"field":"group"}}}}]}}'
@@ -102,12 +173,14 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Statistics - no DLS needed (aggregate data)
           - index_patterns:
               - "wazuh-statistics-*"
             allowed_actions:
               - "read"
               - "search"
               - "get"
+          # Wazuh app configuration
           - index_patterns:
               - ".wazuh"
               - ".wazuh-version"
@@ -115,6 +188,7 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Dashboard saved objects - full access for admin in their tenant
           - index_patterns:
               - ".kibana*"
               - ".opensearch_dashboards*"
@@ -129,7 +203,12 @@ indexer:
               - "cm_tenant"
             allowed_actions:
               - "kibana_all_write"
+          - tenant_patterns:
+              - "Global"
+            allowed_actions:
+              - "kibana_all_read"
 
+      # User: Read-only access to CM agents data
       wazuh_cm_user:
         reserved: false
         cluster_permissions:
@@ -137,6 +216,7 @@ indexer:
           - "cluster_composite_ops_ro"
           - "indices:data/read/scroll*"
         index_permissions:
+          # Wazuh data indices - DLS filters to CM group only
           - index_patterns:
               - "wazuh-alerts-*"
               - "wazuh-archives-*"
@@ -165,6 +245,7 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Dashboard - read only, no write/delete
           - index_patterns:
               - ".kibana*"
               - ".opensearch_dashboards*"
@@ -177,7 +258,13 @@ indexer:
               - "cm_tenant"
             allowed_actions:
               - "kibana_all_read"
+          - tenant_patterns:
+              - "Global"
+            allowed_actions:
+              - "kibana_all_read"
 
+      # ===== GERMANY ROLES =====
+      # Admin: Full access to DE agents data, can manage dashboards in de_tenant
       wazuh_de_admin:
         reserved: false
         cluster_permissions:
@@ -188,6 +275,7 @@ indexer:
           - "indices:admin/template/*"
           - "indices:data/read/scroll*"
         index_permissions:
+          # Wazuh data indices - DLS filters to DE group only
           - index_patterns:
               - "wazuh-alerts-*"
               - "wazuh-archives-*"
@@ -216,6 +304,7 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Dashboard saved objects - full access for admin in their tenant
           - index_patterns:
               - ".kibana*"
               - ".opensearch_dashboards*"
@@ -230,7 +319,12 @@ indexer:
               - "de_tenant"
             allowed_actions:
               - "kibana_all_write"
+          - tenant_patterns:
+              - "Global"
+            allowed_actions:
+              - "kibana_all_read"
 
+      # User: Read-only access to DE agents data (NO delete permissions)
       wazuh_de_user:
         reserved: false
         cluster_permissions:
@@ -238,6 +332,7 @@ indexer:
           - "cluster_composite_ops_ro"
           - "indices:data/read/scroll*"
         index_permissions:
+          # Wazuh data indices - DLS filters to DE group only
           - index_patterns:
               - "wazuh-alerts-*"
               - "wazuh-archives-*"
@@ -266,6 +361,7 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Dashboard - read only, NO write/delete
           - index_patterns:
               - ".kibana*"
               - ".opensearch_dashboards*"
@@ -278,7 +374,13 @@ indexer:
               - "de_tenant"
             allowed_actions:
               - "kibana_all_read"
+          - tenant_patterns:
+              - "Global"
+            allowed_actions:
+              - "kibana_all_read"
 
+      # ===== EXTERNAL ROLES (AUDITORS) =====
+      # Admin: Full access to EXT agents data, can manage dashboards in ext_tenant
       wazuh_ext_admin:
         reserved: false
         cluster_permissions:
@@ -289,6 +391,7 @@ indexer:
           - "indices:admin/template/*"
           - "indices:data/read/scroll*"
         index_permissions:
+          # Wazuh data indices - DLS filters to EXT group only
           - index_patterns:
               - "wazuh-alerts-*"
               - "wazuh-archives-*"
@@ -317,6 +420,7 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Dashboard saved objects - full access for admin in their tenant
           - index_patterns:
               - ".kibana*"
               - ".opensearch_dashboards*"
@@ -331,7 +435,12 @@ indexer:
               - "ext_tenant"
             allowed_actions:
               - "kibana_all_write"
+          - tenant_patterns:
+              - "Global"
+            allowed_actions:
+              - "kibana_all_read"
 
+      # User: Read-only access to EXT agents data (NO delete permissions)
       wazuh_ext_user:
         reserved: false
         cluster_permissions:
@@ -339,6 +448,7 @@ indexer:
           - "cluster_composite_ops_ro"
           - "indices:data/read/scroll*"
         index_permissions:
+          # Wazuh data indices - DLS filters to EXT group only
           - index_patterns:
               - "wazuh-alerts-*"
               - "wazuh-archives-*"
@@ -367,6 +477,7 @@ indexer:
               - "read"
               - "search"
               - "get"
+          # Dashboard - read only, NO write/delete
           - index_patterns:
               - ".kibana*"
               - ".opensearch_dashboards*"
@@ -379,8 +490,21 @@ indexer:
               - "ext_tenant"
             allowed_actions:
               - "kibana_all_read"
+          - tenant_patterns:
+              - "Global"
+            allowed_actions:
+              - "kibana_all_read"
 
+    # -------------------------------------------------------------------------
+    # ROLE MAPPINGS
+    # -------------------------------------------------------------------------
+    # Maps backend roles (from Keycloak or internal users) to OpenSearch roles.
+    #
+    # For Keycloak: Users receive backend_roles from the OIDC token's roles claim
+    # For Internal Auth: Users receive backend_roles defined in internalUsers above
+    # -------------------------------------------------------------------------
     rolesMapping:
+      # Cameroon mappings
       wazuh_cm_admin:
         backend_roles:
           - "wazuh_cm_admin"
@@ -393,6 +517,7 @@ indexer:
         users:
           - "cm_user"
 
+      # Germany mappings
       wazuh_de_admin:
         backend_roles:
           - "wazuh_de_admin"
@@ -405,6 +530,7 @@ indexer:
         users:
           - "de_user"
 
+      # External mappings
       wazuh_ext_admin:
         backend_roles:
           - "wazuh_ext_admin"
@@ -423,12 +549,55 @@ indexer:
     maxRetries: 30
     retryInterval: 10
 
+# =============================================================================
+# DASHBOARD CONFIGURATION
+# =============================================================================
 # Configure preferred tenants for the dashboard
 dashboard:
+  # Multi-tenancy is already enabled by default in the chart
+  # This just adjusts the preferred tenant order
   multiTenancy:
     preferredTenants:
-      - "Global"
-      - "cm_tenant"
-      - "de_tenant"
-      - "ext_tenant"
-      - "Private"
+      - "Global"       # System-wide dashboards
+      - "cm_tenant"    # Cameroon
+      - "de_tenant"    # Germany
+      - "ext_tenant"   # External
+      - "Private"      # Personal dashboards
+
+
+# =============================================================================
+# KEYCLOAK GROUP-TO-TENANT MAPPING REFERENCE
+# =============================================================================
+# This section is documentation only - actual Keycloak configuration must be
+# done in Keycloak Admin Console. See docs/authentication/keycloak-setup.md
+#
+# GROUPS TO CREATE IN KEYCLOAK:
+# =============================
+#
+# | Keycloak Group      | Keycloak Role      | OpenSearch Role    | Tenant Access      |
+# |---------------------|--------------------|--------------------|-------------------|
+# | wazuh-cm-admins     | wazuh_cm_admin     | wazuh_cm_admin     | cm_tenant (RW)    |
+# | wazuh-cm-users      | wazuh_cm_user      | wazuh_cm_user      | cm_tenant (RO)    |
+# | wazuh-de-admins     | wazuh_de_admin     | wazuh_de_admin     | de_tenant (RW)    |
+# | wazuh-de-users      | wazuh_de_user      | wazuh_de_user      | de_tenant (RO)    |
+# | wazuh-ext-admins    | wazuh_ext_admin    | wazuh_ext_admin    | ext_tenant (RW)   |
+# | wazuh-ext-users     | wazuh_ext_user     | wazuh_ext_user     | ext_tenant (RO)   |
+#
+# FLOW:
+# =====
+# 1. Create Keycloak groups (above)
+# 2. Assign Keycloak roles to groups
+# 3. Add users to groups
+# 4. User logs in → Gets roles via OIDC token → OpenSearch maps to tenant
+#
+# KEYCLOAK ROLES TO CREATE:
+# =========================
+# - wazuh_cm_admin
+# - wazuh_cm_user
+# - wazuh_de_admin
+# - wazuh_de_user
+# - wazuh_ext_admin
+# - wazuh_ext_user
+#
+# These roles must match the backend_roles in rolesMapping above.
+# =============================================================================
