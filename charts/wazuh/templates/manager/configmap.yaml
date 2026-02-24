@@ -42,6 +42,15 @@ data:
   "7013-adguard.xml":  |
     {{ $.Files.Get "files/configs/rules/rules.adguard.xml" | nindent 6 }}
 
+  "7014-usb-dlp.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.usb-dlp.xml" | nindent 6 }}
+
+  "7015-dlp-cloud-email.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.dlp-cloud-email.xml" | nindent 6 }}
+
+  "dlp.xml": |
+    {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}
+
   "blacklist-apps.txt":  |
     {{ $.Files.Get "files/configs/lists/blacklist-apps.txt" | nindent 4 }}
 
