@@ -375,6 +375,12 @@ spec:
               subPath: 7015-dlp-cloud-email.xml
               readOnly: true
 
+            # DLP agent configuration (log collection for DLP monitoring)
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf
+              subPath: dlp.xml
+              readOnly: true
+
             # Default group (common settings only)
             - name: config
               mountPath: /wazuh-config-mount/etc/shared/default/agent.conf
