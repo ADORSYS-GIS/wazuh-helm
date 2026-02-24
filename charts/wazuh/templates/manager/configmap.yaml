@@ -14,6 +14,7 @@ data:
     {{ $.Files.Get "files/configs/decoders/decoder.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.yara.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.adguard.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoders/decoder.santa.xml" | nindent 6 }}
   
   "7005-audit-mitre_rules.xml":  |
     {{ $.Files.Get "files/configs/rules/rules.audit-mitre.xml" | nindent 6 }}
@@ -47,6 +48,12 @@ data:
 
   "7015-dlp-cloud-email.xml":  |
     {{ $.Files.Get "files/configs/rules/rules.dlp-cloud-email.xml" | nindent 6 }}
+
+  "7016-lotl-detection.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.lotl-detection.xml" | nindent 6 }}
+
+  "7017-macos-syslog.xml":  |
+    {{ $.Files.Get "files/configs/rules/rules.macos-syslog.xml" | nindent 6 }}
 
   "dlp.xml": |
     {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}
