@@ -1,0 +1,200 @@
+{{- if and .Values.indexer.multiTenancy .Values.indexer.multiTenancy.enabled .Values.indexer.securityAdmin .Values.indexer.securityAdmin.enabled }}
+{{- $multiTenancy := .Values.indexer.multiTenancy }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-security-admin
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-security-admin
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: certs
+          secret:
+            secretName: {{ include "wazuh.cert_secret_name" $ }}
+            defaultMode: 0644
+        - name: root-certs
+          secret:
+            secretName: {{ include "wazuh.cert_root_name" $ }}
+            defaultMode: 0644
+        - name: security-config
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-security-config
+        - name: processed-config
+          emptyDir: {}
+      initContainers:
+        # Hash passwords for internal users
+        - name: hash-passwords
+          image: ghcr.io/adorsys-gis/envsubt:main-7917c58
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              apk add --update --no-cache libintl gettext apache2-utils
+
+              echo "Hashing passwords for multi-tenancy users..."
+
+              # Hash system admin password
+              export ADMIN_PASSWORD_HASH=$(htpasswd -bnBC 12 "" "${INDEXER_PASSWORD}" | tr -d ':\n')
+              export KIBANA_PASSWORD_HASH=$(htpasswd -bnBC 12 "" "${DASHBOARD_PASSWORD}" | tr -d ':\n')
+
+              # Hash multi-tenancy user passwords
+              {{- range $username, $user := $multiTenancy.internalUsers }}
+              {{- if $user.enabled }}
+              export USER_{{ $username | upper }}_HASH=$(htpasswd -bnBC 12 "" "${USER_{{ $username | upper }}}" | tr -d ':\n')
+              {{- end }}
+              {{- end }}
+
+              # Process internal_users.yml with password hashes
+              envsubst < /security-config/internal_users.yml > /processed-config/internal_users.yml
+
+              # Copy other config files as-is
+              cp /security-config/config.yml /processed-config/
+              cp /security-config/tenants.yml /processed-config/
+              cp /security-config/roles.yml /processed-config/
+              cp /security-config/roles_mapping.yml /processed-config/
+              cp /security-config/action_groups.yml /processed-config/
+              cp /security-config/nodes_dn.yml /processed-config/
+              cp /security-config/whitelist.yml /processed-config/
+
+              echo "Password hashing complete!"
+              ls -la /processed-config/
+          env:
+            - name: INDEXER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_PASSWORD
+            - name: DASHBOARD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.dashboard-auth" $ }}
+                  key: DASHBOARD_PASSWORD
+            {{- range $username, $user := $multiTenancy.internalUsers }}
+            {{- if $user.enabled }}
+            - name: USER_{{ $username | upper }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "common.names.fullname" $ }}-multitenancy-creds
+                  key: {{ $username | upper }}_PASSWORD
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: security-config
+              mountPath: /security-config
+              readOnly: true
+            - name: processed-config
+              mountPath: /processed-config
+      containers:
+        - name: security-admin
+          {{- $imageTpl := include "common.images.image" (dict "imageRoot" .Values.indexer.image "global" .Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              # Set Java environment for securityadmin.sh
+              export JAVA_HOME=/usr/share/wazuh-indexer/jdk
+              export PATH=$JAVA_HOME/bin:$PATH
+              export OPENSEARCH_JAVA_HOME=$JAVA_HOME
+
+              INDEXER_URL="https://{{ include "common.names.fullname" $ }}-indexer-api:9200"
+              MAX_RETRIES={{ .Values.indexer.securityAdmin.maxRetries | default 30 }}
+              RETRY_INTERVAL={{ .Values.indexer.securityAdmin.retryInterval | default 10 }}
+
+              echo "Waiting for indexer to be ready..."
+              for i in $(seq 1 $MAX_RETRIES); do
+                if curl -ks -u "${INDEXER_USERNAME}:${INDEXER_PASSWORD}" \
+                   --cacert /usr/share/wazuh-indexer/config/certs/root-ca.pem \
+                   "${INDEXER_URL}/_cluster/health" | grep -qE '"status":"(green|yellow)"'; then
+                  echo "Indexer is ready!"
+                  break
+                fi
+                if [ $i -eq $MAX_RETRIES ]; then
+                  echo "ERROR: Indexer not ready after $MAX_RETRIES attempts"
+                  exit 1
+                fi
+                echo "Attempt $i/$MAX_RETRIES: Indexer not ready, waiting ${RETRY_INTERVAL}s..."
+                sleep $RETRY_INTERVAL
+              done
+
+              # Verify certs are present
+              echo "Verifying certificates..."
+              ls -la /usr/share/wazuh-indexer/config/certs/
+
+              export OPENSEARCH_PATH_CONF=/usr/share/wazuh-indexer/config
+
+              # Run security admin tool to apply configuration
+              echo "Applying security configuration..."
+              /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
+                -h {{ include "common.names.fullname" $ }}-indexer-api \
+                -p 9200 \
+                -cd /processed-config \
+                -cacert /usr/share/wazuh-indexer/config/certs/root-ca.pem \
+                -cert /usr/share/wazuh-indexer/config/certs/admin.pem \
+                -key /usr/share/wazuh-indexer/config/certs/admin-key.pem \
+                -icl -nhnv
+
+              echo "Security configuration applied successfully!"
+
+              # Verify configuration was applied
+              echo "Verifying tenants..."
+              curl -ks -u "${INDEXER_USERNAME}:${INDEXER_PASSWORD}" \
+                   --cacert /usr/share/wazuh-indexer/config/certs/root-ca.pem \
+                   "${INDEXER_URL}/_plugins/_security/api/tenants" | head -100
+
+              echo ""
+              echo "Verifying roles..."
+              curl -ks -u "${INDEXER_USERNAME}:${INDEXER_PASSWORD}" \
+                   --cacert /usr/share/wazuh-indexer/config/certs/root-ca.pem \
+                   "${INDEXER_URL}/_plugins/_security/api/roles" | head -100
+
+              echo ""
+              echo "Multi-tenancy setup complete!"
+          env:
+            - name: INDEXER_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_USERNAME
+            - name: INDEXER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_PASSWORD
+          volumeMounts:
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/admin.pem
+              subPath: admin.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/admin-key.pem
+              subPath: admin-key.pem
+              readOnly: true
+            - name: root-certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/root-ca.pem
+              subPath: root-ca.pem
+              readOnly: true
+            - name: processed-config
+              mountPath: /processed-config
+              readOnly: true
+{{- end }}

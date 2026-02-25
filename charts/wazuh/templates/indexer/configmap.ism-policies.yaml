@@ -1,0 +1,367 @@
+{{- if and .Values.indexer .Values.indexer.lifecycle .Values.indexer.lifecycle.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-ism-policies
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  setup-ism.sh: |
+    #!/bin/bash
+    # ISM Policy Setup Script for Wazuh Indexer
+    # Configurable via Helm values
+
+    set -e
+
+    INDEXER_URL="${INDEXER_URL:-https://wazuh-wazuh-helm-indexer:9200}"
+    INDEXER_USER="${INDEXER_USERNAME:-admin}"
+    INDEXER_PASS="${INDEXER_PASSWORD}"
+
+    # Retention settings from Helm values
+    ALERTS_WARM_DAYS="{{ .Values.indexer.lifecycle.alerts.warmAfterDays }}"
+    ALERTS_DELETE_DAYS="{{ .Values.indexer.lifecycle.alerts.deleteAfterDays }}"
+    ARCHIVES_DELETE_DAYS="{{ .Values.indexer.lifecycle.archives.deleteAfterDays }}"
+    STATISTICS_DELETE_DAYS="{{ .Values.indexer.lifecycle.statistics.deleteAfterDays }}"
+    MONITORING_DELETE_DAYS="{{ .Values.indexer.lifecycle.monitoring.deleteAfterDays }}"
+
+    echo "========================================"
+    echo "Wazuh ISM Policy Setup"
+    echo "========================================"
+    echo "Retention settings:"
+    echo "  - Alerts: warm after ${ALERTS_WARM_DAYS}d, delete after ${ALERTS_DELETE_DAYS}d"
+    echo "  - Archives: delete after ${ARCHIVES_DELETE_DAYS}d"
+    echo "  - Statistics: delete after ${STATISTICS_DELETE_DAYS}d"
+    echo "  - Monitoring: delete after ${MONITORING_DELETE_DAYS}d"
+    echo "========================================"
+
+    # Wait for indexer to be ready
+    echo "Waiting for indexer to be ready..."
+    max_attempts=60
+    attempt=0
+    until curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" "${INDEXER_URL}/_cluster/health" 2>/dev/null | grep -q '"status":"green"\|"status":"yellow"'; do
+      attempt=$((attempt + 1))
+      if [ $attempt -ge $max_attempts ]; then
+        echo "ERROR: Indexer not ready after ${max_attempts} attempts"
+        exit 1
+      fi
+      echo "Indexer not ready (attempt ${attempt}/${max_attempts}), waiting..."
+      sleep 5
+    done
+    echo "Indexer is ready!"
+
+    # Function to create or update ISM policy
+    create_policy() {
+      local policy_name=$1
+      local policy_json=$2
+
+      echo "Creating/updating ISM policy: ${policy_name}"
+
+      # Check if policy exists
+      existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_ism/policies/${policy_name}" 2>/dev/null)
+
+      if echo "$existing" | grep -q '"_id"'; then
+        # Policy exists, get seq_no and primary_term for update
+        seq_no=$(echo "$existing" | grep -o '"_seq_no":[0-9]*' | cut -d: -f2)
+        primary_term=$(echo "$existing" | grep -o '"_primary_term":[0-9]*' | cut -d: -f2)
+
+        curl -s -k -X PUT "${INDEXER_URL}/_plugins/_ism/policies/${policy_name}?if_seq_no=${seq_no}&if_primary_term=${primary_term}" \
+          -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -H 'Content-Type: application/json' \
+          -d "${policy_json}"
+      else
+        # Create new policy
+        curl -s -k -X PUT "${INDEXER_URL}/_plugins/_ism/policies/${policy_name}" \
+          -u "${INDEXER_USER}:${INDEXER_PASS}" \
+          -H 'Content-Type: application/json' \
+          -d "${policy_json}"
+      fi
+      echo ""
+    }
+
+    # Policy for wazuh-alerts-*
+    ALERTS_POLICY='{
+      "policy": {
+        "description": "Wazuh alerts retention policy",
+        "default_state": "hot",
+        "states": [
+          {
+            "name": "hot",
+            "actions": [],
+            "transitions": [
+              {
+                "state_name": "warm",
+                "conditions": {
+                  "min_index_age": "'${ALERTS_WARM_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "warm",
+            "actions": [
+              {
+                "replica_count": {
+                  "number_of_replicas": 0
+                }
+              }
+            ],
+            "transitions": [
+              {
+                "state_name": "delete",
+                "conditions": {
+                  "min_index_age": "'${ALERTS_DELETE_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "delete",
+            "actions": [
+              {
+                "delete": {}
+              }
+            ],
+            "transitions": []
+          }
+        ],
+        "ism_template": [
+          {
+            "index_patterns": ["wazuh-alerts-*"],
+            "priority": 100
+          }
+        ]
+      }
+    }'
+    create_policy "wazuh-alerts-policy" "$ALERTS_POLICY"
+
+    # Policy for wazuh-archives-*
+    ARCHIVES_POLICY='{
+      "policy": {
+        "description": "Wazuh archives retention policy",
+        "default_state": "hot",
+        "states": [
+          {
+            "name": "hot",
+            "actions": [],
+            "transitions": [
+              {
+                "state_name": "delete",
+                "conditions": {
+                  "min_index_age": "'${ARCHIVES_DELETE_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "delete",
+            "actions": [
+              {
+                "delete": {}
+              }
+            ],
+            "transitions": []
+          }
+        ],
+        "ism_template": [
+          {
+            "index_patterns": ["wazuh-archives-*"],
+            "priority": 100
+          }
+        ]
+      }
+    }'
+    create_policy "wazuh-archives-policy" "$ARCHIVES_POLICY"
+
+    # Policy for wazuh-statistics-*
+    STATISTICS_POLICY='{
+      "policy": {
+        "description": "Wazuh statistics retention policy",
+        "default_state": "hot",
+        "states": [
+          {
+            "name": "hot",
+            "actions": [],
+            "transitions": [
+              {
+                "state_name": "delete",
+                "conditions": {
+                  "min_index_age": "'${STATISTICS_DELETE_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "delete",
+            "actions": [
+              {
+                "delete": {}
+              }
+            ],
+            "transitions": []
+          }
+        ],
+        "ism_template": [
+          {
+            "index_patterns": ["wazuh-statistics-*"],
+            "priority": 100
+          }
+        ]
+      }
+    }'
+    create_policy "wazuh-statistics-policy" "$STATISTICS_POLICY"
+
+    # Policy for wazuh-monitoring-*
+    MONITORING_POLICY='{
+      "policy": {
+        "description": "Wazuh monitoring retention policy",
+        "default_state": "hot",
+        "states": [
+          {
+            "name": "hot",
+            "actions": [],
+            "transitions": [
+              {
+                "state_name": "delete",
+                "conditions": {
+                  "min_index_age": "'${MONITORING_DELETE_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "delete",
+            "actions": [
+              {
+                "delete": {}
+              }
+            ],
+            "transitions": []
+          }
+        ],
+        "ism_template": [
+          {
+            "index_patterns": ["wazuh-monitoring-*"],
+            "priority": 100
+          }
+        ]
+      }
+    }'
+    create_policy "wazuh-monitoring-policy" "$MONITORING_POLICY"
+
+    {{- if .Values.indexer.lifecycle.states }}
+    # Policy for wazuh-states-* (inventory and vulnerabilities)
+    STATES_FORCE_MERGE_DAYS="{{ .Values.indexer.lifecycle.states.forceMergeAfterDays }}"
+    STATES_READONLY_DAYS="{{ .Values.indexer.lifecycle.states.readOnlyAfterDays }}"
+    STATES_DELETE_DAYS="{{ .Values.indexer.lifecycle.states.deleteAfterDays }}"
+
+    STATES_POLICY='{
+      "policy": {
+        "description": "Wazuh states/inventory retention policy",
+        "default_state": "hot",
+        "states": [
+          {
+            "name": "hot",
+            "actions": [],
+            "transitions": [
+              {
+                "state_name": "force_merge",
+                "conditions": {
+                  "min_index_age": "'${STATES_FORCE_MERGE_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "force_merge",
+            "actions": [
+              {
+                "force_merge": {
+                  "max_num_segments": 1
+                }
+              }
+            ],
+            "transitions": [
+              {
+                "state_name": "read_only",
+                "conditions": {
+                  "min_index_age": "'${STATES_READONLY_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "read_only",
+            "actions": [
+              {
+                "read_only": {}
+              }
+            ],
+            "transitions": [
+              {
+                "state_name": "delete",
+                "conditions": {
+                  "min_index_age": "'${STATES_DELETE_DAYS}'d"
+                }
+              }
+            ]
+          },
+          {
+            "name": "delete",
+            "actions": [
+              {
+                "delete": {}
+              }
+            ],
+            "transitions": []
+          }
+        ],
+        "ism_template": [
+          {
+            "index_patterns": ["wazuh-states-*"],
+            "priority": 100
+          }
+        ]
+      }
+    }'
+    create_policy "wazuh-states-policy" "$STATES_POLICY"
+    {{- end }}
+
+    # Apply policies to existing indices
+    echo ""
+    echo "Applying policies to existing indices..."
+
+    apply_policy_to_indices() {
+      local pattern=$1
+      local policy_id=$2
+
+      indices=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_cat/indices/${pattern}?h=index" 2>/dev/null | tr -d ' ')
+
+      for index in $indices; do
+        if [ -n "$index" ]; then
+          echo "  Applying ${policy_id} to ${index}"
+          curl -s -k -X POST "${INDEXER_URL}/_plugins/_ism/add/${index}" \
+            -u "${INDEXER_USER}:${INDEXER_PASS}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"policy_id\": \"${policy_id}\"}" 2>/dev/null || true
+        fi
+      done
+    }
+
+    apply_policy_to_indices "wazuh-alerts-*" "wazuh-alerts-policy"
+    apply_policy_to_indices "wazuh-archives-*" "wazuh-archives-policy"
+    apply_policy_to_indices "wazuh-statistics-*" "wazuh-statistics-policy"
+    apply_policy_to_indices "wazuh-monitoring-*" "wazuh-monitoring-policy"
+    {{- if .Values.indexer.lifecycle.states }}
+    apply_policy_to_indices "wazuh-states-*" "wazuh-states-policy"
+    {{- end }}
+
+    echo ""
+    echo "========================================"
+    echo "ISM policies setup completed!"
+    echo "========================================"
+{{- end }}
