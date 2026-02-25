@@ -4,20 +4,17 @@ initJobs:
     additionalLabels: ~
     image:
       registry: docker.io
-      repository: alpine
+      repository: bitnamilegacy/kubectl
       tag: 'latest'
       digest: ""
       pullPolicy: IfNotPresent
       pullSecrets: [ ]
     restartPolicy: OnFailure
     resources: ~
-    command: [ "/bin/sh", "-c" ]
+    command: [ "/bin/bash", "-lc" ]
     args:
       - |
-        set -e
-
-        echo "Installing dependencies..."
-        apk add --no-cache openssh-client kubectl curl
+        set -euo pipefail
 
         echo "Checking if secret ${SECRET_NAME} exists in namespace ${NAMESPACE}..."
         if kubectl -n "${NAMESPACE}" get secret "${SECRET_NAME}" >/dev/null 2>&1; then
@@ -62,13 +59,6 @@ worker_agentless:
     ##
     ##
     registry: ghcr.io
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
   ##
   ##
   volumes:

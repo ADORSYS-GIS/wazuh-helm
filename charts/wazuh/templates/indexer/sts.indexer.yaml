@@ -49,12 +49,14 @@ spec:
         - name: certs
           secret:
             secretName: {{ include "wazuh.cert_secret_name" $ }}
+            defaultMode: 0600
         - name: root-certs
           secret:
             secretName: {{ include "wazuh.cert_root_name" $ }}
         - name: indexer-conf
           configMap:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
+            defaultMode: 0600
             
         {{ with .volumes -}}
         {{ range $k, $v := . }}
@@ -117,32 +119,32 @@ spec:
               mountPath: /var/lib/wazuh-indexer
 
             - name: certs
-              mountPath: /usr/share/wazuh-indexer/certs/indexer-key.pem
+              mountPath: /usr/share/wazuh-indexer/config/certs/indexer-key.pem
               subPath: indexer-key.pem
               readOnly: true
             - name: certs
-              mountPath: /usr/share/wazuh-indexer/certs/indexer.pem
+              mountPath: /usr/share/wazuh-indexer/config/certs/indexer.pem
               subPath: indexer.pem
               readOnly: true
             - name: root-certs
-              mountPath: /usr/share/wazuh-indexer/certs/root-ca.pem
+              mountPath: /usr/share/wazuh-indexer/config/certs/root-ca.pem
               subPath: root-ca.pem
               readOnly: true
             - name: certs
-              mountPath: /usr/share/wazuh-indexer/certs/admin.pem
+              mountPath: /usr/share/wazuh-indexer/config/certs/admin.pem
               subPath: admin.pem
               readOnly: true
             - name: certs
-              mountPath: /usr/share/wazuh-indexer/certs/admin-key.pem
+              mountPath: /usr/share/wazuh-indexer/config/certs/admin-key.pem
               subPath: admin-key.pem
               readOnly: true
 
             - name: indexer-conf
-              mountPath: /usr/share/wazuh-indexer/opensearch.yml
+              mountPath: /usr/share/wazuh-indexer/config/opensearch.yml
               subPath: opensearch.yml
               readOnly: true
             - name: wazuh-config-temp
-              mountPath: /usr/share/wazuh-indexer/opensearch-security/internal_users.yml
+              mountPath: /usr/share/wazuh-indexer/config/opensearch-security/internal_users.yml
               subPath: internal_users.yml
               readOnly: true
               
