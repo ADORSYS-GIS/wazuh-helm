@@ -37,18 +37,18 @@ data:
     echo "  - Monitoring: delete after ${MONITORING_DELETE_DAYS}d"
     echo "========================================"
 
-    # Wait for indexer to be ready
+    # Wait for indexer to be ready (max ~8.3 min to fit within activeDeadlineSeconds: 600)
     echo "Waiting for indexer to be ready..."
-    max_attempts=60
+    max_attempts=50
     attempt=0
     until curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" "${INDEXER_URL}/_cluster/health" 2>/dev/null | grep -q '"status":"green"\|"status":"yellow"'; do
       attempt=$((attempt + 1))
       if [ $attempt -ge $max_attempts ]; then
-        echo "ERROR: Indexer not ready after ${max_attempts} attempts"
+        echo "ERROR: Indexer not ready after ${max_attempts} attempts (waited ~$((max_attempts * 10))s)"
         exit 1
       fi
-      echo "Indexer not ready (attempt ${attempt}/${max_attempts}), waiting..."
-      sleep 5
+      echo "Indexer not ready (attempt ${attempt}/${max_attempts}), waiting 10s..."
+      sleep 10
     done
     echo "Indexer is ready!"
 
