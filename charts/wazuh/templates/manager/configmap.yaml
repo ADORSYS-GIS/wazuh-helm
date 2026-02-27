@@ -14,8 +14,29 @@ data:
     {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoder.docker.xml" | nindent 6 }}
   "0005-audit-mitre_rules.xml":  |
     {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
+
+  "7012-docker-runtime.xml":  |
+    {{ $.Files.Get "files/configs/rules.docker-runtime.xml" | nindent 6 }}
+
+  {{- if and $.Values.cluster.config $.Values.cluster.config.docker $.Values.cluster.config.docker.enabled }}
+  "docker-agent.xml": |
+    <agent_config>
+      <wodle name="docker-listener">
+        <disabled>{{ $.Values.cluster.config.docker.listener.disabled }}</disabled>
+        <attempts>{{ $.Values.cluster.config.docker.listener.attempts }}</attempts>
+        <run_on_start>{{ $.Values.cluster.config.docker.listener.run_on_start }}</run_on_start>
+      </wodle>
+      {{- if $.Values.cluster.config.docker.logCollection.enabled }}
+      <localfile>
+        <log_format>{{ $.Values.cluster.config.docker.logCollection.log_format }}</log_format>
+        <location>{{ $.Values.cluster.config.docker.logCollection.location }}</location>
+      </localfile>
+      {{- end }}
+    </agent_config>
+  {{- end }}
 
   {{ range $k, $v := $.Values.cluster.decoders }}
     {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}

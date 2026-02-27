@@ -873,6 +873,24 @@ cluster:
       ##
       ##
       max_per_hour: 12
+
+    ##
+    ## Docker container monitoring configuration
+    ## When enabled, the manager pushes these settings to agents via shared agent.conf
+    ## Agents with Docker installed will start the Docker listener automatically
+    docker:
+      ## Enable pushing Docker monitoring config to agents
+      enabled: true
+      ## Docker listener wodle settings (agent-side)
+      listener:
+        disabled: "no"
+        attempts: 5
+        run_on_start: "yes"
+      ## Docker container log collection (agent-side)
+      logCollection:
+        enabled: true
+        location: "/var/lib/docker/containers/*/*-json.log"
+        log_format: "syslog"
   
   ##
   ##
