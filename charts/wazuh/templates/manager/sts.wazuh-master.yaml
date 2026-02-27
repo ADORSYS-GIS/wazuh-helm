@@ -222,7 +222,7 @@ spec:
               subPath: 7012-docker-runtime.xml
               readOnly: true
 
-            {{- if and $.Values.cluster.config $.Values.cluster.config.docker $.Values.cluster.config.docker.enabled }}
+            {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
             - name: config
               mountPath: /var/ossec/etc/shared/docker/agent.conf
               subPath: docker-agent.xml
