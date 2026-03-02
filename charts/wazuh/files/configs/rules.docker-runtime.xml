@@ -1,0 +1,92 @@
+<!--
+  Docker Runtime Monitoring Rules
+  Custom rules extending Wazuh's built-in Docker integration rules (87900-87958)
+  ID range: 107000-107099
+  Created by Adorsys GIS
+-->
+
+<group name="docker_runtime,">
+
+  <!-- CRITICAL: Privileged container started -->
+  <rule id="107001" level="12">
+    <if_sid>87903</if_sid>
+    <field name="docker.Actor.Attributes.privileged">true</field>
+    <description>Docker: Privileged container $(docker.Actor.Attributes.name) started</description>
+    <mitre>
+      <id>T1611</id>
+    </mitre>
+    <group>pci_dss_10.2.7,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- HIGH: Interactive shell session in production container -->
+  <rule id="107002" level="10">
+    <if_sid>87908</if_sid>
+    <description>Docker: Interactive shell session in container $(docker.Actor.Attributes.name) - potential unauthorized access</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>pci_dss_10.2.7,gdpr_IV_32.2,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- HIGH: Container running as root -->
+  <rule id="107003" level="10">
+    <if_sid>87903</if_sid>
+    <field name="docker.Actor.Attributes.user">^root$|^0$</field>
+    <description>Docker: Container $(docker.Actor.Attributes.name) running as root user</description>
+    <mitre>
+      <id>T1078.003</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- MEDIUM: Image pulled from untrusted registry (not docker.io or ghcr.io) -->
+  <rule id="107004" level="8">
+    <if_sid>87921</if_sid>
+    <field name="docker.Actor.Attributes.name" negate="yes">^docker.io|^ghcr.io|^registry.hub.docker.com</field>
+    <description>Docker: Image pulled from untrusted registry: $(docker.Actor.Attributes.name)</description>
+    <mitre>
+      <id>T1204.003</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- HIGH: Multiple containers destroyed in short time (potential cleanup/cover-up) -->
+  <rule id="107005" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>87902</if_matched_sid>
+    <description>Docker: Multiple containers destroyed rapidly - potential evidence cleanup</description>
+    <mitre>
+      <id>T1070.004</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- MEDIUM: Host network mode container started -->
+  <rule id="107006" level="8">
+    <if_sid>87903</if_sid>
+    <field name="docker.Actor.Attributes.network_mode">host</field>
+    <description>Docker: Container $(docker.Actor.Attributes.name) started with host network mode</description>
+    <mitre>
+      <id>T1557</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- LOW: Informational - container died -->
+  <rule id="107010" level="3">
+    <if_sid>87900</if_sid>
+    <field name="docker.status">^die$</field>
+    <description>Docker: Container $(docker.Actor.Attributes.name) died with exit code $(docker.Actor.Attributes.exitCode)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- MEDIUM: Container died with non-zero exit code (crash or kill) -->
+  <rule id="107011" level="7">
+    <if_sid>107010</if_sid>
+    <field name="docker.Actor.Attributes.exitCode" negate="yes">^0$</field>
+    <description>Docker: Container $(docker.Actor.Attributes.name) crashed with exit code $(docker.Actor.Attributes.exitCode)</description>
+    <options>no_full_log</options>
+  </rule>
+
+</group>

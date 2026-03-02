@@ -1,0 +1,9 @@
+<!--
+  Docker runtime decoder
+  Parses DockerListener output prefixed with "Wazuh-Docker:"
+-->
+
+<decoder name="wazuh-docker-json">
+  <prematch>^Wazuh-Docker:\s*</prematch>
+  <plugin_decoder offset="after_prematch">JSON_Decoder</plugin_decoder>
+</decoder>

@@ -292,6 +292,18 @@ spec:
               readOnly: true
 
             - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7012-docker-runtime.xml
+              subPath: 7012-docker-runtime.xml
+              readOnly: true
+
+            {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
+            - name: config
+              mountPath: /var/ossec/etc/shared/docker/agent.conf
+              subPath: docker-agent.xml
+              readOnly: true
+            {{- end }}
+
+            - name: config
               mountPath: /var/ossec/etc/shared/dlp/agent.conf
               subPath: dlp.xml
               readOnly: true
