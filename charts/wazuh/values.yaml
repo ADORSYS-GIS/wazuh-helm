@@ -739,9 +739,11 @@ dashboard:
   customDashboards:
     ##
     ##
-    enabled: false
+    enabled: true
     dashboards:
-      "export1.ndjson": https://wazuh-assets-bucket.s3.eu-central-1.amazonaws.com/dashboards/export1.ndjson
+      "soc-critical.ndjson": https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-playbook/refs/heads/main/Dashboards/soc-critical.ndjson
+      "macos.ndjson": https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-playbook/refs/heads/main/Dashboards/macos.ndjson
+      "windows.ndjson": https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-playbook/refs/heads/main/Dashboards/windows.ndjson
     
   ##
   ##
