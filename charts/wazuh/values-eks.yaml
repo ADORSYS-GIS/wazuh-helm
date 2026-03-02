@@ -52,6 +52,11 @@ worker_integration:
   persistence:
     size: 50Gi
 
+worker_agentless:
+  replicaCount: 1
+  persistence:
+    size: 50Gi
+
 master:
   persistence:
     size: 50Gi

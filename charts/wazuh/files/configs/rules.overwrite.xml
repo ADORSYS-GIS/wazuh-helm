@@ -162,7 +162,7 @@
         <description>File modified in / directory.</description>
   </rule>
 
-  <rule id="100009" level="7">
+  <rule id="110009" level="7">
     <if_sid>100300</if_sid>
     <match>ossec.conf</match>
     <description>Changes made to the agent configuration file - $(file)</description>

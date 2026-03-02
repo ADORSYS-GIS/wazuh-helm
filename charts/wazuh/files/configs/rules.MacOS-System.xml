@@ -1,0 +1,205 @@
+<!-- 
+  Purpose: macOS System, Security, Logging & Audit Event Rules (OPTIMIZED)
+  Rule Range: 600005-600027
+  Categories: Kernel Events, SIP, Keychain, Authentication, Log Clearing, Audit Trail
+  Optimization: PCRE2 regex, rule consolidation, improved ordering, sequential IDs
+-->
+
+<group name="macos,syslog,">
+  
+  <!-- ========================================== -->
+  <!-- CRITICAL SYSTEM EVENTS (600005-600006)    -->
+  <!-- ========================================== -->
+  
+  <rule id="600005" level="12">
+    <if_group>syslog</if_group>
+    <match>kernel</match>
+    <regex type="pcre2">(?:panic|kernel\s+trap|fatal(?:\s+error)?|critical(?:\s+error)?)</regex>
+    <description>macOS: Critical kernel panic or fatal error detected</description>
+    <group>kernel,system_error,pci_dss_10.6.1,gpg13_4.12,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_SI.4,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude benign kernel messages (consolidated) -->
+  <rule id="600006" level="0">
+    <if_sid>600005</if_sid>
+    <regex type="pcre2">(?:critical\s+(?:section|path|region)|thermal|temperature|cooling|USB\s+disconnect|device\s+removed|hardware\s+disconnect)</regex>
+    <description>macOS: Benign kernel messages - noise reduction</description>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- SYSTEM INTEGRITY PROTECTION (600007-600005) -->
+  <!-- ========================================== -->
+  
+  <rule id="600007" level="12">
+    <if_group>syslog</if_group>
+    <match>kernel</match>
+    <regex type="pcre2">System\s+Integrity\s+Protection|SIP\s+violation</regex>
+    <description>macOS: System Integrity Protection violation detected</description>
+    <group>sip,system_error,pci_dss_10.6.1,gpg13_4.1,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_SI.7,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude SIP informational/legitimate operations (consolidated) -->
+  <rule id="600008" level="0">
+    <if_sid>600007</if_sid>
+    <regex type="pcre2">(?:SIP\s+(?:status|enabled|disabled|configuration)|checking\s+SIP|Xcode|lldb|d?trace|d?truss|developer|Software\s+Update|(?:system|macOS)\s+update|installer|recovery\s+(?:mode|boot)|csrutil)</regex>
+    <description>macOS: SIP informational/legitimate operations - noise reduction</description>
+  </rule>
+  
+  <!-- Lower severity for SIP warnings vs violations -->
+  <rule id="600009" level="8">
+    <if_sid>600007</if_sid>
+    <regex type="pcre2">SIP\s+(?:warning|notice)|may\s+be\s+restricted</regex>
+    <description>macOS: SIP warning or notice (not violation)</description>
+    <group>sip,system_error,pci_dss_10.6.1,gpg13_4.1,gdpr_IV_35.7.d,hipaa_164.312.b,nist_800_53_SI.7,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- KEYCHAIN ACCESS (600010-600011)           -->
+  <!-- ========================================== -->
+  
+  <rule id="600010" level="8">
+    <if_group>syslog</if_group>
+    <match>SecurityAgent</match>
+    <regex type="pcre2">keychain|password</regex>
+    <description>macOS: Keychain access detected</description>
+    <group>keychain,access_control,pci_dss_10.2.1,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.a.2.I,nist_800_53_AC.2,tsc_CC6.1</group>
+  </rule>
+  
+  <!-- Exclude normal keychain operations (consolidated) -->
+  <rule id="600011" level="0">
+    <if_sid>600010</if_sid>
+    <regex type="pcre2">(?:keychain\s+(?:unlock|repair|verify|first\s+aid)|normal\s+access|automatic\s+unlock|login\s+keychain|Safari|Mail|Calendar|Contacts|System\s+Preferences|loginwindow|autofill|auto-fill|password\s+suggestion|iCloud\s+keychain)</regex>
+    <description>macOS: Normal keychain operations - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude time-based maintenance (moved up for efficiency) -->
+  <rule id="600012" level="0">
+    <if_sid>600010</if_sid>
+    <time>00:00-06:00</time>
+    <regex type="pcre2">backup|sync|maintenance</regex>
+    <description>macOS: Scheduled keychain maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- CRITICAL: Suspicious keychain access -->
+  <rule id="600013" level="15">
+    <if_sid>600010</if_sid>
+    <regex type="pcre2">keychain\s+(?:export|dump)|password\s+extract|unauthorized\s+access|security\s+dump-keychain</regex>
+    <description>macOS: CRITICAL - Suspicious keychain export or unauthorized access</description>
+    <group>keychain,access_control,credential_theft,pci_dss_10.2.1,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.a.2.I,nist_800_53_AC.2,tsc_CC6.1,tsc_CC6.8</group>
+  </rule>
+  
+  <!-- Lower severity for keychain creation -->
+  <rule id="600014" level="4">
+    <if_sid>600010</if_sid>
+    <regex type="pcre2">keychain\s+(?:create|setup)|new\s+keychain</regex>
+    <description>macOS: New keychain creation</description>
+    <group>keychain,access_control,pci_dss_10.2.1,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.a.2.I,nist_800_53_AC.2,tsc_CC6.1</group>
+  </rule>
+  
+  <!-- Correlation: Multiple keychain access attempts -->
+  <rule id="600015" level="12" frequency="5" timeframe="300">
+    <if_matched_sid>600010</if_matched_sid>
+    <description>macOS: Multiple keychain access events - potential credential harvesting</description>
+    <group>keychain,correlation,credential_theft,pci_dss_10.2.1,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.a.2.I,nist_800_53_AC.2,tsc_CC6.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- ROOT ACCESS EVENTS (600016-600021)        -->
+  <!-- ========================================== -->
+  
+  <rule id="600016" level="10">
+    <if_group>authentication_success</if_group>
+    <user>root</user>
+    <description>macOS: Root user login detected</description>
+    <group>root_access,authentication,pci_dss_10.2.5,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3</group>
+  </rule>
+  
+  <!-- Exclude benign system processes (consolidated) -->
+  <rule id="600017" level="0">
+    <if_sid>600016</if_sid>
+    <regex type="pcre2">(?:launchd|kernel_task|kextd|mds(?:worker)?|systemstats|Software\s+Update|installer|pkgutil|system_profiler|com\.apple\.|/System/Library/|Apple\s+service|Time\s+Machine|backupd|syncdefaultsd|cloudd|securityd|SecurityAgent|authd|opendirectoryd)</regex>
+    <description>macOS: System process root access - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600018" level="0">
+    <if_sid>600016</if_sid>
+    <time>02:00-05:00</time>
+    <regex type="pcre2">periodic|maintenance|cleanup|cron</regex>
+    <description>macOS: Scheduled maintenance root access - noise reduction</description>
+  </rule>
+  
+  <!-- CRITICAL: Interactive root login -->
+  <rule id="600019" level="15">
+    <if_sid>600016</if_sid>
+    <regex type="pcre2">(?:ssh|console|terminal|tty)\s+(?:login|session)|interactive\s+(?:login|session)|su\s+-|su\s+root</regex>
+    <description>macOS: CRITICAL - Interactive root login detected</description>
+    <group>root_access,authentication,privilege_escalation,pci_dss_10.2.5,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3</group>
+  </rule>
+  
+  <!-- Lower severity for sudo escalation -->
+  <rule id="600020" level="6">
+    <if_sid>600016</if_sid>
+    <regex type="pcre2">sudo(?:\s+|:)</regex>
+    <description>macOS: Root access via sudo</description>
+    <group>root_access,authentication,privilege_escalation,pci_dss_10.2.5,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3</group>
+  </rule>
+  
+  <!-- Correlation: Multiple root access attempts -->
+  <rule id="600021" level="12" frequency="5" timeframe="300">
+    <if_matched_sid>600016</if_matched_sid>
+    <description>macOS: Multiple root access events - potential privilege escalation attempt</description>
+    <group>root_access,correlation,privilege_escalation,pci_dss_10.2.5,gpg13_7.8,gdpr_IV_32.2,hipaa_164.312.b,nist_800_53_AU.14,nist_800_53_AC.7,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- SYSTEM LOG CLEARED (600022-600027)        -->
+  <!-- ========================================== -->
+  
+  <rule id="600022" level="10">
+    <if_group>syslog</if_group>
+    <match>syslogd</match>
+    <regex type="pcre2">log\s+(?:cleared|rotated|deleted|removed)</regex>
+    <description>macOS: System log cleared or deleted</description>
+    <group>log_clearing,pci_dss_10.5.2,gpg13_10.1,gdpr_IV_30.1.g,hipaa_164.312.b,nist_800_53_AU.9,tsc_CC7.2</group>
+  </rule>
+  
+  <!-- Exclude benign log operations (consolidated) -->
+  <rule id="600023" level="0">
+    <if_sid>600022</if_sid>
+    <regex type="pcre2">(?:newsyslog|logrotate|automatic\s+rotation|scheduled\s+rotation|disk\s+space|storage\s+full|space\s+management|low\s+disk|startup|boot|initialization|syslogd\s+start|CleanMyMac|Onyx|Maintenance|DiskUtility|Console|configuration\s+change|syslog\s+config|facility\s+change)</regex>
+    <description>macOS: Benign log operations - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600024" level="0">
+    <if_sid>600022</if_sid>
+    <time>02:00-05:00</time>
+    <regex type="pcre2">maintenance|periodic|cleanup|automatic</regex>
+    <description>macOS: Scheduled log maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- CRITICAL: Manual log clearing -->
+  <rule id="600025" level="15">
+    <if_sid>600022</if_sid>
+    <regex type="pcre2">(?:manually|user)\s+cleared|rm\s+.*\.log|truncate\s+.*\.?log|>\s*/var/log/|log\s+flush|log\s+erase</regex>
+    <description>macOS: CRITICAL - Manual log clearing detected (evidence tampering)</description>
+    <group>log_clearing,evidence_tampering,pci_dss_10.5.2,gpg13_10.1,gdpr_IV_30.1.g,hipaa_164.312.b,nist_800_53_AU.9,tsc_CC7.2,tsc_CC6.1</group>
+  </rule>
+  
+  <!-- Lower severity for archiving -->
+  <rule id="600026" level="4">
+    <if_sid>600022</if_sid>
+    <regex type="pcre2">archived?|compressed?|gzipped?|log\s+archive</regex>
+    <description>macOS: Log archiving operation</description>
+    <group>log_clearing,pci_dss_10.5.2,gpg13_10.1,gdpr_IV_30.1.g,hipaa_164.312.b,nist_800_53_AU.9,tsc_CC7.2</group>
+  </rule>
+  
+  <!-- Correlation: Multiple log clearing events -->
+  <rule id="600027" level="15" frequency="3" timeframe="600">
+    <if_matched_sid>600022</if_matched_sid>
+    <description>macOS: CRITICAL - Multiple log clearing events (log tampering pattern)</description>
+    <group>log_clearing,correlation,evidence_tampering,pci_dss_10.5.2,gpg13_10.1,gdpr_IV_30.1.g,hipaa_164.312.b,nist_800_53_AU.9,tsc_CC7.2</group>
+  </rule>
+
+</group>

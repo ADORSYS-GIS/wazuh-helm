@@ -1,0 +1,257 @@
+<!--
+    Purpose: macOS File Integrity Monitoring - Part 2
+    Rule Range: 600063-600091
+    Categories: Kernel Extensions, SSH Configuration, Sudoers, Correlation Rules
+-->
+
+<group name="macos,syslog,">
+  <!-- ========================================== -->
+  <!-- KERNEL EXTENSIONS (600063-600071)         -->
+  <!-- ========================================== -->
+  
+  <rule id="600063" level="12">
+    <if_group>syscheck</if_group>
+    <field name="file" type="pcre2">^/(?:System/)?Library/Extensions/</field>
+    <description>macOS FIM: Kernel extension modified - critical system change</description>
+    <group>fim,kernel_extensions,file_integrity,kernel,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: Check suspicious names FIRST -->
+  <rule id="600064" level="15">
+    <if_sid>600063</if_sid>
+    <field name="file" type="pcre2">backdoor|malware|trojan|rootkit|keylog|rat\.|bot\.|miner|exploit</field>
+    <description>macOS FIM: CRITICAL - Suspicious kernel extension name detected</description>
+    <group>fim,kernel_extensions,file_integrity,kernel,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: Third-party kernel extensions -->
+  <rule id="600065" level="15">
+    <if_sid>600063</if_sid>
+    <field name="file" type="pcre2">^/Library/Extensions/</field>
+    <field name="event_type" type="pcre2">added|modified</field>
+    <description>macOS FIM: CRITICAL - Third-party kernel extension modified</description>
+    <group>fim,kernel_extensions,file_integrity,kernel,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude Apple system extensions (consolidated) -->
+  <rule id="600066" level="0">
+    <if_sid>600063</if_sid>
+    <field name="uname" type="pcre2">^_installer$|^root$</field>
+    <field name="file" type="pcre2">com\.apple\.|Apple</field>
+    <field name="process" type="pcre2">Software\s+Update|installer|pkgutil|system_profiler</field>
+    <description>macOS FIM: Apple kernel extension update - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude legitimate drivers and security software (consolidated) -->
+  <rule id="600067" level="0">
+    <if_sid>600063</if_sid>
+    <field name="file" type="pcre2">VirtualBox|VMware|Parallels|NVIDIA|AMD|Intel|ClamAV|Sophos|Bitdefender|ESET|Malwarebytes|CrowdStrike|SentinelOne|Carbon\s+Black</field>
+    <description>macOS FIM: Known legitimate driver/security extension - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude kext cache operations -->
+  <rule id="600068" level="0">
+    <if_sid>600063</if_sid>
+    <field name="process" type="pcre2">kextcache|kextload|kextunload|kextstat</field>
+    <description>macOS FIM: Kernel extension cache operations - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600069" level="0">
+    <if_sid>600063</if_sid>
+    <time>02:00-05:00</time>
+    <field name="process" type="pcre2">periodic|maintenance|cleanup</field>
+    <description>macOS FIM: Scheduled kernel extension maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- Medium: Permission changes -->
+  <rule id="600070" level="8">
+    <if_sid>600063</if_sid>
+    <field name="changed_attributes" type="pcre2">permission|uid|gid|ownership</field>
+    <description>macOS FIM: Kernel extension permission change</description>
+    <group>fim,kernel_extensions,file_integrity,kernel,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- High: Extension deleted -->
+  <rule id="600071" level="12">
+    <if_sid>600063</if_sid>
+    <field name="event_type">deleted</field>
+    <description>macOS FIM: Kernel extension deleted - potential evasion</description>
+    <group>fim,kernel_extensions,file_integrity,kernel,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- SSH CONFIGURATION (600072-600081)         -->
+  <!-- ========================================== -->
+  
+  <rule id="600072" level="10">
+    <if_group>syscheck</if_group>
+    <field name="file" type="pcre2">^/(?:private/)?etc/ssh/</field>
+    <description>macOS FIM: SSH configuration file modified</description>
+    <group>fim,ssh_config,file_integrity,ssh,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: sshd_config modifications -->
+  <rule id="600073" level="15">
+    <if_sid>600072</if_sid>
+    <field name="file" type="pcre2">sshd_config</field>
+    <field name="event_type" type="pcre2">modified|added</field>
+    <description>macOS FIM: CRITICAL - SSH daemon configuration modified</description>
+    <group>fim,ssh_config,file_integrity,ssh,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: authorized_keys modifications -->
+  <rule id="600074" level="15">
+    <if_sid>600072</if_sid>
+    <field name="file" type="pcre2">authorized_keys</field>
+    <field name="event_type" type="pcre2">modified|added</field>
+    <description>macOS FIM: CRITICAL - SSH authorized_keys file modified</description>
+    <group>fim,ssh_config,file_integrity,ssh,authentication,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude system updates -->
+  <rule id="600075" level="0">
+    <if_sid>600072</if_sid>
+    <field name="uname" type="pcre2">^_installer$|^root$</field>
+    <field name="process" type="pcre2">installer|pkgutil|Software\s+Update</field>
+    <description>macOS FIM: System update SSH configuration - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude SSH key generation -->
+  <rule id="600076" level="0">
+    <if_sid>600072</if_sid>
+    <field name="process" type="pcre2">ssh-keygen|sshd</field>
+    <field name="file" type="pcre2">ssh_host_.*_key</field>
+    <description>macOS FIM: SSH key generation during setup - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600077" level="0">
+    <if_sid>600072</if_sid>
+    <time>02:00-05:00</time>
+    <field name="process" type="pcre2">periodic|maintenance|cleanup</field>
+    <description>macOS FIM: Scheduled SSH maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- Medium: Host key regeneration -->
+  <rule id="600078" level="8">
+    <if_sid>600072</if_sid>
+    <field name="file" type="pcre2">ssh_host_.*_key</field>
+    <field name="event_type" type="pcre2">modified|added</field>
+    <description>macOS FIM: SSH host key regenerated - investigate</description>
+    <group>fim,ssh_config,file_integrity,ssh,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Medium: Permission changes -->
+  <rule id="600079" level="8">
+    <if_sid>600072</if_sid>
+    <field name="changed_attributes" type="pcre2">permission|uid|gid|ownership</field>
+    <description>macOS FIM: SSH file permission change</description>
+    <group>fim,ssh_config,file_integrity,ssh,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- High: SSH config deleted -->
+  <rule id="600080" level="12">
+    <if_sid>600072</if_sid>
+    <field name="event_type">deleted</field>
+    <description>macOS FIM: SSH configuration file deleted - investigate</description>
+    <group>fim,ssh_config,file_integrity,ssh,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Low: known_hosts update -->
+  <rule id="600081" level="4">
+    <if_sid>600072</if_sid>
+    <field name="file" type="pcre2">known_hosts</field>
+    <field name="event_type">modified</field>
+    <description>macOS FIM: SSH known_hosts file updated</description>
+    <group>fim,ssh_config,file_integrity,ssh,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- SUDOERS FILE (600082-600091)              -->
+  <!-- ========================================== -->
+  
+  <rule id="600082" level="12">
+    <if_group>syscheck</if_group>
+    <field name="file" type="pcre2">^/(?:private/)?etc/sudoers(?:\.d/)?</field>
+    <description>macOS FIM: Sudoers file modified - privilege escalation risk</description>
+    <group>fim,sudoers,file_integrity,privilege_escalation,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: Content modifications -->
+  <rule id="600083" level="15">
+    <if_sid>600082</if_sid>
+    <field name="event_type">modified</field>
+    <field name="changed_attributes" type="pcre2">size|md5|sha1|sha256</field>
+    <description>macOS FIM: CRITICAL - Unauthorized sudoers content modified</description>
+    <group>fim,sudoers,file_integrity,privilege_escalation,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: Sudoers deleted -->
+  <rule id="600084" level="15">
+    <if_sid>600082</if_sid>
+    <field name="event_type">deleted</field>
+    <description>macOS FIM: CRITICAL - Sudoers file deleted</description>
+    <group>fim,sudoers,file_integrity,privilege_escalation,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude system updates -->
+  <rule id="600085" level="0">
+    <if_sid>600082</if_sid>
+    <field name="uname" type="pcre2">^_installer$|^root$</field>
+    <field name="process" type="pcre2">installer|pkgutil|Software\s+Update</field>
+    <description>macOS FIM: System update sudoers modification - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude legitimate admin tools (consolidated) -->
+  <rule id="600086" level="0">
+    <if_sid>600082</if_sid>
+    <field name="process" type="pcre2">visudo|System\s+Preferences|dscl|Jamf|SCCM|MDM|Intune|enterprise</field>
+    <description>macOS FIM: Legitimate administrative sudoers modification - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude backup operations -->
+  <rule id="600087" level="0">
+    <if_sid>600082</if_sid>
+    <field name="process" type="pcre2">cp|backup|rsync|tar</field>
+    <field name="file" type="pcre2">\.bak|\.backup|\.old|\.orig</field>
+    <description>macOS FIM: Sudoers backup operation - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600088" level="0">
+    <if_sid>600082</if_sid>
+    <time>02:00-05:00</time>
+    <field name="process" type="pcre2">periodic|maintenance|cleanup</field>
+    <description>macOS FIM: Scheduled sudoers maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- High: sudoers.d modifications -->
+  <rule id="600089" level="12">
+    <if_sid>600082</if_sid>
+    <field name="file" type="pcre2">sudoers\.d/</field>
+    <field name="event_type" type="pcre2">added|modified</field>
+    <description>macOS FIM: Sudoers.d directory file modified - investigate</description>
+    <group>fim,sudoers,file_integrity,privilege_escalation,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Medium: Permission changes -->
+  <rule id="600090" level="8">
+    <if_sid>600082</if_sid>
+    <field name="changed_attributes" type="pcre2">permission|uid|gid|ownership</field>
+    <description>macOS FIM: Sudoers file permission change</description>
+    <group>fim,sudoers,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- CORRELATION RULES                         -->
+  <!-- ========================================== -->
+  
+  <!-- Multiple kernel extension modifications -->
+  <rule id="600091" level="15" frequency="3" timeframe="600">
+    <if_matched_sid>600063</if_matched_sid>
+    <description>macOS FIM: CRITICAL - Multiple kernel extension changes (rootkit pattern)</description>
+    <group>fim,correlation,kernel,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+
+</group>

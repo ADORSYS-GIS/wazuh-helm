@@ -4,7 +4,7 @@ global:
   domain: wazuh.example.com
   ##
   ##
-  version: "4.13.1"
+  version: "4.14.2"
   ##
   ##
   imageRegistry: ""
@@ -539,6 +539,104 @@ worker_integration:
     capabilities:
       add: [ "SYS_CHROOT" ]
     privileged: true
+
+##
+##
+worker_agentless:
+  ##
+  ##
+  enabled: false
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
+  ##
+  ##
+  replicaCount: 1
+  ##
+  ##
+  updateStrategy:
+    type: RollingUpdate
+  ##
+  ##
+  nameOverride: ""
+  ##
+  ##
+  image:
+    ##
+    ##
+    registry: ghcr.io
+    ##
+    ##
+    repository: adorsys-gis/wazuh-manager-agentless
+    ##
+    ##
+    tag: '{{ .Values.global.version }}'
+    ##
+    ##
+    digest: ""
+    ## Specify a imagePullPolicy
+    ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+    ##
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+
+  ##
+  ##
+  volumeMounts: [ ]
+
+  ##
+  ##
+  initContainers: { }
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+  ##
+  ##
+  podManagementPolicy: Parallel
+
+  ##
+  ##
+  persistence:
+    ##
+    ##
+    size: 200Mi
+    ##
+    ##
+    storageClassName: ~
+    ##
+    ##
+    accessModes:
+      - ReadWriteOnce
+
+  resources: ~
+
+  ##
+  ##
+  affinity: ~
+
+  ##
+  ##
+  securityContext: ~
 
 
 master:
@@ -1226,3 +1324,34 @@ integration:
       enabled: false
       sqsName: ~
       interval: 1h
+
+initJobs:
+  '{{ include "common.names.fullname" $ }}-dummy':
+    enable: false
+    additionalLabels: ~
+    image:
+      registry: docker.io
+      repository: bash
+      tag: 'latest'
+      digest: ""
+      pullPolicy: IfNotPresent
+      pullSecrets: [ ]
+    restartPolicy: OnFailure
+    resources: ~
+    command: [ "/bin/bash","-lc" ]
+    args:
+      - |
+        #!/bin/bash
+        
+        echo "Dummy job task"
+    
+
+    volumeMounts: ~
+
+    env: ~
+
+    envFrom: ~
+
+    volumes: ~
+
+    initContainers: ~

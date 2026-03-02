@@ -253,6 +253,32 @@
         <timeout_allowed>no</timeout_allowed>
     </command>
 
+    <command>
+      <name>windows-dlp</name>
+      <executable>dlp.cmd</executable>
+    <timeout_allowed>no</timeout_allowed>
+    </command>
+
+    <active-response>
+      <disabled>no</disabled>
+      <command>windows-dlp</command>
+      <location>local</location>
+      <rules_id>100532, 100533, 100534</rules_id>
+    </active-response>
+
+    <command>
+      <name>unix-dlp</name>
+      <executable>dlp.sh</executable>
+    <timeout_allowed>no</timeout_allowed>
+    </command>
+
+    <active-response>
+      <disabled>no</disabled>
+      <command>unix-dlp</command>
+      <location>local</location>
+      <rules_id>100536, 100537, 100539, 100540</rules_id>
+    </active-response>
+
     <!--
     <active-response>
       active-response options here
@@ -431,4 +457,10 @@
 
     <!-- Jira integration -->
     ${JIRA_CONFIG}
+
+    <!-- Agentless conf -->
+    ${AGENTLESS_CONFIG}
+
+    <!-- Extra conf -->
+    ${EXTRA_CONFIG}
 </ossec_config>

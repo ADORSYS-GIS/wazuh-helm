@@ -1,0 +1,226 @@
+<!-- 
+  Purpose: macOS File Integrity Monitoring - Part 1
+  Rule Range: 600028-600062
+  Categories: System Binaries, Configuration Files, Launch Daemons/Agents, Correlation Rules
+-->
+
+<group name="macos,syslog,">
+  
+  <!-- ========================================== -->
+  <!-- SYSTEM BINARIES (600028-600035)          -->
+  <!-- ========================================== -->
+  
+  <rule id="600028" level="12">
+    <if_group>syscheck</if_group>
+    <field name="file" type="pcre2">^/(?:usr/)?s?bin/</field>
+    <description>macOS FIM: Critical system binary modified</description>
+    <group>fim,system_binaries,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: Check unauthorized modifications FIRST -->
+  <rule id="600029" level="15">
+    <if_sid>600028</if_sid>
+    <field name="event_type">modified</field>
+    <field name="changed_attributes" type="pcre2">size|md5|sha1|sha256</field>
+    <description>macOS FIM: CRITICAL - Unauthorized system binary content modified</description>
+    <group>fim,system_binaries,file_integrity,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude legitimate system operations (consolidated) -->
+  <rule id="600030" level="0">
+    <if_sid>600028</if_sid>
+    <field name="uname" type="pcre2">^_(?:installer|system)|^root$</field>
+    <field name="gname" type="pcre2">^(?:wheel|admin)$</field>
+    <description>macOS FIM: System update binary modification - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude package managers and dev tools (consolidated) -->
+  <rule id="600031" level="0">
+    <if_sid>600028</if_sid>
+    <field name="audit_user" type="pcre2">brew|port|fink</field>
+    <field name="file" type="pcre2">xcode|swift|clang|llvm|gcc</field>
+    <description>macOS FIM: Package manager/dev tools binary - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude Apple signed binaries -->
+  <rule id="600032" level="0">
+    <if_sid>600028</if_sid>
+    <field name="audit_user">^_installer$</field>
+    <field name="file" type="pcre2">Apple|com\.apple\.</field>
+    <description>macOS FIM: Apple signed binary update - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600033" level="0">
+    <if_sid>600028</if_sid>
+    <time>02:00-05:00</time>
+    <field name="audit_user" type="pcre2">^_system$|^root$</field>
+    <description>macOS FIM: Scheduled binary maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- Medium: Permission changes -->
+  <rule id="600034" level="8">
+    <if_sid>600028</if_sid>
+    <field name="event_type">modified</field>
+    <field name="changed_attributes" type="pcre2">permission|uid|gid|ownership</field>
+    <description>macOS FIM: System binary permission/ownership change</description>
+    <group>fim,system_binaries,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- High: New binary added -->
+  <rule id="600035" level="12">
+    <if_sid>600028</if_sid>
+    <field name="event_type">added</field>
+    <description>macOS FIM: New system binary created - investigate origin</description>
+    <group>fim,system_binaries,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- CONFIGURATION FILES (600036-600042)       -->
+  <!-- ========================================== -->
+  
+  <rule id="600036" level="10">
+    <if_group>syscheck</if_group>
+    <field name="file" type="pcre2">^/(?:private/)?etc/</field>
+    <description>macOS FIM: System configuration file modified</description>
+    <group>fim,config_files,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: Check security configs FIRST -->
+  <rule id="600037" level="15">
+    <if_sid>600036</if_sid>
+    <field name="file" type="pcre2">sudoers|/ssh/|pam\.d|security/|authorization</field>
+    <field name="event_type" type="pcre2">modified|added</field>
+    <description>macOS FIM: CRITICAL - Security configuration modified</description>
+    <group>fim,config_files,file_integrity,privilege_escalation,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude benign config changes (consolidated) -->
+  <rule id="600038" level="0">
+    <if_sid>600036</if_sid>
+    <field name="uname" type="pcre2">^_(?:installer|system|networkd|ntp)|^root$</field>
+    <field name="gname" type="pcre2">^(?:wheel|admin)$</field>
+    <field name="file" type="pcre2">newsyslog|resolv\.conf|ntp\.conf|localtime|hosts</field>
+    <description>macOS FIM: Routine system configuration - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude package manager configs -->
+  <rule id="600039" level="0">
+    <if_sid>600036</if_sid>
+    <field name="file" type="pcre2">^/(?:private/)?etc/paths</field>
+    <field name="audit_user" type="pcre2">brew|port|fink</field>
+    <description>macOS FIM: Package manager configuration - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600040" level="0">
+    <if_sid>600036</if_sid>
+    <time>02:00-05:00</time>
+    <field name="audit_user" type="pcre2">^_system$|^root$</field>
+    <description>macOS FIM: Scheduled config maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- Medium: Permission changes -->
+  <rule id="600041" level="8">
+    <if_sid>600036</if_sid>
+    <field name="event_type">modified</field>
+    <field name="changed_attributes" type="pcre2">permission|uid|gid|ownership</field>
+    <description>macOS FIM: Configuration file permission change</description>
+    <group>fim,config_files,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Medium: New config file -->
+  <rule id="600042" level="10">
+    <if_sid>600036</if_sid>
+    <field name="event_type">added</field>
+    <description>macOS FIM: New system configuration file created</description>
+    <group>fim,config_files,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- LAUNCH DAEMONS/AGENTS (600043-600050)     -->
+  <!-- ========================================== -->
+  
+  <rule id="600043" level="12">
+    <if_group>syscheck</if_group>
+    <field name="file" type="pcre2">^/(?:System/)?Library/Launch(?:Daemons|Agents)/</field>
+    <description>macOS FIM: Launch daemon/agent modified - persistence mechanism</description>
+    <group>fim,persistence,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: Check suspicious names FIRST -->
+  <rule id="600044" level="15">
+    <if_sid>600043</if_sid>
+    <field name="file" type="pcre2">backdoor|malware|trojan|rootkit|hidden|keylog|rat\.|bot\.|miner|crypto</field>
+    <description>macOS FIM: CRITICAL - Suspicious launch daemon/agent name detected</description>
+    <group>fim,persistence,file_integrity,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- CRITICAL: User-writable locations -->
+  <rule id="600045" level="15">
+    <if_sid>600043</if_sid>
+    <field name="file" type="pcre2">^/Library/Launch(?:Agents|Daemons)/</field>
+    <field name="event_type" type="pcre2">added|modified</field>
+    <description>macOS FIM: CRITICAL - User-writable launch daemon/agent modified</description>
+    <group>fim,persistence,file_integrity,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Exclude Apple system daemons (consolidated) -->
+  <rule id="600046" level="0">
+    <if_sid>600043</if_sid>
+    <field name="uname" type="pcre2">^_installer$|^root$</field>
+    <field name="file" type="pcre2">com\.apple\.|Apple</field>
+    <description>macOS FIM: Apple system daemon/agent - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude legitimate applications (consolidated) -->
+  <rule id="600047" level="0">
+    <if_sid>600043</if_sid>
+    <field name="file" type="pcre2">com\.(?:microsoft|adobe|google|dropbox|slack|zoom|docker)\.|xcode|developer</field>
+    <field name="process" type="pcre2">installer|pkgutil|Software\s+Update</field>
+    <description>macOS FIM: Known legitimate application daemon - noise reduction</description>
+  </rule>
+  
+  <!-- Exclude scheduled maintenance -->
+  <rule id="600048" level="0">
+    <if_sid>600043</if_sid>
+    <time>02:00-05:00</time>
+    <field name="process" type="pcre2">periodic|maintenance|cleanup</field>
+    <description>macOS FIM: Scheduled daemon maintenance - noise reduction</description>
+  </rule>
+  
+  <!-- Medium: Permission changes -->
+  <rule id="600049" level="8">
+    <if_sid>600043</if_sid>
+    <field name="changed_attributes" type="pcre2">permission|uid|gid|ownership</field>
+    <description>macOS FIM: Launch daemon/agent permission change</description>
+    <group>fim,persistence,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- High: Daemon/agent deleted -->
+  <rule id="600050" level="12">
+    <if_sid>600043</if_sid>
+    <field name="event_type">deleted</field>
+    <description>macOS FIM: Launch daemon/agent deleted - potential evasion</description>
+    <group>fim,persistence,file_integrity,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- ========================================== -->
+  <!-- CORRELATION RULES                         -->
+  <!-- ========================================== -->
+  
+  <!-- Multiple binary modifications -->
+  <rule id="600061" level="15" frequency="3" timeframe="300">
+    <if_matched_sid>600029</if_matched_sid>
+    <description>macOS FIM: CRITICAL - Multiple system binaries modified (malware pattern)</description>
+    <group>fim,correlation,malware,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+  
+  <!-- Multiple persistence modifications -->
+  <rule id="600062" level="15" frequency="3" timeframe="600">
+    <if_matched_sid>600043</if_matched_sid>
+    <description>macOS FIM: CRITICAL - Multiple launch daemon/agent changes (persistence attack)</description>
+    <group>fim,correlation,persistence,pci_dss_11.5,gpg13_4.11,gdpr_IV_35.7.d,hipaa_164.312.c.1,nist_800_53_SI.7,tsc_CC6.1,tsc_CC6.8,tsc_CC7.1</group>
+  </rule>
+
+</group>

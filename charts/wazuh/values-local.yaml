@@ -9,6 +9,10 @@ worker:
 worker_integration: 
   enabled: false
   resources: ~
+
+worker_agentless:
+  enabled: false
+  resources: ~
   
 indexer: 
   replicas: 1

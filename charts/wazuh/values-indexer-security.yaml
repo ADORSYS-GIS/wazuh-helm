@@ -24,6 +24,7 @@ indexer:
   
 initJobs:
   '{{ include "common.names.fullname" $ }}-security-admin':
+    enable: true
     additionalLabels: ~
     additionalAnnotations:
       "helm.sh/hook": post-install,post-upgrade
