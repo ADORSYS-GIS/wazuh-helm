@@ -1,0 +1,14 @@
+  indexer:
+    image:
+      registry: ghcr.io
+      repository: adorsys-gis/wazuh-indexer-s3
+      tag: release-candidate-indexer-snapshots-c3dbb18
+    s3Snapshot:
+      enabled: true
+      credentialsSecret: aws-s3-credentials
+      repository: "s3-repo"
+      cronjob:
+        enabled: true
+      cleanup:
+        enabled: true
+

@@ -1,0 +1,69 @@
+{{- if and .Values.indexer.s3Snapshot .Values.indexer.s3Snapshot.enabled
+         .Values.indexer.s3Snapshot.cronjob .Values.indexer.s3Snapshot.cronjob.enabled }}
+{{- with .Values.indexer.s3Snapshot }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.names.fullname" $ }}-indexer-s3-snapshot
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+spec:
+  schedule: {{ .cronjob.schedule | default "0 2 * * *" | quote }}
+  ## Prevent overlapping snapshot jobs. If a previous run is still active when
+  ## the next trigger fires, skip it rather than launching a second concurrent job.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .cronjob.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .cronjob.failedJobsHistoryLimit | default 1 }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 12 }}
+            app: {{ include "common.names.fullname" $ }}-indexer-s3-snapshot
+        spec:
+          restartPolicy: OnFailure
+          volumes:
+            - name: s3-snapshot-script
+              configMap:
+                name: {{ include "common.names.fullname" $ }}-s3-snapshot-script
+                defaultMode: 0444
+          containers:
+            - name: s3-snapshot
+              image: {{ printf "%s/%s:%s" .cronjob.image.registry .cronjob.image.repository .cronjob.image.tag | quote }}
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - /scripts/s3-snapshot.sh
+              env:
+                - name: OPENSEARCH_URL
+                  value: "https://{{ include "common.names.fullname" $ }}-indexer-api:9200"
+                - name: SNAPSHOT_REPOSITORY
+                  value: {{ .repository | default "s3-repo" | quote }}
+                - name: OPENSEARCH_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "secret.indexer-auth" $ }}
+                      key: INDEXER_USERNAME
+                - name: OPENSEARCH_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "secret.indexer-auth" $ }}
+                      key: INDEXER_PASSWORD
+              volumeMounts:
+                - name: s3-snapshot-script
+                  mountPath: /scripts/s3-snapshot.sh
+                  subPath: s3-snapshot.sh
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 64Mi
+{{- end }}
+{{- end }}

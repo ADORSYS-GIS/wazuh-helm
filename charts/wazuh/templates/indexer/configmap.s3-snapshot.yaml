@@ -1,0 +1,15 @@
+{{- if and .Values.indexer.s3Snapshot .Values.indexer.s3Snapshot.enabled
+         .Values.indexer.s3Snapshot.cronjob .Values.indexer.s3Snapshot.cronjob.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-s3-snapshot-script
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+data:
+  "s3-snapshot.sh": |
+    {{ $.Files.Get "files/scripts/s3-snapshot.sh" | nindent 4 }}
+{{- end }}

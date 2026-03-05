@@ -139,6 +139,60 @@ indexer:
     ## The secret must have keys: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
     ##
     credentialsSecret: "aws-s3-credentials"
+    ## Name of the S3 snapshot repository registered in OpenSearch.
+    ## This must be registered once manually via the API before snapshots can run.
+    ## See the s3-snapshot-repository.md documentation for the registration command.
+    ##
+    repository: "s3-repo"
+    ## CronJob for automated daily snapshots.
+    ##
+    cronjob:
+      ## Enable the scheduled snapshot CronJob
+      ##
+      enabled: false
+      ## Cron schedule in UTC. Default: 2am daily.
+      ##
+      schedule: "0 2 * * *"
+      ## Number of successfully completed jobs to retain
+      ##
+      successfulJobsHistoryLimit: 3
+      ## Number of failed jobs to retain for debugging
+      ##
+      failedJobsHistoryLimit: 1
+      ## Lightweight curl image (Alpine-based) used to call the OpenSearch API.
+      ## Only curl and sh are required.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
+    ## CronJob to delete snapshots older than retentionDays.
+    ## Runs 1 hour after the snapshot job (3am by default) to ensure the
+    ## daily snapshot has completed before cleanup begins.
+    ##
+    cleanup:
+      ## Enable the scheduled cleanup CronJob
+      ##
+      enabled: false
+      ## Cron schedule in UTC. Default: 3am daily.
+      ##
+      schedule: "0 3 * * *"
+      ## Snapshots older than this many days will be deleted.
+      ## Only snapshots whose names contain an 8-digit date (YYYYMMDD) are eligible.
+      ##
+      retentionDays: 30
+      ## Number of successfully completed jobs to retain
+      ##
+      successfulJobsHistoryLimit: 3
+      ## Number of failed jobs to retain for debugging
+      ##
+      failedJobsHistoryLimit: 1
+      ## Same lightweight curl image as the snapshot job.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
 
   # --- Index Lifecycle Management ---
   lifecycle:
