@@ -52,7 +52,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           tags: |
             type=raw,value=4.13.1-rc.2,enable={{is_default_branch}}
