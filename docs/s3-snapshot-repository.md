@@ -326,24 +326,69 @@ resources:
 
 ---
 
-## Registering the S3 Snapshot Repository
+## Automated S3 Repository Registration
 
-After deployment, the S3 repository must be registered with OpenSearch once via the API. This is a one-time operation that persists in the cluster state.
+The S3 snapshot repository is registered automatically on every `helm upgrade` via a `post-install,post-upgrade` hook Job. No manual `curl` command is needed.
+
+The registration Job (`s3-snapshot-register`) calls `PUT /_snapshot/{repo}` with the S3 bucket settings from `values.yaml`. The call is idempotent — if the repository already exists it is updated; if it doesn't exist it is created.
+
+### Hook Ordering
+
+All four hook resources fire in the `post-install,post-upgrade` phase, after the Indexer StatefulSet and Services have been applied:
+
+| Weight | Resource | Purpose |
+|--------|----------|---------|
+| 1 | `s3-snapshot-register-script` ConfigMap | Makes the script available before the Job starts |
+| 3 | `s3-snapshot-register` Job | Registers or updates the S3 repository |
+| 5 | `s3-snapshot-restore-script` ConfigMap | Makes the restore script available |
+| 10 | `s3-snapshot-restore` Job | Restores from a named snapshot (opt-in) |
+
+The register Job always runs before the restore Job, guaranteeing the repository exists whenever a restore is attempted.
+
+### How It Works
+
+`files/scripts/s3-snapshot-register.sh` executes the following steps:
+
+1. **Wait for OpenSearch** — polls `/_cluster/health` every 10s up to `WAIT_TIMEOUT` (default 300s)
+2. **Check if repo exists** — `GET /_snapshot/{repo}` to determine whether to log "Creating new" or "Updating existing"
+3. **Build settings JSON** — always includes `type`, `bucket`, `region`, `base_path`; adds `endpoint` only if non-empty (for MinIO or custom S3-compatible stores)
+4. **Register repo** — `PUT /_snapshot/{repo}` with basic auth; exits non-zero on failure
+5. **Verify connectivity** — `POST /_snapshot/{repo}/_verify` confirms the cluster can reach the S3 bucket; logs a warning (does not fail) if verification fails, so the user can investigate separately
+
+### Values Configuration
+
+```yaml
+indexer:
+  s3Snapshot:
+    enabled: true
+    credentialsSecret: "ext-wazuh-aws-s3-snapshot-credentials"
+    repository: "s3-repo"
+    s3Settings:
+      bucket: "your-wazuh-snapshots-bucket"   # required
+      region: "eu-central-1"
+      basePath: "snapshots"
+      endpoint: ""                             # optional: custom S3-compatible URL
+    register:
+      enabled: true
+      waitTimeout: 300
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
+```
+
+### Verifying the Registration Job
 
 ```bash
+# Watch registration job logs after deploy
+kubectl logs -n wazuh job/<release>-indexer-s3-snapshot-register -f
+# Should end with: INFO  === S3 Snapshot Repository Registration Completed ===
+
+# Confirm repo is registered
 kubectl exec -n wazuh wazuh-wazuh-helm-indexer-0 -- \
   curl -sk -u admin:<password> \
-  -X PUT "https://localhost:9200/_snapshot/s3-repo" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "s3",
-    "settings": {
-      "bucket": "your-bucket-name",
-      "region": "eu-central-1",
-      "base_path": "snapshots"
-    }
-  }'
-# Expected response: {"acknowledged":true}
+  "https://localhost:9200/_snapshot/s3-repo?pretty"
+# Returns repository settings (not a 404)
 ```
 
 ---
@@ -372,8 +417,11 @@ kubectl exec -n wazuh wazuh-wazuh-helm-indexer-0 -- \
 # Output must include: repository-s3
 ```
 
-### 4. S3 repository registration succeeds
+### 4. S3 repository registration job completed
 ```bash
+kubectl logs -n wazuh job/<release>-indexer-s3-snapshot-register
+# Should end with: INFO  === S3 Snapshot Repository Registration Completed ===
+
 kubectl exec -n wazuh wazuh-wazuh-helm-indexer-0 -- \
   curl -sk -u admin:<password> \
   "https://localhost:9200/_snapshot/s3-repo"
@@ -392,7 +440,7 @@ kubectl exec -n wazuh wazuh-wazuh-helm-indexer-0 -- \
 
 ## Automated Snapshot CronJob
 
-A daily CronJob triggers an OpenSearch snapshot to S3 at 2am UTC. It is enabled via `indexer.s3Snapshot.cronjob.enabled` and requires the S3 repository to be registered first (see [Registering the S3 Snapshot Repository](#registering-the-s3-snapshot-repository)).
+A daily CronJob triggers an OpenSearch snapshot to S3 at 2am UTC. It is enabled via `indexer.s3Snapshot.cronjob.enabled`. The S3 repository is automatically registered by the `s3-snapshot-register` hook Job on each deploy — see [Automated S3 Repository Registration](#automated-s3-repository-registration).
 
 ### How It Works
 
@@ -508,8 +556,10 @@ The restore Job is a Helm `post-install,post-upgrade` hook, meaning it fires **a
 
 | Hook phase | Weight | Resource |
 |---|---|---|
+| `post-install,post-upgrade` | 1 | ConfigMap (register script) |
+| `post-install,post-upgrade` | 3 | Job (register — always runs) |
 | `post-install,post-upgrade` | 5 | ConfigMap (restore script) |
-| `post-install,post-upgrade` | 10 | Job (restore) |
+| `post-install,post-upgrade` | 10 | Job (restore — opt-in) |
 
 The Job uses `helm.sh/hook-delete-policy: before-hook-creation`, so the previous Job is automatically removed each time `helm upgrade` is run. This means a restore can be re-triggered simply by running `helm upgrade` again with the same flags.
 
@@ -594,6 +644,9 @@ kubectl exec -n wazuh wazuh-wazuh-helm-indexer-0 -- \
 | Repository registration returns `500` | AWS credentials invalid or missing S3 bucket permissions | Verify IAM permissions allow `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on the bucket |
 | Init container logs show `OPENSEARCH_PATH_CONF must be set` | Running old image without `ENV OPENSEARCH_PATH_CONF` baked in | Rebuild and push the Dockerfile; the env var is now set in the init container spec as well |
 | `StorageClass is invalid` error on `helm upgrade` | Existing StorageClass can't be updated in-place | `kubectl delete storageclass wazuh-wazuh-helm` then re-upgrade |
+| Register job fails with HTTP 500 | `repository-s3` plugin not installed or AWS credentials missing from keystore | Verify plugin with `opensearch-plugin list`; check `setup-s3-keystore` init container logs |
+| Register job fails: `bucket does not exist` or `Access Denied` | S3 bucket missing or IAM permissions insufficient | Verify `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on the bucket; confirm `s3Settings.bucket` and `s3Settings.region` match the actual bucket |
+| Register job logs "Updating existing" but settings not applied | OpenSearch cached old settings | Restart the indexer pod to reload the repository configuration |
 | Snapshot CronJob shows `state: PARTIAL` | Some shards unavailable at snapshot time | Check cluster health; if cluster was yellow during snapshot, consider retaining and taking a new snapshot once green |
 | Cleanup CronJob skips a snapshot | Snapshot name contains no 8-digit date | Expected behaviour for manually-named snapshots; rename it to include a date if you want it managed by the cleanup job |
 | Restore job exits with HTTP 000 | Cert files not readable by container user | Confirm `defaultMode: 0444` is set on the `admin-certs` volume in the Job template |
@@ -626,6 +679,9 @@ kubectl exec -n wazuh wazuh-wazuh-helm-indexer-0 -- \
 | `charts/wazuh/files/scripts/s3-snapshot-restore.sh` | Created | Restore script — mTLS admin cert auth, waits for readiness, closes all indices, validates shard counts |
 | `charts/wazuh/templates/indexer/configmap.s3-snapshot-restore.yaml` | Created | ConfigMap embedding `s3-snapshot-restore.sh` (post-install hook, weight 5) |
 | `charts/wazuh/templates/indexer/job.s3-snapshot-restore.yaml` | Created | One-shot Job — post-install/post-upgrade hook, weight 10, `backoffLimit: 0` |
+| `charts/wazuh/files/scripts/s3-snapshot-register.sh` | Created | Registration script — waits for readiness, checks if repo exists, calls `PUT /_snapshot/{repo}`, verifies S3 connectivity |
+| `charts/wazuh/templates/indexer/configmap.s3-snapshot-register.yaml` | Created | ConfigMap embedding `s3-snapshot-register.sh` (post-install hook, weight 1) |
+| `charts/wazuh/templates/indexer/job.s3-snapshot-register.yaml` | Created | One-shot Job — post-install/post-upgrade hook, weight 3, runs on every deploy (idempotent) |
 
 ### `wazuh` repository
 
