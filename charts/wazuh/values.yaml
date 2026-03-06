@@ -140,10 +140,45 @@ indexer:
     ##
     credentialsSecret: "aws-s3-credentials"
     ## Name of the S3 snapshot repository registered in OpenSearch.
-    ## This must be registered once manually via the API before snapshots can run.
-    ## See the s3-snapshot-repository.md documentation for the registration command.
     ##
     repository: "s3-repo"
+    ## S3 bucket settings used when registering the snapshot repository.
+    ## Required when register.enabled is true.
+    ##
+    s3Settings:
+      ## S3 bucket name (required)
+      ##
+      bucket: ""
+      ## AWS region of the bucket
+      ##
+      region: "eu-central-1"
+      ## Path prefix inside the bucket where snapshots are stored
+      ##
+      basePath: "snapshots"
+      ## Custom S3-compatible endpoint URL (optional — leave empty for AWS S3).
+      ## Example: "https://minio.example.com"
+      ##
+      endpoint: ""
+    ## One-shot Job that registers (or updates) the S3 snapshot repository in OpenSearch.
+    ## Runs as a post-install/post-upgrade hook before the restore Job.
+    ## The PUT /_snapshot/{repo} call is idempotent — safe to run on every deploy.
+    ##
+    ## Usage: enabled by default when s3Snapshot.enabled is true.
+    ## Disable only if you manage repository registration manually.
+    ##
+    register:
+      ## Enable the repository registration Job
+      ##
+      enabled: true
+      ## Max seconds to wait for OpenSearch to become reachable after deployment.
+      ##
+      waitTimeout: 300
+      ## Same lightweight curl image as the other snapshot jobs.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
     ## CronJob for automated daily snapshots.
     ##
     cronjob:

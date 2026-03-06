@@ -7,6 +7,12 @@
       enabled: true
       credentialsSecret: aws-s3-credentials
       repository: "s3-repo"
+      s3Settings:
+        bucket: "wazuh-dev-backup"
+        region: "eu-central-1"
+        basePath: "snapshots"
+      register:
+        enabled: true
       cronjob:
         enabled: true
       cleanup:
