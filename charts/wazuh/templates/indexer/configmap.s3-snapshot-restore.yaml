@@ -1,0 +1,20 @@
+{{- if and .Values.indexer.s3Snapshot .Values.indexer.s3Snapshot.enabled
+         .Values.indexer.s3Snapshot.restore .Values.indexer.s3Snapshot.restore.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-s3-snapshot-restore-script
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    ## Created before the restore Job (weight 5 < weight 10) so the script
+    ## is available when the Job pod starts.
+    "helm.sh/hook": "post-install,post-upgrade"
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+data:
+  "s3-snapshot-restore.sh": |
+    {{ $.Files.Get "files/scripts/s3-snapshot-restore.sh" | nindent 4 }}
+{{- end }}

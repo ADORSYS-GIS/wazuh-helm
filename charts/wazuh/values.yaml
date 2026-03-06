@@ -193,6 +193,38 @@ indexer:
         registry: docker.io
         repository: curlimages/curl
         tag: "8.11.1"
+    ## One-shot restore Job triggered via a Helm post-install/post-upgrade hook.
+    ## Enable at deploy time when you need to recover from a named snapshot.
+    ## The job waits for OpenSearch to become reachable before proceeding,
+    ## so it is safe to deploy alongside the Indexer StatefulSet.
+    ##
+    ## Usage:
+    ##   helm upgrade -i wazuh ./ -n wazuh \
+    ##     --values values-s3-local.yaml \
+    ##     --set indexer.s3Snapshot.restore.enabled=true \
+    ##     --set indexer.s3Snapshot.restore.snapshotName=snapshot-20260301
+    ##
+    restore:
+      ## Enable the one-shot restore Job
+      ##
+      enabled: false
+      ## Name of the snapshot to restore. Required when enabled.
+      ##
+      snapshotName: ""
+      ## Close all open indices before restoring.
+      ## Required when restoring to a cluster that already has data.
+      ## Safe to leave true for a fresh cluster (no-op if no indices exist).
+      ##
+      closeIndices: true
+      ## Max seconds to wait for OpenSearch to become reachable after deployment.
+      ##
+      waitTimeout: 300
+      ## Same lightweight curl image as the other snapshot jobs.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
 
   # --- Index Lifecycle Management ---
   lifecycle:

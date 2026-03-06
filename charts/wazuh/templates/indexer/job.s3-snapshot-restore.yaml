@@ -1,0 +1,87 @@
+{{- if and .Values.indexer.s3Snapshot .Values.indexer.s3Snapshot.enabled
+         .Values.indexer.s3Snapshot.restore .Values.indexer.s3Snapshot.restore.enabled }}
+{{- with .Values.indexer.s3Snapshot }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-indexer-s3-snapshot-restore
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    ## Runs after all regular resources (StatefulSets, Services) are deployed,
+    ## giving the Indexer pod time to start. The script internally waits for
+    ## OpenSearch to become reachable before attempting the restore.
+    "helm.sh/hook": "post-install,post-upgrade"
+    "helm.sh/hook-weight": "10"
+    ## Delete the previous job before creating a new one so the user can
+    ## re-trigger a restore by running helm upgrade again.
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+spec:
+  ## No retries — if the restore fails, the user should investigate the logs
+  ## and re-trigger by running helm upgrade with the same restore values.
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-indexer-s3-snapshot-restore
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: s3-snapshot-restore-script
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-s3-snapshot-restore-script
+            defaultMode: 0444
+        ## Admin TLS certificate — grants full OpenSearch cluster access via mTLS,
+        ## bypassing the security plugin. Required for privileged operations such as
+        ## closing indices and triggering a snapshot restore.
+        - name: admin-certs
+          secret:
+            secretName: {{ include "wazuh.cert_secret_name" $ }}
+            defaultMode: 0444
+      containers:
+        - name: s3-snapshot-restore
+          image: {{ printf "%s/%s:%s" .restore.image.registry .restore.image.repository .restore.image.tag | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /scripts/s3-snapshot-restore.sh
+          env:
+            - name: OPENSEARCH_URL
+              value: "https://{{ include "common.names.fullname" $ }}-indexer-api:9200"
+            - name: SNAPSHOT_REPOSITORY
+              value: {{ .repository | default "s3-repo" | quote }}
+            - name: SNAPSHOT_NAME
+              value: {{ .restore.snapshotName | quote }}
+            - name: CLOSE_INDICES
+              value: {{ .restore.closeIndices | default true | quote }}
+            - name: WAIT_TIMEOUT
+              value: {{ .restore.waitTimeout | default 300 | quote }}
+            - name: ADMIN_CERT
+              value: /certs/admin.pem
+            - name: ADMIN_KEY
+              value: /certs/admin-key.pem
+          volumeMounts:
+            - name: s3-snapshot-restore-script
+              mountPath: /scripts/s3-snapshot-restore.sh
+              subPath: s3-snapshot-restore.sh
+              readOnly: true
+            - name: admin-certs
+              mountPath: /certs/admin.pem
+              subPath: admin.pem
+              readOnly: true
+            - name: admin-certs
+              mountPath: /certs/admin-key.pem
+              subPath: admin-key.pem
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+{{- end }}
+{{- end }}
