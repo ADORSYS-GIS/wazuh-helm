@@ -237,6 +237,12 @@ indexer:
         scheduleHour: 8               # 8:02 AM
         scheduleMinute: 2
         scheduleTimezone: "UTC"
+      # DLP Cloud Storage Detection - detects cloud storage service access
+      dlpCloudStorage:
+        enabled: false
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 15
 
   # --- Anomaly Detection ---
   anomalyDetection:
