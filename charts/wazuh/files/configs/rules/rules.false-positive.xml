@@ -1,0 +1,108 @@
+<!-- False positive and silencing rules -->
+<!-- These rules override core Wazuh rules to reduce noise -->
+
+<group name="ossec,">
+  <!-- Rootcheck false positives for IDE temp files -->
+  <rule id="100500" level="0">
+    <if_group>rootcheck</if_group>
+    <match>^/tmp/(\.mount_cursor|\.cursor|Cursor|\.vscode-ipc).*</match>
+    <description>Ignore false positives for Cursor/IntelliJ IDEA temp files in /tmp</description>
+  </rule>
+
+  <!-- Silence Wazuh agent started/stopped messages -->
+  <rule id="503" level="0" overwrite="yes">
+    <if_sid>500</if_sid>
+    <match>Agent started</match>
+    <description>Silenced: Wazuh agent started</description>
+  </rule>
+
+  <rule id="504" level="0" overwrite="yes">
+    <if_sid>500</if_sid>
+    <match>Agent stopped</match>
+    <description>Silenced: Wazuh agent stopped</description>
+  </rule>
+
+  <!-- Silence port status changes -->
+  <rule id="533" level="0" overwrite="yes">
+    <if_sid>530</if_sid>
+    <match>ossec: output: 'netstat</match>
+    <check_diff />
+    <description>Silenced: Port status change</description>
+  </rule>
+</group>
+
+<!-- Suricata - Silence noisy protocol detection alerts -->
+<group name="ids,suricata,">
+  <!-- Silence one-direction protocol detection (network asymmetry noise) -->
+  <rule id="86601" level="0" overwrite="yes">
+    <if_sid>86600</if_sid>
+    <field name="alert.signature">^SURICATA Applayer Detect protocol only one direction$</field>
+    <description>Silenced: Suricata protocol detection (one direction only)</description>
+  </rule>
+</group>
+
+<!-- SCA - Silence informational events, keep failures -->
+<group name="sca,">
+  <!-- Silence SCA scan started -->
+  <rule id="19002" level="0" overwrite="yes">
+    <decoded_as>sca</decoded_as>
+    <field name="sca.type">^scan_start$</field>
+    <description>Silenced: SCA scan started</description>
+  </rule>
+
+  <!-- Silence SCA scan ended -->
+  <rule id="19003" level="0" overwrite="yes">
+    <decoded_as>sca</decoded_as>
+    <field name="sca.type">^scan_end$</field>
+    <description>Silenced: SCA scan ended</description>
+  </rule>
+
+  <!-- Silence SCA passed checks -->
+  <rule id="19007" level="0" overwrite="yes">
+    <if_sid>19006</if_sid>
+    <field name="sca.check.result">^passed$</field>
+    <description>Silenced: SCA passed check</description>
+  </rule>
+</group>
+
+<!-- AppArmor - Silence DENIED events -->
+<group name="apparmor,">
+  <rule id="52002" level="0" overwrite="yes">
+    <if_sid>52001</if_sid>
+    <action>DENIED</action>
+    <description>Silenced: AppArmor DENIED</description>
+  </rule>
+
+  <!-- Silence grouped AppArmor messages (low value) -->
+  <rule id="52000" level="0" overwrite="yes">
+    <decoded_as>apparmor</decoded_as>
+    <description>Silenced: AppArmor messages grouped</description>
+  </rule>
+</group>
+
+<!-- Windows Defender - Silence informational status messages -->
+<group name="windows,">
+  <!-- Silence "Antimalware platform is running and in a healthy state" -->
+  <rule id="62128" level="0" overwrite="yes">
+    <if_sid>62100</if_sid>
+    <field name="win.eventdata.threatName">^$</field>
+    <field name="win.system.eventID">^1001$</field>
+    <description>Silenced: Windows Defender healthy state</description>
+  </rule>
+
+  <!-- Silence "Antimalware definitions updated successfully" -->
+  <rule id="62130" level="0" overwrite="yes">
+    <if_sid>62100</if_sid>
+    <field name="win.system.eventID">^2000$</field>
+    <description>Silenced: Windows Defender definitions updated</description>
+  </rule>
+</group>
+
+<!-- Log rotation - Silence normal log rotation events -->
+<group name="ossec,">
+  <rule id="591" level="0" overwrite="yes">
+    <if_sid>500</if_sid>
+    <match>Log file rotated</match>
+    <description>Silenced: Log file rotated</description>
+  </rule>
+</group>

@@ -1,0 +1,341 @@
+<!--
+  Data Loss Prevention (DLP) Rules - Cloud Storage & Email Exfiltration
+  Detects potential data exfiltration via cloud services and personal email
+
+  Rule ID Range: 800300-800399
+
+  MITRE ATT&CK Coverage:
+  - T1567.002: Exfiltration to Cloud Storage
+  - T1048: Exfiltration Over Alternative Protocol
+  - T1071.001: Application Layer Protocol: Web Protocols
+
+  ISO 27001:2022 Controls:
+  - A.8.12: Data leakage prevention
+  - A.5.33: Protection of records
+-->
+
+<group name="dlp,cloud_storage,data_exfiltration,">
+
+  <!-- ================================================== -->
+  <!-- CLOUD STORAGE SERVICE DETECTION                    -->
+  <!-- DNS queries to cloud storage providers             -->
+  <!-- ================================================== -->
+
+  <!-- Dropbox Detection -->
+  <rule id="800300" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)dropbox\.com|dropboxapi\.com|dropbox-dns\.com</match>
+    <description>DLP: Cloud storage access detected - Dropbox</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,cloud_storage,dropbox,</group>
+  </rule>
+
+  <!-- Google Drive Detection -->
+  <rule id="800301" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)drive\.google\.com|docs\.google\.com|googleapis\.com.*drive|googleusercontent\.com</match>
+    <description>DLP: Cloud storage access detected - Google Drive</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,cloud_storage,google_drive,</group>
+  </rule>
+
+  <!-- OneDrive Detection -->
+  <rule id="800302" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)onedrive\.live\.com|1drv\.ms|onedrive\.com|sharepoint\.com</match>
+    <description>DLP: Cloud storage access detected - OneDrive/SharePoint</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,cloud_storage,onedrive,</group>
+  </rule>
+
+  <!-- iCloud Detection -->
+  <rule id="800303" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)icloud\.com|icloud-content\.com|apple-cloudkit\.com</match>
+    <description>DLP: Cloud storage access detected - iCloud</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,cloud_storage,icloud,</group>
+  </rule>
+
+  <!-- Box.com Detection -->
+  <rule id="800304" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)box\.com|boxcdn\.net|boxcloud\.com</match>
+    <description>DLP: Cloud storage access detected - Box</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,cloud_storage,box,</group>
+  </rule>
+
+  <!-- WeTransfer Detection (File Sharing) -->
+  <rule id="800305" level="8">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)wetransfer\.com|we\.tl</match>
+    <description>DLP WARNING: File transfer service detected - WeTransfer</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,file_transfer,wetransfer,suspicious,</group>
+  </rule>
+
+  <!-- Mega.nz Detection (Often used for exfiltration) -->
+  <rule id="800306" level="10">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)mega\.nz|mega\.co\.nz|megaupload</match>
+    <description>DLP ALERT: High-risk file hosting detected - MEGA</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,file_transfer,mega,high_risk,</group>
+  </rule>
+
+  <!-- Anonymous File Sharing Services -->
+  <rule id="800307" level="12">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)anonfiles\.com|anonymousfiles|file\.io|0x0\.st|transfer\.sh|tmpfiles\.org|uploadfiles\.io</match>
+    <description>DLP CRITICAL: Anonymous file sharing service detected - High exfiltration risk</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,file_transfer,anonymous,critical,data_exfiltration,</group>
+  </rule>
+
+  <!-- MediaFire, SendSpace, Zippyshare -->
+  <rule id="800308" level="8">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)mediafire\.com|sendspace\.com|zippyshare\.com|rapidshare|uploaded\.net</match>
+    <description>DLP WARNING: File hosting service detected - Potential exfiltration</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,file_transfer,file_hosting,suspicious,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- PERSONAL EMAIL SERVICE DETECTION                   -->
+  <!-- ================================================== -->
+
+  <!-- Gmail Personal -->
+  <rule id="800320" level="5">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)mail\.google\.com|gmail\.com</match>
+    <description>DLP: Personal email access detected - Gmail</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,personal_email,gmail,</group>
+  </rule>
+
+  <!-- Yahoo Mail -->
+  <rule id="800321" level="5">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)mail\.yahoo\.com|ymail\.com</match>
+    <description>DLP: Personal email access detected - Yahoo Mail</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,personal_email,yahoo,</group>
+  </rule>
+
+  <!-- Outlook/Hotmail Personal -->
+  <rule id="800322" level="5">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)outlook\.live\.com|hotmail\.com|live\.com</match>
+    <description>DLP: Personal email access detected - Outlook/Hotmail</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,personal_email,outlook,</group>
+  </rule>
+
+  <!-- ProtonMail (Encrypted - Higher risk) -->
+  <rule id="800323" level="8">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)protonmail\.com|proton\.me|pm\.me</match>
+    <description>DLP WARNING: Encrypted email service detected - ProtonMail</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,personal_email,protonmail,encrypted,suspicious,</group>
+  </rule>
+
+  <!-- Tutanota (Encrypted) -->
+  <rule id="800324" level="8">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)tutanota\.com|tutamail\.com|tuta\.io</match>
+    <description>DLP WARNING: Encrypted email service detected - Tutanota</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,personal_email,tutanota,encrypted,suspicious,</group>
+  </rule>
+
+  <!-- Temporary/Disposable Email Services -->
+  <rule id="800325" level="10">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)guerrillamail|tempmail|10minutemail|mailinator|throwaway|fakeinbox|temp-mail|disposable</match>
+    <description>DLP ALERT: Disposable email service detected - High exfiltration risk</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,personal_email,disposable,high_risk,data_exfiltration,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- MESSAGING APPS (Alternative Exfiltration)          -->
+  <!-- ================================================== -->
+
+  <!-- Telegram -->
+  <rule id="800330" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)telegram\.org|t\.me|telegram-cdn</match>
+    <description>DLP: Messaging app detected - Telegram</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,messaging,telegram,</group>
+  </rule>
+
+  <!-- Signal -->
+  <rule id="800331" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)signal\.org|whispersystems\.org</match>
+    <description>DLP: Encrypted messaging app detected - Signal</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,messaging,signal,encrypted,</group>
+  </rule>
+
+  <!-- WhatsApp Web -->
+  <rule id="800332" level="5">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)web\.whatsapp\.com|whatsapp\.net</match>
+    <description>DLP: Messaging app detected - WhatsApp</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,messaging,whatsapp,</group>
+  </rule>
+
+  <!-- Discord (File sharing capable) -->
+  <rule id="800333" level="6">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)discord\.com|discordapp\.com|discord\.gg</match>
+    <description>DLP: Messaging platform detected - Discord</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,messaging,discord,</group>
+  </rule>
+
+  <!-- Slack (Could be personal workspace) -->
+  <rule id="800334" level="4">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)slack\.com|slack-edge\.com</match>
+    <description>DLP: Collaboration platform detected - Slack</description>
+    <mitre>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,messaging,slack,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- CODE REPOSITORIES (Source Code Exfiltration)       -->
+  <!-- ================================================== -->
+
+  <!-- Personal GitHub -->
+  <rule id="800340" level="5">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)github\.com|githubusercontent\.com|github\.io</match>
+    <description>DLP: Code repository access detected - GitHub</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,code_repository,github,</group>
+  </rule>
+
+  <!-- GitLab -->
+  <rule id="800341" level="5">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)gitlab\.com|gitlab\.io</match>
+    <description>DLP: Code repository access detected - GitLab</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,code_repository,gitlab,</group>
+  </rule>
+
+  <!-- Bitbucket -->
+  <rule id="800342" level="5">
+    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <match type="pcre2">(?i)bitbucket\.org|bitbucket\.io</match>
+    <description>DLP: Code repository access detected - Bitbucket</description>
+    <mitre>
+      <id>T1567.002</id>
+    </mitre>
+    <group>dlp,code_repository,bitbucket,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- PROCESS-BASED DETECTION (Windows Sysmon)           -->
+  <!-- Detects cloud sync client processes                -->
+  <!-- ================================================== -->
+
+  <!-- Dropbox Process -->
+  <rule id="800350" level="6">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)dropbox\.exe</field>
+    <description>DLP: Dropbox client process started</description>
+    <group>dlp,cloud_storage,dropbox,process,</group>
+  </rule>
+
+  <!-- Google Drive Process -->
+  <rule id="800351" level="6">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)googledrivesync\.exe|GoogleDriveFS\.exe</field>
+    <description>DLP: Google Drive client process started</description>
+    <group>dlp,cloud_storage,google_drive,process,</group>
+  </rule>
+
+  <!-- OneDrive Process -->
+  <rule id="800352" level="6">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)onedrive\.exe</field>
+    <description>DLP: OneDrive client process started</description>
+    <group>dlp,cloud_storage,onedrive,process,</group>
+  </rule>
+
+  <!-- Telegram Process -->
+  <rule id="800353" level="6">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)telegram\.exe</field>
+    <description>DLP: Telegram client process started</description>
+    <group>dlp,messaging,telegram,process,</group>
+  </rule>
+
+  <!-- ================================================== -->
+  <!-- CROSS-PLATFORM AGGREGATION                         -->
+  <!-- ================================================== -->
+
+  <!-- Any high-risk exfiltration activity -->
+  <rule id="800360" level="14">
+    <if_sid>800306,800307,800325</if_sid>
+    <description>DLP CRITICAL: High-risk data exfiltration activity detected - Immediate investigation required</description>
+    <mitre>
+      <id>T1567.002</id>
+      <id>T1048</id>
+    </mitre>
+    <group>dlp,critical,data_exfiltration,incident,</group>
+  </rule>
+
+</group>

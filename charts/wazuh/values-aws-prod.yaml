@@ -1,0 +1,40 @@
+# AWS Integration Configuration for Production
+# Use this file with: helm upgrade wazuh ./charts/wazuh -f values-aws-prod.yaml
+
+integration:
+  aws:
+    enable: true
+    profile: "main"
+    awsOrganizationId: "o-rse1nyh5qe"
+
+    secrets:
+      existingSecret: "ext-wazuh-aws-secrets"
+
+    ## CloudTrail Configuration
+    cloudtrail:
+      enabled: true
+      bucketName: "wazuh-cloudtrail-020980146275"
+      interval: 30m  # Increased from 1m to prevent backlog issues
+      ## Only process logs from Feb 1, 2026 onwards
+      ## This prevents processing 48+ days of backlog
+      onlyLogsAfter: "2026-FEB-01"
+
+    ## AWS Config
+    config:
+      enabled: true
+      bucketName: "wazuh-config-020980146275"
+      awsAccountIds: "020980146275,564357927993,590183746717,191844718867,471112655819,571075516563,982081049921,984270176785"
+
+    ## Security Hub
+    securityHub:
+      enabled: true
+      sqsName: "wazuh-securityhub-sqs"
+      interval: 1h
+
+    ## GuardDuty
+    guardduty:
+      enabled: true
+      bucketName: "adorsys-guardduty-findings-020980146275"
+      awsAccountIds: "020980146275,564357927993,590183746717,191844718867,471112655819,571075516563,982081049921,984270176785"
+      ## Only process findings from Feb 1, 2026 onwards
+      onlyLogsAfter: "2026-FEB-01"

@@ -25,6 +25,9 @@ spec:
       annotations:
         {{- include "common.annotations.standard" ( dict "customAnnotations" .additionalAnnotations "context" $ ) | nindent 8 }}
         checksum/config: {{ include (print $.Template.BasePath "/indexer/configmap.yaml") $ | sha256sum }}
+        {{ with .keycloak -}}
+        checksum/secret-kc: {{ include (print $.Template.BasePath "/indexer/secret.keycloak.yaml") $ | sha256sum }}
+        {{- end }}
         {{ with .auth -}}
         checksum/secret: {{ include (print $.Template.BasePath "/indexer/secret.yaml") $ | sha256sum }}
         {{- end }}
@@ -46,6 +49,10 @@ spec:
       volumes:
         - name: wazuh-config-temp
           emptyDir: { }
+        - name: keystore-data
+          emptyDir: { }
+        - name: etc-wazuh-indexer
+          emptyDir: { }
         - name: certs
           secret:
             secretName: {{ include "wazuh.cert_secret_name" $ }}
@@ -58,16 +65,106 @@ spec:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
             defaultMode: 0600
             
+        {{ with .keycloak }}
+        {{- if .enabled -}}
+        - name: wazuh-keycloak-config
+          secret:
+            secretName: '{{ include "common.names.fullname" $ }}-keycloak-conf'
+        {{- end -}}
+        {{ end }}
+        
+        {{- if and $.Values.notification.email $.Values.notification.email.enabled }}
+        - name: email-credentials
+          secret:
+            secretName: {{ if $.Values.notification.email.existingSecret }}{{ $.Values.notification.email.existingSecret }}{{ else }}{{ include "common.names.fullname" $ }}-email-cred{{ end }}
+        {{- end }}
         {{ with .volumes -}}
-        {{ range $k, $v := . }}
-        {{ if $v }}
-        - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
-          {{ include "common.tplvalues.render" (dict "value" $v "context" $) | nindent 10 }}
-        {{ end }}
-        {{ end }}
-        {{ end }}
-      {{ with .initContainers }}
+        {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
+        {{- end }}
       initContainers:
+      {{- if and $.Values.notification.email $.Values.notification.email.enabled }}
+        - name: keystore-setup
+          {{- $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              export OPENSEARCH_PATH_CONF=/keystore-workdir
+              KEYSTORE_PATH="$OPENSEARCH_PATH_CONF/opensearch.keystore"
+
+              # Copy existing keystore from image or create new one
+              if [ -f /usr/share/wazuh-indexer/config/opensearch.keystore ]; then
+                echo "Copying existing keystore..."
+                cp /usr/share/wazuh-indexer/config/opensearch.keystore "$KEYSTORE_PATH"
+              else
+                echo "Creating new keystore..."
+                /usr/share/wazuh-indexer/bin/opensearch-keystore create
+              fi
+
+              chmod 660 "$KEYSTORE_PATH"
+
+              # Add email credentials to keystore
+              ACCOUNT_NAME="{{ $.Values.notification.email.accountName }}"
+              echo "Configuring email credentials for account: $ACCOUNT_NAME"
+
+              # Add username
+              cat /email-credentials/username | /usr/share/wazuh-indexer/bin/opensearch-keystore add --stdin -f "opensearch.notifications.core.email.${ACCOUNT_NAME}.username"
+
+              # Add password
+              cat /email-credentials/password | /usr/share/wazuh-indexer/bin/opensearch-keystore add --stdin -f "opensearch.notifications.core.email.${ACCOUNT_NAME}.password"
+
+              echo "Email credentials configured successfully"
+              /usr/share/wazuh-indexer/bin/opensearch-keystore list
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          volumeMounts:
+            - name: email-credentials
+              mountPath: /email-credentials
+              readOnly: true
+            - name: keystore-data
+              mountPath: /keystore-workdir
+      {{- end }}
+        # Create symlinks for cert paths expected by Java security policy
+        - name: cert-path-setup
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p /etc/wazuh-indexer/certs
+              ln -sf /usr/share/wazuh-indexer/config/certs/root-ca.pem /etc/wazuh-indexer/certs/root-ca.pem
+              ln -sf /usr/share/wazuh-indexer/config/certs/indexer.pem /etc/wazuh-indexer/certs/indexer.pem
+              ln -sf /usr/share/wazuh-indexer/config/certs/indexer-key.pem /etc/wazuh-indexer/certs/indexer-key.pem
+              ln -sf /usr/share/wazuh-indexer/config/certs/admin.pem /etc/wazuh-indexer/certs/admin.pem
+              ln -sf /usr/share/wazuh-indexer/config/certs/admin-key.pem /etc/wazuh-indexer/certs/admin-key.pem
+              echo "Cert symlinks created successfully"
+          volumeMounts:
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/indexer-key.pem
+              subPath: indexer-key.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/indexer.pem
+              subPath: indexer.pem
+              readOnly: true
+            - name: root-certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/root-ca.pem
+              subPath: root-ca.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/admin.pem
+              subPath: admin.pem
+              readOnly: true
+            - name: certs
+              mountPath: /usr/share/wazuh-indexer/config/certs/admin-key.pem
+              subPath: admin-key.pem
+              readOnly: true
+            - name: etc-wazuh-indexer
+              mountPath: /etc/wazuh-indexer
+      {{ with .initContainers }}
       {{ range $k, $v := . }}
       {{ if $v }}
         - name: {{ include "common.tplvalues.render" (dict "value" $k "context" $) }}
@@ -117,7 +214,11 @@ spec:
           volumeMounts:
             - name: {{ include "common.names.fullname" $ }}-indexer
               mountPath: /var/lib/wazuh-indexer
-
+            {{- if and $.Values.notification.email $.Values.notification.email.enabled }}
+            - name: keystore-data
+              mountPath: /usr/share/wazuh-indexer/config/opensearch.keystore
+              subPath: opensearch.keystore
+            {{- end }}
             - name: certs
               mountPath: /usr/share/wazuh-indexer/config/certs/indexer-key.pem
               subPath: indexer-key.pem
@@ -138,7 +239,8 @@ spec:
               mountPath: /usr/share/wazuh-indexer/config/certs/admin-key.pem
               subPath: admin-key.pem
               readOnly: true
-
+            - name: etc-wazuh-indexer
+              mountPath: /etc/wazuh-indexer
             - name: indexer-conf
               mountPath: /usr/share/wazuh-indexer/config/opensearch.yml
               subPath: opensearch.yml

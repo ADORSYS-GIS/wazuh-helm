@@ -1,0 +1,63 @@
+{{- if and .Values.indexer .Values.indexer.alerting .Values.indexer.alerting.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-alerting-setup
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: alerting-setup
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 8 }}
+        app.kubernetes.io/component: alerting-setup
+    spec:
+      restartPolicy: OnFailure
+      {{- if and .Values.indexer.serviceAccount .Values.indexer.serviceAccount.name }}
+      serviceAccountName: {{ .Values.indexer.serviceAccount.name }}
+      {{- end }}
+      containers:
+        - name: alerting-setup
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - /scripts/setup-alerting-monitors.sh
+          env:
+            - name: INDEXER_URL
+              value: "https://{{ include "common.names.fullname" $ }}-indexer:9200"
+            - name: INDEXER_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_USERNAME
+            - name: INDEXER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_PASSWORD
+          volumeMounts:
+            - name: alerting-scripts
+              mountPath: /scripts
+              readOnly: true
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: alerting-scripts
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-alerting-monitors
+            defaultMode: 0755
+{{- end }}

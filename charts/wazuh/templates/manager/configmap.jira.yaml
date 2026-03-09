@@ -1,5 +1,5 @@
-{{ with .Values.integration.jira -}}
-{{- if .enabled -}}
+{{- with .Values.integration.jira }}
+{{- if .enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,8 +11,7 @@ metadata:
 data:
   "custom-jira.py": |
     {{ $.Files.Get "files/scripts/custom-jira.py" | nindent 6 }}
-
   "custom-jira": |
     {{ $.Files.Get "files/scripts/custom-jira.sh" | nindent 6 }}
-{{- end -}}
+{{- end }}
 {{- end }}
