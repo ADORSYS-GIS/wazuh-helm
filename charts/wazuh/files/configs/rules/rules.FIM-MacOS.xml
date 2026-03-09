@@ -816,4 +816,5 @@
         <regex>configuration change|syslog.*config|facility.*change</regex>
         <description>macOS: Syslog configuration change - noise reduction</description>
     </rule>
+
 </group>

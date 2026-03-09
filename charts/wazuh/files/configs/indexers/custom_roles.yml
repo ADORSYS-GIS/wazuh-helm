@@ -1,0 +1,98 @@
+_meta:
+  type: "roles"
+  config_version: 2
+
+app_admin:
+  reserved: true
+  hidden: false
+  description: "Administrator role with full access."
+  cluster_permissions:
+    - '*'
+  index_permissions:
+    - index_patterns:
+        - '*'
+      allowed_actions:
+        - '*'
+  tenant_permissions:
+    - tenant_patterns:
+        - '*'
+      allowed_actions:
+        - 'kibana_all_write'
+
+app_security_analyst:
+  reserved: true
+  hidden: false
+  description: "Security Analyst role with read access to logs and alerts."
+  cluster_permissions:
+    - 'cluster_monitor'
+  index_permissions:
+    - index_patterns:
+        - 'wazuh-alerts-*'
+        - 'wazuh-archives-*'
+      allowed_actions:
+        - 'read'
+        - 'search'
+  tenant_permissions:
+    - tenant_patterns:
+        - 'security_tenant'
+      allowed_actions:
+        - 'kibana_all_read'
+
+app_incident_responder:
+  reserved: true
+  hidden: false
+  description: "Incident Responder role for handling security incidents."
+  cluster_permissions:
+    - 'cluster_monitor'
+  index_permissions:
+    - index_patterns:
+        - 'wazuh-alerts-*'
+      allowed_actions:
+        - 'read'
+        - 'delete'
+    - index_patterns:
+        - 'wazuh-archives-*'
+      allowed_actions:
+        - 'read'
+  tenant_permissions:
+    - tenant_patterns:
+        - 'incident_tenant'
+      allowed_actions:
+        - 'kibana_all_read'
+
+app_compliance_officer:
+  reserved: true
+  hidden: false
+  description: "Compliance Officer role for auditing and compliance reviews."
+  cluster_permissions:
+    - 'cluster_monitor'
+  index_permissions:
+    - index_patterns:
+        - 'wazuh-archives-*'
+        - 'wazuh-compliance-*'
+      allowed_actions:
+        - 'read'
+  tenant_permissions:
+    - tenant_patterns:
+        - 'compliance_tenant'
+      allowed_actions:
+        - 'kibana_all_read'
+
+app_read_only:
+  reserved: false
+  hidden: false
+  description: "Read-only role for limited access to dashboards and logs."
+  cluster_permissions:
+    - 'cluster_composite_ops_ro'
+  index_permissions:
+    - index_patterns:
+        - 'wazuh-alerts-*'
+        - 'wazuh-archives-*'
+        - 'wazuh-monitoring-*'
+      allowed_actions: ['read','search']
+  tenant_permissions:
+    - tenant_patterns:
+        - 'readonly_tenant'
+      allowed_actions:
+        - 'kibana_all_read'
+          
