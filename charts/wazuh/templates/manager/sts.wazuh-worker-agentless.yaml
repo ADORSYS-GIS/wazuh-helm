@@ -292,7 +292,7 @@ spec:
               readOnly: true
 
             - name: config
-              mountPath: /var/ossec/etc/shared/dlp/agent.conf
+              mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf
               subPath: dlp.xml
               readOnly: true
               
