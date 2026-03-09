@@ -1182,16 +1182,6 @@ integration:
   docker:
     ## Enable pushing Docker monitoring config to agents
     enabled: true
-    ## Docker listener wodle settings (agent-side)
-    listener:
-      disabled: "no"
-      attempts: 5
-      run_on_start: "yes"
-    ## Docker container log collection (agent-side)
-    logCollection:
-      enabled: true
-      location: "/var/lib/docker/containers/*/*-json.log"
-      log_format: "syslog"
 
   ##
   ## Azure integrations for Log Analytics, Graph API, and Storage
