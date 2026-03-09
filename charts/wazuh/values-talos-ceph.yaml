@@ -16,7 +16,7 @@ storageClasses:
 apiCred:
   auth:
     username: wazuh-admin
-    password: ""  # Change this!
+    password: "WzCb7GtyN6@27"
 
 # Wazuh Manager Master configuration
 master:
@@ -26,10 +26,10 @@ master:
   resources:
     requests:
       cpu: 500m
-      memory: 2Gi
+      memory: 4Gi
     limits:
       cpu: 2000m
-      memory: 6Gi
+      memory: 10Gi
 
   # Persistent storage for master data
   persistence:
@@ -37,11 +37,6 @@ master:
     size: 50Gi
     accessModes:
       - ReadWriteOnce
-
-  # Use emptyDir for backup to avoid RBD multi-attach
-  volumes:
-    - name: manager-backup
-      emptyDir: {}
 
   volumeMounts: []
 
@@ -54,7 +49,7 @@ master:
 
 # Wazuh Manager Worker configuration
 worker:
-  replicaCount: 2
+  replicaCount: 0  # Disabled - master handles agents directly, avoids PVC multi-attach issue
 
   # Resource limits - workers need moderate memory
   resources:
@@ -88,11 +83,6 @@ worker:
         targetPort: agents-events
         protocol: TCP
 
-  # Use emptyDir for backup to avoid RBD multi-attach
-  volumes:
-    - name: manager-backup
-      emptyDir: {}
-
   # Node affinity - prefer control plane nodes
   nodeSelector: {}
   tolerations:
@@ -107,7 +97,7 @@ indexer:
     enabled: false
 
   # Number of indexer replicas
-  replicas: 3
+  replicas: 1
 
   # Java heap size - ~40% of memory limit (leave room for OS and OpenSearch overhead)
   # 1.5GB heap for 4Gi container is a safe balance
@@ -148,7 +138,7 @@ indexer:
   lifecycle:
     enabled: true
     alerts:
-      warmAfterDays: 7    # Move to warm state after 7 days (reduces replicas)
+      warmAfterDays: 7     # Move to warm state after 7 days (reduces replicas)
       deleteAfterDays: 90  # Delete alerts after 90 days
     archives:
       deleteAfterDays: 30  # Delete archives after 30 days
@@ -187,6 +177,30 @@ indexer:
       securityRemoval:
         intervalMinutes: 5
         lookbackMinutes: 5
+        throttleMinutes: 5
+      # DLP Cloud Storage detection (Dropbox, Google Drive, etc.)
+      dlpCloudStorage:
+        enabled: true
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 30
+      # DLP High-Risk Exfiltration (MEGA, anonymous hosting, encrypted email)
+      dlpHighRiskExfiltration:
+        enabled: true
+        intervalMinutes: 1
+        lookbackMinutes: 2
+        throttleMinutes: 5
+      # DLP USB Mass Storage Detection (USB drives, external storage)
+      dlpUsbMassStorage:
+        enabled: true
+        intervalMinutes: 1
+        lookbackMinutes: 2
+        throttleMinutes: 15
+      # DLP USB HID/BadUSB Detection (keyboard attacks, rapid HID connections)
+      dlpUsbHidBadusb:
+        enabled: true
+        intervalMinutes: 1
+        lookbackMinutes: 1
         throttleMinutes: 5
 
 # Filebeat configuration

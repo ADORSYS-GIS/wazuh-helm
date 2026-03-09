@@ -63,14 +63,14 @@ indexer:
       # ----- CAMEROON -----
       cm_admin:
         enabled: true
-        password: "CM_Admin_Ch@ng3M3!"      # CHANGE IN PRODUCTION
+        password: "SecureAdminCameroon2024"      # CHANGE IN PRODUCTION
         backendRoles:
           - "wazuh_cm_admin"
         description: "Cameroon country administrator"
 
       cm_user:
         enabled: true                        # Enable for read-only users
-        password: "CM_User_Ch@ng3M3!"
+        password: "SecureRead0nlyCameroon2024"
         backendRoles:
           - "wazuh_cm_user"
         description: "Cameroon read-only user"
@@ -78,14 +78,14 @@ indexer:
       # ----- GERMANY -----
       de_admin:
         enabled: true
-        password: "DE_Admin_Ch@ng3M3!"      # CHANGE IN PRODUCTION
+        password: "SecureAdminGermany2024"      # CHANGE IN PRODUCTION
         backendRoles:
           - "wazuh_de_admin"
         description: "Germany country administrator"
 
       de_user:
         enabled: true
-        password: "DE_User_Ch@ng3M3!"
+        password: "SecureRead0nlyGermany2024"
         backendRoles:
           - "wazuh_de_user"
         description: "Germany read-only user"
@@ -93,14 +93,14 @@ indexer:
       # ----- EXTERNAL (AUDITORS) -----
       ext_admin:
         enabled: true
-        password: "EXT_Admin_Ch@ng3M3!"     # CHANGE IN PRODUCTION
+        password: "SecureAdminExternal2024"     # CHANGE IN PRODUCTION
         backendRoles:
           - "wazuh_ext_admin"
         description: "External actors administrator (auditors)"
 
       ext_user:
         enabled: true
-        password: "EXT_User_Ch@ng3M3!"
+        password: "SecureRead0nlyExternal2024"
         backendRoles:
           - "wazuh_ext_user"
         description: "External read-only user"
