@@ -23,7 +23,7 @@
 
   <!-- Dropbox Detection -->
   <rule id="800300" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)dropbox\.com|dropboxapi\.com|dropbox-dns\.com</match>
     <description>DLP: Cloud storage access detected - Dropbox</description>
     <mitre>
@@ -34,7 +34,7 @@
 
   <!-- Google Drive Detection -->
   <rule id="800301" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)drive\.google\.com|docs\.google\.com|googleapis\.com.*drive|googleusercontent\.com</match>
     <description>DLP: Cloud storage access detected - Google Drive</description>
     <mitre>
@@ -45,7 +45,7 @@
 
   <!-- OneDrive Detection -->
   <rule id="800302" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)onedrive\.live\.com|1drv\.ms|onedrive\.com|sharepoint\.com</match>
     <description>DLP: Cloud storage access detected - OneDrive/SharePoint</description>
     <mitre>
@@ -56,7 +56,7 @@
 
   <!-- iCloud Detection -->
   <rule id="800303" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)icloud\.com|icloud-content\.com|apple-cloudkit\.com</match>
     <description>DLP: Cloud storage access detected - iCloud</description>
     <mitre>
@@ -67,7 +67,7 @@
 
   <!-- Box.com Detection -->
   <rule id="800304" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)box\.com|boxcdn\.net|boxcloud\.com</match>
     <description>DLP: Cloud storage access detected - Box</description>
     <mitre>
@@ -78,7 +78,7 @@
 
   <!-- WeTransfer Detection (File Sharing) -->
   <rule id="800305" level="8">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)wetransfer\.com|we\.tl</match>
     <description>DLP WARNING: File transfer service detected - WeTransfer</description>
     <mitre>
@@ -89,7 +89,7 @@
 
   <!-- Mega.nz Detection (Often used for exfiltration) -->
   <rule id="800306" level="10">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)mega\.nz|mega\.co\.nz|megaupload</match>
     <description>DLP ALERT: High-risk file hosting detected - MEGA</description>
     <mitre>
@@ -100,7 +100,7 @@
 
   <!-- Anonymous File Sharing Services -->
   <rule id="800307" level="12">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)anonfiles\.com|anonymousfiles|file\.io|0x0\.st|transfer\.sh|tmpfiles\.org|uploadfiles\.io</match>
     <description>DLP CRITICAL: Anonymous file sharing service detected - High exfiltration risk</description>
     <mitre>
@@ -111,7 +111,7 @@
 
   <!-- MediaFire, SendSpace, Zippyshare -->
   <rule id="800308" level="8">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)mediafire\.com|sendspace\.com|zippyshare\.com|rapidshare|uploaded\.net</match>
     <description>DLP WARNING: File hosting service detected - Potential exfiltration</description>
     <mitre>
@@ -126,7 +126,7 @@
 
   <!-- Gmail Personal -->
   <rule id="800320" level="5">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)mail\.google\.com|gmail\.com</match>
     <description>DLP: Personal email access detected - Gmail</description>
     <mitre>
@@ -137,7 +137,7 @@
 
   <!-- Yahoo Mail -->
   <rule id="800321" level="5">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)mail\.yahoo\.com|ymail\.com</match>
     <description>DLP: Personal email access detected - Yahoo Mail</description>
     <mitre>
@@ -148,7 +148,7 @@
 
   <!-- Outlook/Hotmail Personal -->
   <rule id="800322" level="5">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)outlook\.live\.com|hotmail\.com|live\.com</match>
     <description>DLP: Personal email access detected - Outlook/Hotmail</description>
     <mitre>
@@ -159,7 +159,7 @@
 
   <!-- ProtonMail (Encrypted - Higher risk) -->
   <rule id="800323" level="8">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)protonmail\.com|proton\.me|pm\.me</match>
     <description>DLP WARNING: Encrypted email service detected - ProtonMail</description>
     <mitre>
@@ -170,7 +170,7 @@
 
   <!-- Tutanota (Encrypted) -->
   <rule id="800324" level="8">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)tutanota\.com|tutamail\.com|tuta\.io</match>
     <description>DLP WARNING: Encrypted email service detected - Tutanota</description>
     <mitre>
@@ -181,7 +181,7 @@
 
   <!-- Temporary/Disposable Email Services -->
   <rule id="800325" level="10">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)guerrillamail|tempmail|10minutemail|mailinator|throwaway|fakeinbox|temp-mail|disposable</match>
     <description>DLP ALERT: Disposable email service detected - High exfiltration risk</description>
     <mitre>
@@ -196,7 +196,7 @@
 
   <!-- Telegram -->
   <rule id="800330" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)telegram\.org|t\.me|telegram-cdn</match>
     <description>DLP: Messaging app detected - Telegram</description>
     <mitre>
@@ -207,7 +207,7 @@
 
   <!-- Signal -->
   <rule id="800331" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)signal\.org|whispersystems\.org</match>
     <description>DLP: Encrypted messaging app detected - Signal</description>
     <mitre>
@@ -218,7 +218,7 @@
 
   <!-- WhatsApp Web -->
   <rule id="800332" level="5">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)web\.whatsapp\.com|whatsapp\.net</match>
     <description>DLP: Messaging app detected - WhatsApp</description>
     <mitre>
@@ -229,7 +229,7 @@
 
   <!-- Discord (File sharing capable) -->
   <rule id="800333" level="6">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)discord\.com|discordapp\.com|discord\.gg</match>
     <description>DLP: Messaging platform detected - Discord</description>
     <mitre>
@@ -240,7 +240,7 @@
 
   <!-- Slack (Could be personal workspace) -->
   <rule id="800334" level="4">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)slack\.com|slack-edge\.com</match>
     <description>DLP: Collaboration platform detected - Slack</description>
     <mitre>
@@ -255,7 +255,7 @@
 
   <!-- Personal GitHub -->
   <rule id="800340" level="5">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)github\.com|githubusercontent\.com|github\.io</match>
     <description>DLP: Code repository access detected - GitHub</description>
     <mitre>
@@ -266,7 +266,7 @@
 
   <!-- GitLab -->
   <rule id="800341" level="5">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)gitlab\.com|gitlab\.io</match>
     <description>DLP: Code repository access detected - GitLab</description>
     <mitre>
@@ -277,7 +277,7 @@
 
   <!-- Bitbucket -->
   <rule id="800342" level="5">
-    <if_sid>760001,760030,760050,760060,760061,110001</if_sid>
+    <if_sid>760001,760030,760050,760060,110001</if_sid>
     <match type="pcre2">(?i)bitbucket\.org|bitbucket\.io</match>
     <description>DLP: Code repository access detected - Bitbucket</description>
     <mitre>
