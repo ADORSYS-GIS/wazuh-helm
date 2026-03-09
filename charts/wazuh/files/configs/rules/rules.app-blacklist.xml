@@ -131,7 +131,7 @@
   <!-- Via software inventory -->
   <rule id="750020" level="10">
     <if_sid>221</if_sid>
-    <field name="data.program.name" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent</field>
+    <field name="data.program.name" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|edonkey|kazaa|ares|tixati|biglybt|webtorrent</field>
     <description>UNAUTHORIZED: P2P/Torrent client installed - $(data.program.name)</description>
     <mitre>
       <id>T1048</id>
@@ -142,7 +142,7 @@
   <!-- Via auditd execve -->
   <rule id="750021" level="10">
     <if_group>audit</if_group>
-    <field name="audit.execve.a0" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|kazaa|ares|tixati|biglybt|webtorrent|aria2</field>
+    <field name="audit.execve.a0" type="pcre2">(?i)utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|limewire|frostwire|emule|edonkey|kazaa|ares|tixati|biglybt|webtorrent|aria2</field>
     <description>ALERT: P2P/Torrent client executed - $(audit.execve.a0)</description>
     <mitre>
       <id>T1048</id>
@@ -208,6 +208,34 @@
   </rule>
 
   <!-- ================================================== -->
+  <!-- CATEGORY: SOCIAL MEDIA/MESSAGING (LOW - Level 6)   -->
+  <!-- ================================================== -->
+
+  <!-- Via software inventory -->
+  <rule id="750070" level="6">
+    <if_sid>221</if_sid>
+    <field name="data.program.name" type="pcre2">(?i)whatsapp|telegram|signal|discord|slack|skype|zoom|teams|facebook|messenger|instagram|tiktok|snapchat|twitter|linkedin|wechat|viber|line|threema</field>
+    <description>Policy Violation: Social media/messaging app installed - $(data.program.name)</description>
+    <group>unauthorized_software,social_media,policy_violation,</group>
+  </rule>
+
+  <!-- Via auditd execve -->
+  <rule id="750071" level="6">
+    <if_group>audit</if_group>
+    <field name="audit.execve.a0" type="pcre2">(?i)whatsapp|telegram|signal|discord|slack|skype|zoom|teams|facebook|messenger|instagram|tiktok|snapchat|twitter|linkedin|wechat|viber|line|threema</field>
+    <description>Policy Violation: Social media/messaging app executed - $(audit.execve.a0)</description>
+    <group>unauthorized_software,unauthorized_process,social_media,</group>
+  </rule>
+
+  <!-- Via dpkg/apt -->
+  <rule id="750072" level="6">
+    <if_sid>2902</if_sid>
+    <match type="pcre2">(?i)telegram|signal|discord|slack|zoom|teams|whatsapp</match>
+    <description>Policy Violation: Social media/messaging app installed via apt/dpkg</description>
+    <group>unauthorized_software,dpkg,social_media,</group>
+  </rule>
+
+  <!-- ================================================== -->
   <!-- WINDOWS SPECIFIC DETECTION                         -->
   <!-- ================================================== -->
 
@@ -222,7 +250,7 @@
   <!-- Windows installed program - blacklisted (consolidated) -->
   <rule id="750081" level="12">
     <if_sid>750080</if_sid>
-    <field name="win.eventdata.data" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|screenconnect|radmin|ultraviewer|utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|nmap|wireshark|metasploit|burpsuite|hashcat|hydra|mimikatz|xmrig|nicehash|minergate|phoenixminer|nordvpn|expressvpn|surfshark|protonvpn|cyberghost|tunnelbear|steam|epicgames|origin|battlenet|riotclient|uplay</field>
+    <field name="win.eventdata.data" type="pcre2">(?i)teamviewer|anydesk|ammyy|remotepc|supremo|rustdesk|parsec|splashtop|logmein|screenconnect|radmin|ultraviewer|utorrent|bittorrent|qbittorrent|deluge|transmission|vuze|edonkey|emule|nmap|wireshark|metasploit|burpsuite|hashcat|hydra|mimikatz|xmrig|nicehash|minergate|phoenixminer|nordvpn|expressvpn|surfshark|protonvpn|cyberghost|tunnelbear|steam|epicgames|origin|battlenet|riotclient|uplay|whatsapp|telegram|signal|discord|slack|skype|zoom|teams|facebook|messenger|instagram|tiktok|snapchat|twitter|linkedin|wechat|viber</field>
     <description>UNAUTHORIZED: Blacklisted Windows program installed via MSI</description>
     <group>unauthorized_software,windows,</group>
   </rule>

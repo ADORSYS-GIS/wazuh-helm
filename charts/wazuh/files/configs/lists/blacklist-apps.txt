@@ -35,6 +35,7 @@ vuze:p2p
 limewire:p2p
 frostwire:p2p
 emule:p2p
+edonkey:p2p
 kazaa:p2p
 ares:p2p
 tixati:p2p
@@ -103,6 +104,27 @@ psiphon:vpn
 ultrasurf:vpn
 torproject:vpn
 torbrowser:vpn
+
+# ===== Social Media / Messaging (if not allowed in enterprise) =====
+whatsapp:social_media
+telegram:social_media
+signal:social_media
+discord:social_media
+slack:social_media
+skype:social_media
+zoom:social_media
+teams:social_media
+facebook:social_media
+messenger:social_media
+instagram:social_media
+tiktok:social_media
+snapchat:social_media
+twitter:social_media
+linkedin:social_media
+wechat:social_media
+viber:social_media
+line:social_media
+threema:social_media
 
 # ===== Other Potentially Unwanted =====
 ccleaner:pup
