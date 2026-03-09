@@ -243,6 +243,24 @@ indexer:
         intervalMinutes: 5
         lookbackMinutes: 5
         throttleMinutes: 15
+      # DLP High Risk Exfiltration Detection
+      dlpHighRiskExfiltration:
+        enabled: false
+        intervalMinutes: 5
+        lookbackMinutes: 5
+        throttleMinutes: 15
+      # DLP USB HID/BadUSB Detection
+      dlpUsbHidBadusb:
+        enabled: false
+        intervalMinutes: 1
+        lookbackMinutes: 2
+        throttleMinutes: 5
+      # DLP USB Mass Storage Detection
+      dlpUsbMassStorage:
+        enabled: false
+        intervalMinutes: 1
+        lookbackMinutes: 2
+        throttleMinutes: 5
 
   # --- Anomaly Detection ---
   anomalyDetection:
