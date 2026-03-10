@@ -1,0 +1,82 @@
+{{- if and .Values.indexer.s3Snapshot .Values.indexer.s3Snapshot.enabled
+         .Values.indexer.s3Snapshot.register .Values.indexer.s3Snapshot.register.enabled }}
+{{- with .Values.indexer.s3Snapshot }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-indexer-s3-snapshot-register
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    ## Runs after all regular resources (StatefulSets, Services) are deployed,
+    ## giving the Indexer pod time to start. The script internally waits for
+    ## OpenSearch to become reachable before attempting the registration.
+    "helm.sh/hook": "post-install,post-upgrade"
+    "helm.sh/hook-weight": "3"
+    ## Delete the previous job before creating a new one so the registration
+    ## is re-applied on every helm upgrade (the PUT is idempotent).
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+spec:
+  ## No retries — if the registration fails, investigate the logs and
+  ## re-trigger by running helm upgrade again.
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-indexer-s3-snapshot-register
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: s3-snapshot-register-script
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-s3-snapshot-register-script
+            defaultMode: 0444
+      containers:
+        - name: s3-snapshot-register
+          image: {{ printf "%s/%s:%s" .register.image.registry .register.image.repository .register.image.tag | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /scripts/s3-snapshot-register.sh
+          env:
+            - name: OPENSEARCH_URL
+              value: "https://{{ include "common.names.fullname" $ }}-indexer-api:9200"
+            - name: SNAPSHOT_REPOSITORY
+              value: {{ .repository | default "s3-repo" | quote }}
+            - name: S3_BUCKET
+              value: {{ .s3Settings.bucket | quote }}
+            - name: S3_REGION
+              value: {{ .s3Settings.region | default "eu-central-1" | quote }}
+            - name: S3_BASE_PATH
+              value: {{ .s3Settings.basePath | default "snapshots" | quote }}
+            - name: S3_ENDPOINT
+              value: {{ .s3Settings.endpoint | default "" | quote }}
+            - name: WAIT_TIMEOUT
+              value: {{ .register.waitTimeout | default 300 | quote }}
+            - name: OPENSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_USERNAME
+            - name: OPENSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "secret.indexer-auth" $ }}
+                  key: INDEXER_PASSWORD
+          volumeMounts:
+            - name: s3-snapshot-register-script
+              mountPath: /scripts/s3-snapshot-register.sh
+              subPath: s3-snapshot-register.sh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+{{- end }}
+{{- end }}

@@ -1,0 +1,37 @@
+## k3s ships with rancher.io/local-path as its default StorageClass.
+## Disable the chart's built-in StorageClass to avoid the immutable provisioner error.
+storageClasses:
+  '{{ include "wazuh.storageClassName" $ }}':
+    enabled: false
+
+indexer:
+  image:
+    registry: ghcr.io
+    repository: adorsys-gis/wazuh-indexer-s3
+    tag: release-candidate-indexer-snapshots-c3dbb18
+  s3Snapshot:
+    enabled: true
+    credentialsSecret: aws-s3-credentials
+    repository: "s3-repo"
+    s3Settings:
+      bucket: "wazuh-dev-backup"
+      region: "eu-central-1"
+      basePath: "snapshots"
+    register:
+      enabled: true
+    cronjob:
+      enabled: true
+    cleanup:
+      enabled: true
+
+cluster:
+  rootCaSecretName: "wazuh-root-ca"
+
+master:
+  backup:
+    enabled: true
+    image:
+      registry: ghcr.io
+      repository: adorsys-gis/wazuh-manager-backup
+      tag: "local"
+

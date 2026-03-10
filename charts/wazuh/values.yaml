@@ -127,6 +127,140 @@ indexer:
   resources: ~
   affinity: ~
 
+  ## S3 snapshot repository configuration
+  ## Requires a custom indexer image with the repository-s3 plugin installed.
+  ## See utils/packages/wazuh-indexer-s3/Dockerfile for building the image.
+  ##
+  s3Snapshot:
+    ## Enable S3 snapshot repository support
+    ##
+    enabled: true
+    ## Name of an existing Kubernetes Secret containing AWS credentials.
+    ## The secret must have keys: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+    ##
+    credentialsSecret: "aws-s3-credentials"
+    ## Name of the S3 snapshot repository registered in OpenSearch.
+    ##
+    repository: "s3-repo"
+    ## S3 bucket settings used when registering the snapshot repository.
+    ## Required when register.enabled is true.
+    ##
+    s3Settings:
+      ## S3 bucket name (required)
+      ##
+      bucket: ""
+      ## AWS region of the bucket
+      ##
+      region: "eu-central-1"
+      ## Path prefix inside the bucket where snapshots are stored
+      ##
+      basePath: "snapshots"
+      ## Custom S3-compatible endpoint URL (optional — leave empty for AWS S3).
+      ## Example: "https://minio.example.com"
+      ##
+      endpoint: ""
+    ## One-shot Job that registers (or updates) the S3 snapshot repository in OpenSearch.
+    ## Runs as a post-install/post-upgrade hook before the restore Job.
+    ## The PUT /_snapshot/{repo} call is idempotent — safe to run on every deploy.
+    ##
+    ## Usage: enabled by default when s3Snapshot.enabled is true.
+    ## Disable only if you manage repository registration manually.
+    ##
+    register:
+      ## Enable the repository registration Job
+      ##
+      enabled: true
+      ## Max seconds to wait for OpenSearch to become reachable after deployment.
+      ##
+      waitTimeout: 300
+      ## Same lightweight curl image as the other snapshot jobs.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
+    ## CronJob for automated daily snapshots.
+    ##
+    cronjob:
+      ## Enable the scheduled snapshot CronJob
+      ##
+      enabled: false
+      ## Cron schedule in UTC. Default: 2am daily.
+      ##
+      schedule: "0 2 * * *"
+      ## Number of successfully completed jobs to retain
+      ##
+      successfulJobsHistoryLimit: 3
+      ## Number of failed jobs to retain for debugging
+      ##
+      failedJobsHistoryLimit: 1
+      ## Lightweight curl image (Alpine-based) used to call the OpenSearch API.
+      ## Only curl and sh are required.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
+    ## CronJob to delete snapshots older than retentionDays.
+    ## Runs 1 hour after the snapshot job (3am by default) to ensure the
+    ## daily snapshot has completed before cleanup begins.
+    ##
+    cleanup:
+      ## Enable the scheduled cleanup CronJob
+      ##
+      enabled: false
+      ## Cron schedule in UTC. Default: 3am daily.
+      ##
+      schedule: "0 3 * * *"
+      ## Snapshots older than this many days will be deleted.
+      ## Only snapshots whose names contain an 8-digit date (YYYYMMDD) are eligible.
+      ##
+      retentionDays: 30
+      ## Number of successfully completed jobs to retain
+      ##
+      successfulJobsHistoryLimit: 3
+      ## Number of failed jobs to retain for debugging
+      ##
+      failedJobsHistoryLimit: 1
+      ## Same lightweight curl image as the snapshot job.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
+    ## One-shot restore Job triggered via a Helm post-install/post-upgrade hook.
+    ## Enable at deploy time when you need to recover from a named snapshot.
+    ## The job waits for OpenSearch to become reachable before proceeding,
+    ## so it is safe to deploy alongside the Indexer StatefulSet.
+    ##
+    ## Usage:
+    ##   helm upgrade -i wazuh ./ -n wazuh \
+    ##     --values values-s3-local.yaml \
+    ##     --set indexer.s3Snapshot.restore.enabled=true \
+    ##     --set indexer.s3Snapshot.restore.snapshotName=snapshot-20260301
+    ##
+    restore:
+      ## Enable the one-shot restore Job
+      ##
+      enabled: false
+      ## Name of the snapshot to restore. Required when enabled.
+      ##
+      snapshotName: ""
+      ## Close all open indices before restoring.
+      ## Required when restoring to a cluster that already has data.
+      ## Safe to leave true for a fresh cluster (no-op if no indices exist).
+      ##
+      closeIndices: true
+      ## Max seconds to wait for OpenSearch to become reachable after deployment.
+      ##
+      waitTimeout: 300
+      ## Same lightweight curl image as the other snapshot jobs.
+      ##
+      image:
+        registry: docker.io
+        repository: curlimages/curl
+        tag: "8.11.1"
+
   # --- Index Lifecycle Management ---
   lifecycle:
     enabled: true
@@ -439,19 +573,137 @@ worker_integration:
     repository: wazuh/wazuh-manager
     tag: '{{ .Values.global.version }}'
     pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
 
-  # Backup volume configuration - when enabled, mounts PVC for /var/ossec/backup
+  ##
+  ##
+  ingress:
+    ##
+    ##
+    enabled: false
+    ##
+    ##
+    name: "wazuh-master"
+    ##
+    ##
+    className: ""
+    ##
+    ##
+    annotations: { }
+    ##
+    ##
+    host: "{{ .Values.global.domain }}"
+    ##
+    ##
+    tls: true
+
+    additionalLabels: { }
+
+  ##
+  ##
+  podManagementPolicy: Parallel
+
+  ##
+  ##
+  updateStrategy:
+    type: RollingUpdate
+
+  ## Scheduled backup of manager configuration files to S3.
+  ## Tars /var/ossec/etc/{ossec.conf,client.keys,rules/,decoders/,lists/,shared/}
+  ## from the manager-master-0 pod and streams directly to S3 via kubectl exec.
+  ##
+  ## AWS credentials are reused from indexer.s3Snapshot.credentialsSecret.
+  ## The S3 bucket and region are taken from indexer.s3Snapshot.s3Settings.
+  ##
   backup:
-    enabled: true
+    ## Enable the daily manager configuration backup CronJob.
+    ##
+    enabled: false
+    ## Cron schedule in UTC. Default: 1am daily (before the indexer snapshot at 2am).
+    ##
+    schedule: "0 1 * * *"
+    ## Number of days to retain backup objects in S3.
+    ## Objects whose filenames contain a date older than this are deleted.
+    ##
+    retentionDays: 30
+    ## S3 key prefix for manager backup objects.
+    ## Backups land at s3://{bucket}/{s3BasePath}/manager-config-YYYYMMDD-HHMMSS.tar.gz
+    ##
+    s3BasePath: "manager-backups"
+    ## Number of successfully completed CronJob runs to retain in Kubernetes.
+    ##
+    successfulJobsHistoryLimit: 3
+    ## Number of failed CronJob runs to retain for debugging.
+    ##
+    failedJobsHistoryLimit: 1
+    ## Custom image with aws-cli + kubectl pre-installed.
+    ## Built from utils/packages/wazuh-manager-backup/Dockerfile and pushed to GHCR.
+    ##
+    image:
+      registry: ghcr.io
+      repository: adorsys-gis/wazuh-manager-backup
+      tag: "latest"
+    ## On-demand restore of a manager configuration backup from S3.
+    ## Runs as a Helm post-install/post-upgrade hook — only when restore.enabled=true.
+    ## After the restore completes, redeploy without these flags to prevent re-running.
+    ##
+    ## Example:
+    ##   helm upgrade wazuh charts/wazuh -n wazuh -f values.yaml \
+    ##     --set master.backup.restore.enabled=true \
+    ##     --set master.backup.restore.backupFile=manager-config-20260309-231725.tar.gz
+    ##
+    restore:
+      ## Set to true to trigger a restore on the next helm install/upgrade.
+      ## IMPORTANT: set back to false after the restore completes.
+      ##
+      enabled: false
+      ## Name of the backup file to restore (required when enabled=true).
+      ## Find available backups with:
+      ##   aws s3 ls s3://<bucket>/manager-backups/
+      ##
+      backupFile: ""
 
-  initContainers: {}
-  env: []
-  envFrom: []
+  ##
+  initContainers: { }
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+    - name: snort-alerts
+      persistentVolumeClaim:
+        claimName: snort-alerts
+    - name: owasp-zap-alerts
+      persistentVolumeClaim:
+        claimName: owasp-zap-alerts
 
-  # Additional volumes (manager-backup is added automatically when backup.enabled=true)
-  volumes: []
+  volumeMounts:
+    - name: snort-alerts
+      mountPath: /var/log/snort/
+    - name: owasp-zap-alerts
+      mountPath: /var/log/owasp-zap/
 
-  volumeMounts: []
+  resources: ~
 
   persistence:
     size: 50Gi

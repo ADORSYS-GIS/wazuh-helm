@@ -1,0 +1,15 @@
+{{- if and .Values.indexer.s3Snapshot .Values.indexer.s3Snapshot.enabled
+         .Values.indexer.s3Snapshot.cleanup .Values.indexer.s3Snapshot.cleanup.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-s3-snapshot-cleanup-script
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+data:
+  "s3-snapshot-cleanup.sh": |
+    {{ $.Files.Get "files/scripts/s3-snapshot-cleanup.sh" | nindent 4 }}
+{{- end }}

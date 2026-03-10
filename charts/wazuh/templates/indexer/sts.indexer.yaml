@@ -65,6 +65,7 @@ spec:
             name: '{{ include "common.names.fullname" $ }}-indexer-conf'
             defaultMode: 0600
             
+<<<<<<< HEAD
         {{ with .keycloak }}
         {{- if .enabled -}}
         - name: wazuh-keycloak-config
@@ -78,6 +79,13 @@ spec:
           secret:
             secretName: {{ if $.Values.notification.email.existingSecret }}{{ $.Values.notification.email.existingSecret }}{{ else }}{{ include "common.names.fullname" $ }}-email-cred{{ end }}
         {{- end }}
+=======
+        {{- if and .s3Snapshot .s3Snapshot.enabled }}
+        - name: indexer-keystore
+          emptyDir: {}
+        {{- end }}
+
+>>>>>>> 5056788 (feat: add custom image to build indexer with s3 repo plugin)
         {{ with .volumes -}}
         {{ include "common.tplvalues.render" (dict "value" . "context" $) | nindent 8}}
         {{- end }}
@@ -172,6 +180,39 @@ spec:
       {{ end }}
       {{ end }}
       {{ end }}
+      {{- if and .s3Snapshot .s3Snapshot.enabled }}
+        - name: setup-s3-keystore
+          {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
+          image: {{ include "common.tplvalues.render" (dict "value" $imageTpl "context" $) | quote }}
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              /usr/share/wazuh-indexer/bin/opensearch-keystore create
+              echo "$AWS_ACCESS_KEY_ID" | /usr/share/wazuh-indexer/bin/opensearch-keystore add --stdin s3.client.default.access_key
+              echo "$AWS_SECRET_ACCESS_KEY" | /usr/share/wazuh-indexer/bin/opensearch-keystore add --stdin s3.client.default.secret_key
+              cp /usr/share/wazuh-indexer/config/opensearch.keystore /keystore/opensearch.keystore
+          env:
+            - name: OPENSEARCH_PATH_CONF
+              value: /usr/share/wazuh-indexer/config
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .s3Snapshot.credentialsSecret }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .s3Snapshot.credentialsSecret }}
+                  key: AWS_SECRET_ACCESS_KEY
+          volumeMounts:
+            - name: indexer-keystore
+              mountPath: /keystore
+      {{- end }}
       containers:
         - name: wazuh-indexer
           {{ $imageTpl := include "common.images.image" (dict "imageRoot" .image "global" $.Values.global) }}
@@ -249,7 +290,13 @@ spec:
               mountPath: /usr/share/wazuh-indexer/config/opensearch-security/internal_users.yml
               subPath: internal_users.yml
               readOnly: true
-              
+          {{- if and .s3Snapshot .s3Snapshot.enabled }}
+            - name: indexer-keystore
+              mountPath: /usr/share/wazuh-indexer/config/opensearch.keystore
+              subPath: opensearch.keystore
+              readOnly: true
+          {{- end }}
+
           {{ with .volumeMounts }}
           {{ range $k, $v := . }}
           {{ if $v }}

@@ -1,0 +1,93 @@
+{{- if and .Values.master .Values.master.backup .Values.master.backup.enabled }}
+{{- with .Values.master.backup }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.names.fullname" $ }}-manager-backup
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+spec:
+  schedule: {{ .schedule | default "0 1 * * *" | quote }}
+  ## Prevent overlapping runs — if a backup is still in progress when the next
+  ## schedule fires (e.g. slow S3 upload), skip rather than run a second copy.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .failedJobsHistoryLimit | default 1 }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 12 }}
+            app: {{ include "common.names.fullname" $ }}-manager-backup
+        spec:
+          serviceAccountName: {{ include "common.names.fullname" $ }}-manager-backup
+          restartPolicy: OnFailure
+          volumes:
+            - name: manager-backup-script
+              configMap:
+                name: {{ include "common.names.fullname" $ }}-manager-backup-script
+                defaultMode: 0444
+          containers:
+            - name: backup
+              image: {{ printf "%s/%s:%s" .image.registry .image.repository .image.tag | quote }}
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - /scripts/manager-backup.sh
+              env:
+                ## Namespace is injected via the Downward API so the script can
+                ## pass it to kubectl without hardcoding it.
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                ## StatefulSet pod names are deterministic: <release>-manager-master-0
+                - name: MANAGER_POD
+                  value: "{{ include "common.names.fullname" $ }}-manager-master-0"
+                - name: S3_BUCKET
+                  value: {{ $.Values.indexer.s3Snapshot.s3Settings.bucket | quote }}
+                - name: S3_REGION
+                  value: {{ $.Values.indexer.s3Snapshot.s3Settings.region | default "eu-central-1" | quote }}
+                - name: S3_BASE_PATH
+                  value: {{ .s3BasePath | default "manager-backups" | quote }}
+                - name: RETENTION_DAYS
+                  value: {{ .retentionDays | default 30 | quote }}
+                - name: HELM_RELEASE
+                  value: {{ $.Release.Name | quote }}
+                ## Helm fullname (release + chart name) used as prefix for chart-generated secrets.
+                - name: HELM_FULLNAME
+                  value: {{ include "common.names.fullname" $ | quote }}
+                {{- if .criticalSecrets }}
+                ## Override the default list of individually-backed-up secret names.
+                - name: CRITICAL_SECRETS
+                  value: {{ .criticalSecrets | quote }}
+                {{- end }}
+                ## AWS credentials reuse the same secret as the indexer S3 snapshots.
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.indexer.s3Snapshot.credentialsSecret }}
+                      key: AWS_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.indexer.s3Snapshot.credentialsSecret }}
+                      key: AWS_SECRET_ACCESS_KEY
+              volumeMounts:
+                - name: manager-backup-script
+                  mountPath: /scripts/manager-backup.sh
+                  subPath: manager-backup.sh
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+{{- end }}
+{{- end }}
