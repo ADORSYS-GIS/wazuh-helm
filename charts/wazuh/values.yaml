@@ -573,19 +573,137 @@ worker_integration:
     repository: wazuh/wazuh-manager
     tag: '{{ .Values.global.version }}'
     pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## e.g:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: [ ]
+  ##
+  ##
+  additionalAnnotations: { }
+  ##
+  ##
+  additionalLabels: { }
 
-  # Backup volume configuration - when enabled, mounts PVC for /var/ossec/backup
+  ##
+  ##
+  ingress:
+    ##
+    ##
+    enabled: false
+    ##
+    ##
+    name: "wazuh-master"
+    ##
+    ##
+    className: ""
+    ##
+    ##
+    annotations: { }
+    ##
+    ##
+    host: "{{ .Values.global.domain }}"
+    ##
+    ##
+    tls: true
+
+    additionalLabels: { }
+
+  ##
+  ##
+  podManagementPolicy: Parallel
+
+  ##
+  ##
+  updateStrategy:
+    type: RollingUpdate
+
+  ## Scheduled backup of manager configuration files to S3.
+  ## Tars /var/ossec/etc/{ossec.conf,client.keys,rules/,decoders/,lists/,shared/}
+  ## from the manager-master-0 pod and streams directly to S3 via kubectl exec.
+  ##
+  ## AWS credentials are reused from indexer.s3Snapshot.credentialsSecret.
+  ## The S3 bucket and region are taken from indexer.s3Snapshot.s3Settings.
+  ##
   backup:
-    enabled: true
+    ## Enable the daily manager configuration backup CronJob.
+    ##
+    enabled: false
+    ## Cron schedule in UTC. Default: 1am daily (before the indexer snapshot at 2am).
+    ##
+    schedule: "0 1 * * *"
+    ## Number of days to retain backup objects in S3.
+    ## Objects whose filenames contain a date older than this are deleted.
+    ##
+    retentionDays: 30
+    ## S3 key prefix for manager backup objects.
+    ## Backups land at s3://{bucket}/{s3BasePath}/manager-config-YYYYMMDD-HHMMSS.tar.gz
+    ##
+    s3BasePath: "manager-backups"
+    ## Number of successfully completed CronJob runs to retain in Kubernetes.
+    ##
+    successfulJobsHistoryLimit: 3
+    ## Number of failed CronJob runs to retain for debugging.
+    ##
+    failedJobsHistoryLimit: 1
+    ## Custom image with aws-cli + kubectl pre-installed.
+    ## Built from utils/packages/wazuh-manager-backup/Dockerfile and pushed to GHCR.
+    ##
+    image:
+      registry: ghcr.io
+      repository: adorsys-gis/wazuh-manager-backup
+      tag: "latest"
+    ## On-demand restore of a manager configuration backup from S3.
+    ## Runs as a Helm post-install/post-upgrade hook — only when restore.enabled=true.
+    ## After the restore completes, redeploy without these flags to prevent re-running.
+    ##
+    ## Example:
+    ##   helm upgrade wazuh charts/wazuh -n wazuh -f values.yaml \
+    ##     --set master.backup.restore.enabled=true \
+    ##     --set master.backup.restore.backupFile=manager-config-20260309-231725.tar.gz
+    ##
+    restore:
+      ## Set to true to trigger a restore on the next helm install/upgrade.
+      ## IMPORTANT: set back to false after the restore completes.
+      ##
+      enabled: false
+      ## Name of the backup file to restore (required when enabled=true).
+      ## Find available backups with:
+      ##   aws s3 ls s3://<bucket>/manager-backups/
+      ##
+      backupFile: ""
 
-  initContainers: {}
-  env: []
-  envFrom: []
+  ##
+  initContainers: { }
+  ##
+  ##
+  env: [ ]
+  ##
+  ##
+  envFrom: [ ]
+  ##
+  ##
+  volumes:
+    - name: manager-backup
+      persistentVolumeClaim:
+        claimName: '{{ include "common.names.fullname" $ }}-manager-backup'
+    - name: snort-alerts
+      persistentVolumeClaim:
+        claimName: snort-alerts
+    - name: owasp-zap-alerts
+      persistentVolumeClaim:
+        claimName: owasp-zap-alerts
 
-  # Additional volumes (manager-backup is added automatically when backup.enabled=true)
-  volumes: []
+  volumeMounts:
+    - name: snort-alerts
+      mountPath: /var/log/snort/
+    - name: owasp-zap-alerts
+      mountPath: /var/log/owasp-zap/
 
-  volumeMounts: []
+  resources: ~
 
   persistence:
     size: 50Gi

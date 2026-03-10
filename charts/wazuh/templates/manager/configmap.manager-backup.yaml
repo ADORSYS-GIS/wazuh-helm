@@ -1,0 +1,14 @@
+{{- if and .Values.master .Values.master.backup .Values.master.backup.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-manager-backup-script
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+data:
+  "manager-backup.sh": |
+    {{ $.Files.Get "files/scripts/manager-backup.sh" | nindent 4 }}
+{{- end }}

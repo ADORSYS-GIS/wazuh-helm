@@ -1,0 +1,88 @@
+{{- if and .Values.master .Values.master.backup .Values.master.backup.enabled
+         .Values.master.backup.restore .Values.master.backup.restore.enabled }}
+{{- with .Values.master.backup }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.names.fullname" $ }}-manager-restore
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    ## Runs after all regular resources (StatefulSets, Services) are deployed,
+    ## giving the manager pod time to start before the restore begins.
+    "helm.sh/hook": "post-install,post-upgrade"
+    "helm.sh/hook-weight": "10"
+    ## Delete the previous job before creating a new one so the operator can
+    ## re-trigger a restore by running helm upgrade with the same values.
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+spec:
+  ## No retries — if the restore fails, the operator should inspect the logs
+  ## and re-trigger by running helm upgrade with the same restore values.
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 8 }}
+        app: {{ include "common.names.fullname" $ }}-manager-restore
+    spec:
+      restartPolicy: Never
+      ## Reuses the backup ServiceAccount — it already has pods/exec, pods get/list,
+      ## and secrets get/list in this namespace.
+      serviceAccountName: {{ include "common.names.fullname" $ }}-manager-backup
+      volumes:
+        - name: manager-restore-script
+          configMap:
+            name: {{ include "common.names.fullname" $ }}-manager-restore-script
+            defaultMode: 0444
+      containers:
+        - name: restore
+          image: {{ printf "%s/%s:%s" .image.registry .image.repository .image.tag | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /scripts/manager-restore.sh
+          env:
+            ## Namespace is injected via the Downward API so the script can
+            ## pass it to kubectl without hardcoding it.
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            ## StatefulSet pod names are deterministic: <release>-manager-master-0
+            - name: MANAGER_POD
+              value: "{{ include "common.names.fullname" $ }}-manager-master-0"
+            - name: S3_BUCKET
+              value: {{ $.Values.indexer.s3Snapshot.s3Settings.bucket | quote }}
+            - name: S3_REGION
+              value: {{ $.Values.indexer.s3Snapshot.s3Settings.region | default "eu-central-1" | quote }}
+            - name: S3_BASE_PATH
+              value: {{ .s3BasePath | default "manager-backups" | quote }}
+            - name: BACKUP_FILE
+              value: {{ .restore.backupFile | quote }}
+            ## AWS credentials reuse the same secret as the indexer S3 snapshots.
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.indexer.s3Snapshot.credentialsSecret }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.indexer.s3Snapshot.credentialsSecret }}
+                  key: AWS_SECRET_ACCESS_KEY
+          volumeMounts:
+            - name: manager-restore-script
+              mountPath: /scripts/manager-restore.sh
+              subPath: manager-restore.sh
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+{{- end }}
+{{- end }}

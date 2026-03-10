@@ -1,0 +1,24 @@
+{{- if and .Values.master .Values.master.backup .Values.master.backup.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "common.names.fullname" $ }}-manager-backup-role
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" (dict) "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" (dict) "context" $ ) | nindent 4 }}
+rules:
+  ## Needed to verify the manager pod is Running before attempting exec.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  ## Needed to run kubectl exec into the manager pod to stream the tar archive.
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  ## Needed to export namespace secrets for the secrets backup step.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+{{- end }}
