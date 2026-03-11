@@ -1,0 +1,2940 @@
+{{- if and .Values.indexer .Values.indexer.alerting .Values.indexer.alerting.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" $ }}-alerting-monitors
+  namespace: {{ include "common.names.namespace" $ }}
+  annotations:
+    {{- include "common.annotations.standard" ( dict "customAnnotations" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" $.Values.commonLabels "context" $ ) | nindent 4 }}
+data:
+  setup-alerting-monitors.sh: |
+    #!/bin/sh
+    # OpenSearch Alerting Monitors Setup Script
+    # Creates monitors for detecting unauthorized applications
+
+    # Don't exit on error - we handle errors manually
+    # set -e
+
+    INDEXER_URL="${INDEXER_URL:-https://wazuh-wazuh-helm-indexer:9200}"
+    INDEXER_USER="${INDEXER_USERNAME:-admin}"
+    INDEXER_PASS="${INDEXER_PASSWORD}"
+
+    {{- if .Values.notification.slack.enabled }}
+    SLACK_WEBHOOK="{{ .Values.notification.slack.webhookUrl }}"
+    {{- end }}
+    {{- if and .Values.notification.email .Values.notification.email.enabled }}
+    EMAIL_HOST="{{ .Values.notification.email.host }}"
+    EMAIL_PORT="{{ .Values.notification.email.port }}"
+    EMAIL_METHOD="{{ .Values.notification.email.method | default "starttls" }}"
+    EMAIL_FROM="{{ .Values.notification.email.from }}"
+    EMAIL_USERNAME="{{ .Values.notification.email.username }}"
+    EMAIL_PASSWORD="{{ .Values.notification.email.password }}"
+    EMAIL_RECIPIENTS="{{ .Values.notification.email.recipients | join "," }}"
+    {{- end }}
+
+    echo "========================================"
+    echo "OpenSearch Alerting Monitors Setup"
+    echo "========================================"
+
+    # Wait for indexer to be ready
+    echo "Waiting for indexer to be ready..."
+    max_attempts=60
+    attempt=0
+    until curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" "${INDEXER_URL}/_cluster/health" 2>/dev/null | grep -q '"status":"green"\|"status":"yellow"'; do
+      attempt=$((attempt + 1))
+      if [ $attempt -ge $max_attempts ]; then
+        echo "ERROR: Indexer not ready after ${max_attempts} attempts"
+        exit 1
+      fi
+      echo "Indexer not ready (attempt ${attempt}/${max_attempts}), waiting..."
+      sleep 5
+    done
+    echo "Indexer is ready!"
+
+    # Function to create or update a destination (notification channel)
+    create_destination() {
+      dest_name=$1
+      dest_type=$2
+      webhook_url=$3
+
+      echo "Creating notification destination: ${dest_name}"
+
+      # Check if destination exists (404 is expected on fresh install)
+      existing=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_alerting/destinations" 2>/dev/null || echo "{}")
+
+      if echo "$existing" | grep -q "\"name\":\"${dest_name}\""; then
+        echo "  Destination ${dest_name} already exists, skipping..."
+        return 0
+      fi
+
+      curl -s -k -X POST "${INDEXER_URL}/_plugins/_alerting/destinations" \
+        -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -H 'Content-Type: application/json' \
+        -d '{
+          "name": "'"${dest_name}"'",
+          "type": "slack",
+          "slack": {
+            "url": "'"${webhook_url}"'"
+          }
+        }'
+      echo ""
+    }
+
+    # Function to get destination ID by name
+    get_destination_id() {
+      dest_name=$1
+      result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_alerting/destinations" 2>/dev/null || echo "{}")
+      echo "$result" | \
+        grep -o '"id":"[^"]*","type":"[^"]*","name":"'"${dest_name}"'"' | \
+        grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true
+    }
+
+    # Function to create or update a monitor
+    create_monitor() {
+      monitor_name=$1
+      monitor_json=$2
+
+      echo "Creating/updating monitor: ${monitor_name}"
+
+      # Search for existing monitor with exact name match (404 is expected on fresh install)
+      search_result=$(curl -s -k -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        "${INDEXER_URL}/_plugins/_alerting/monitors/_search" \
+        -H 'Content-Type: application/json' \
+        -d '{"query":{"term":{"monitor.name.keyword":"'"${monitor_name}"'"}}}' 2>/dev/null || echo "{}")
+
+      # Check if we found a matching monitor
+      hits_total=$(echo "$search_result" | grep -o '"total":{"value":[0-9]*' | head -1 | grep -o '[0-9]*$')
+
+      if [ "$hits_total" != "" ] && [ "$hits_total" -gt 0 ]; then
+        # Extract monitor ID from the hits
+        monitor_id=$(echo "$search_result" | grep -o '"hits":\[{"_index":"[^"]*","_id":"[^"]*"' | grep -o '"_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [ -n "$monitor_id" ] && [ "$monitor_id" != "" ]; then
+          echo "  Monitor exists with ID: ${monitor_id}, updating..."
+          curl -s -k -X PUT "${INDEXER_URL}/_plugins/_alerting/monitors/${monitor_id}" \
+            -u "${INDEXER_USER}:${INDEXER_PASS}" \
+            -H 'Content-Type: application/json' \
+            -d "${monitor_json}"
+          echo ""
+          return 0
+        fi
+      fi
+
+      # Create new monitor
+      echo "  Creating new monitor..."
+      curl -s -k -X POST "${INDEXER_URL}/_plugins/_alerting/monitors" \
+        -u "${INDEXER_USER}:${INDEXER_PASS}" \
+        -H 'Content-Type: application/json' \
+        -d "${monitor_json}"
+      echo ""
+    }
+
+    {{- if .Values.notification.slack.enabled }}
+    # Create Slack notification channel using OpenSearch Notifications plugin
+    echo "Creating Slack notification channel..."
+
+    # Delete existing Slack channel to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-slack-channel" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    SLACK_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-slack-channel",
+        "config": {
+          "name": "wazuh-slack-alerts",
+          "description": "Wazuh Slack Alerts Channel",
+          "config_type": "slack",
+          "is_enabled": true,
+          "slack": {
+            "url": "'"${SLACK_WEBHOOK}"'"
+          }
+        }
+      }' 2>/dev/null)
+    echo "Slack Response: $SLACK_RESPONSE"
+
+    SLACK_DEST_ID="wazuh-slack-channel"
+    echo "Slack destination ID: ${SLACK_DEST_ID}"
+    {{- end }}
+
+    {{- if and .Values.notification.email .Values.notification.email.enabled }}
+    # Create Email notification channel using OpenSearch Notifications plugin
+    echo "Configuring email notification channels..."
+
+    # Delete existing SMTP config to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-smtp-account" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating SMTP account..."
+    # Note: method must be "start_tls" (not "starttls"), "ssl", or "none"
+    SMTP_METHOD_FIXED=$(echo "${EMAIL_METHOD}" | sed 's/starttls/start_tls/')
+    SMTP_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-smtp-account",
+        "config": {
+          "name": "wazuh-smtp-account",
+          "description": "Wazuh SMTP Account for alerts",
+          "config_type": "smtp_account",
+          "is_enabled": true,
+          "smtp_account": {
+            "host": "'"${EMAIL_HOST}"'",
+            "port": '"${EMAIL_PORT}"',
+            "method": "'"${SMTP_METHOD_FIXED}"'",
+            "from_address": "'"${EMAIL_FROM}"'"
+          }
+        }
+      }' 2>/dev/null)
+    echo "SMTP Response: $SMTP_RESPONSE"
+
+    # Delete existing email group to update it with current recipients
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-email-group" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating email group..."
+    GROUP_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-email-group",
+        "config": {
+          "name": "wazuh-security-team",
+          "description": "Wazuh Security Team Recipients",
+          "config_type": "email_group",
+          "is_enabled": true,
+          "email_group": {
+            "recipient_list": [
+              {{- $recipients := .Values.notification.email.recipients }}
+              {{- range $i, $email := $recipients }}
+              {{- if $i }},{{ end }}
+              {"recipient": "{{ $email }}"}
+              {{- end }}
+            ]
+          }
+        }
+      }' 2>/dev/null)
+    echo "Email Group Response: $GROUP_RESPONSE"
+
+    # Delete existing email channel to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-email-channel" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating email notification channel..."
+    # Note: Only use email_group_id_list to avoid duplicate emails (not recipient_list + group)
+    CHANNEL_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-email-channel",
+        "config": {
+          "name": "wazuh-email-alerts",
+          "description": "Wazuh Email Alerts Channel",
+          "config_type": "email",
+          "is_enabled": true,
+          "email": {
+            "email_account_id": "wazuh-smtp-account",
+            "email_group_id_list": ["wazuh-email-group"]
+          }
+        }
+      }' 2>/dev/null)
+    echo "Email Channel Response: $CHANNEL_RESPONSE"
+
+    EMAIL_DEST_ID="wazuh-email-channel"
+    echo "Email destination ID: ${EMAIL_DEST_ID}"
+    {{- end }}
+
+    {{- if and .Values.notification.github .Values.notification.github.enabled }}
+    # Create GitHub webhook notification channel for creating issues
+    echo "Creating GitHub webhook notification channel..."
+
+    GITHUB_OWNER="{{ .Values.notification.github.owner }}"
+    GITHUB_REPO="{{ .Values.notification.github.repo }}"
+    GITHUB_TOKEN="{{ .Values.notification.github.token }}"
+    GITHUB_LABELS='{{ .Values.notification.github.labels | toJson }}'
+
+    # Delete existing GitHub webhook config to update it
+    curl -s -k -X DELETE "${INDEXER_URL}/_plugins/_notifications/configs/wazuh-github-webhook" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" 2>/dev/null || true
+
+    echo "Creating GitHub webhook..."
+    GITHUB_RESPONSE=$(curl -s -k -X POST "${INDEXER_URL}/_plugins/_notifications/configs" \
+      -u "${INDEXER_USER}:${INDEXER_PASS}" \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "config_id": "wazuh-github-webhook",
+        "config": {
+          "name": "wazuh-github-issues",
+          "description": "Wazuh GitHub Issues Webhook",
+          "config_type": "webhook",
+          "is_enabled": true,
+          "webhook": {
+            "url": "https://api.github.com/repos/'"${GITHUB_OWNER}"'/'"${GITHUB_REPO}"'/issues",
+            "header_params": {
+              "Authorization": "Bearer '"${GITHUB_TOKEN}"'",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28"
+            },
+            "method": "POST"
+          }
+        }
+      }' 2>/dev/null)
+    echo "GitHub Webhook Response: $GITHUB_RESPONSE"
+
+    GITHUB_DEST_ID="wazuh-github-webhook"
+    echo "GitHub destination ID: ${GITHUB_DEST_ID}"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 1: Unauthorized Application Installations
+    # Detects blacklisted software installations (Rules 750010-750091)
+    # ================================================================
+
+    UNAUTHORIZED_APP_MONITOR='{
+      "name": "Unauthorized Application Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.unauthorizedApps.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.unauthorizedApps.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "unauthorized_software"}},
+                          {"match": {"rule.groups": "remote_access"}},
+                          {"match": {"rule.groups": "hacking_tool"}},
+                          {"match": {"rule.groups": "cryptominer"}},
+                          {"match": {"rule.groups": "p2p"}},
+                          {"range": {"rule.id": {"gte": 750010, "lte": 750099}}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 10
+                  }
+                },
+                "by_rule": {
+                  "terms": {
+                    "field": "rule.description",
+                    "size": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Unauthorized App Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Unauthorized App",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.unauthorizedApps.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":rotating_light: *SECURITY ALERT: Unauthorized Application Detected*\n\n*Total Detections:* {{`{{ctx.results[0].hits.total.value}}`}}\n*Time:* {{`{{ctx.periodEnd}}`}}\n\n*Event Details:*\n{{`{{#ctx.results[0].hits.hits}}`}}\n:warning: Agent: {{`{{_source.agent.name}}`}} | Rule: {{`{{_source.rule.description}}`}} | Level: {{`{{_source.rule.level}}`}}\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n*Affected Agents:*\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}- {{`{{key}}`}}: {{`{{doc_count}}`}} alerts\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\n\n:mag: Check Wazuh Dashboard for details.",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Unauthorized App",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.unauthorizedApps.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH ALERT] Unauthorized Application Detected - {{`{{ctx.results[0].hits.total.value}}`}} events",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "==================================================\nSECURITY ALERT: Unauthorized Application Detected\n==================================================\n\nTotal Detections: {{`{{ctx.results[0].hits.total.value}}`}}\nAlert Time: {{`{{ctx.periodEnd}}`}}\n\n--------------------------------------------------\nEVENT DETAILS\n--------------------------------------------------\n{{`{{#ctx.results[0].hits.hits}}`}}\n* Agent: {{`{{_source.agent.name}}`}} (ID: {{`{{_source.agent.id}}`}})\n  Rule: {{`{{_source.rule.description}}`}}\n  Level: {{`{{_source.rule.level}}`}}\n  Time: {{`{{_source.@timestamp}}`}}\n\n{{`{{/ctx.results[0].hits.hits}}`}}\n--------------------------------------------------\nAFFECTED AGENTS SUMMARY\n--------------------------------------------------\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\n* {{`{{key}}`}}: {{`{{doc_count}}`}} alert(s)\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\n\n--------------------------------------------------\nACTION REQUIRED\n--------------------------------------------------\n1. Investigate the detected applications\n2. Verify if installation was authorized\n3. Remove unauthorized software if confirmed\n4. Review agent security policies\n\nCheck Wazuh Dashboard for full details.\n\n--------------------------------------------------\nGenerated by Wazuh Alerting\n",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Unauthorized App",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.unauthorizedApps.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH] Unauthorized Application Detected - {{`{{ctx.results[0].hits.total.value}}`}} events\",\"body\":\"## Security Alert: Unauthorized Application\\n\\n**Total Detections:** {{`{{ctx.results[0].hits.total.value}}`}}\\n**Alert Time:** {{`{{ctx.periodEnd}}`}}\\n\\n### Event Details\\n\\n| Agent | Rule | Level | Time |\\n|-------|------|-------|------|\\n{{`{{#ctx.results[0].hits.hits}}`}}| {{`{{_source.agent.name}}`}} | {{`{{_source.rule.description}}`}} | {{`{{_source.rule.level}}`}} | {{`{{_source.@timestamp}}`}} |\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n### Affected Agents\\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\\n- **{{`{{key}}`}}**: {{`{{doc_count}}`}} alert(s)\\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\\n\\n### Action Items\\n- [ ] Investigate detected applications\\n- [ ] Verify if installation was authorized\\n- [ ] Remove unauthorized software\\n- [ ] Review agent security policies\\n\\n---\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"unauthorized-app\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Unauthorized Application Monitor" "$UNAUTHORIZED_APP_MONITOR"
+
+    # ================================================================
+    # MONITOR 2: Critical Security Tools Detection
+    # Specifically monitors for hacking tools and crypto miners
+    # ================================================================
+
+    CRITICAL_TOOLS_MONITOR='{
+      "name": "Critical Hacking Tools Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.criticalTools.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.criticalTools.lookbackMinutes | default 2 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "hacking_tool"}},
+                          {"match": {"rule.groups": "cryptominer"}},
+                          {"range": {"rule.id": {"gte": 750030, "lte": 750049}}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Critical Tool Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Critical Tool",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalTools.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":skull_and_crossbones: *CRITICAL SECURITY ALERT*\n\n*Hacking Tool or Crypto Miner Detected!*\n*Total Events:* {{`{{ctx.results[0].hits.total.value}}`}}\n\n{{`{{#ctx.results[0].hits.hits}}`}}\n:warning: *Agent:* {{`{{_source.agent.name}}`}} ({{`{{_source.agent.id}}`}})\n*Rule:* {{`{{_source.rule.description}}`}}\n*Level:* {{`{{_source.rule.level}}`}}\n*Time:* {{`{{_source.@timestamp}}`}}\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:rotating_light: *Immediate investigation required!*",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Critical Tool",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalTools.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL] Hacking Tool or Crypto Miner Detected - {{`{{ctx.results[0].hits.total.value}}`}} events!",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\nCRITICAL SECURITY ALERT\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\nHacking Tool or Crypto Miner Detected!\nTotal Events: {{`{{ctx.results[0].hits.total.value}}`}}\nAlert Time: {{`{{ctx.periodEnd}}`}}\n\n---------------------------------------------------\nDETECTION DETAILS\n---------------------------------------------------\n{{`{{#ctx.results[0].hits.hits}}`}}\n* AGENT: {{`{{_source.agent.name}}`}} (ID: {{`{{_source.agent.id}}`}})\n  Rule ID: {{`{{_source.rule.id}}`}}\n  Rule Level: {{`{{_source.rule.level}}`}}\n  Description: {{`{{_source.rule.description}}`}}\n  Groups: {{`{{_source.rule.groups}}`}}\n  Time: {{`{{_source.@timestamp}}`}}\n\n{{`{{/ctx.results[0].hits.hits}}`}}\n---------------------------------------------------\nIMMEDIATE ACTIONS REQUIRED\n---------------------------------------------------\n1. ISOLATE the affected system immediately\n2. Identify and terminate the malicious process\n3. Preserve evidence for forensic analysis\n4. Scan all connected systems\n5. Report incident to security team\n\n---------------------------------------------------\nGenerated by Wazuh Alerting\n",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Critical Tool",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalTools.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL] Hacking Tool/Crypto Miner - {{`{{ctx.results[0].hits.total.value}}`}} events!\",\"body\":\"## :rotating_light: Critical Security Alert\\n\\n**Hacking Tool or Crypto Miner Detected!**\\n\\n| Field | Value |\\n|-------|-------|\\n| Total Events | {{`{{ctx.results[0].hits.total.value}}`}} |\\n| Alert Time | {{`{{ctx.periodEnd}}`}} |\\n\\n### Detection Details\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n#### Event on {{`{{_source.agent.name}}`}}\\n| Field | Value |\\n|-------|-------|\\n| Agent | {{`{{_source.agent.name}}`}} (ID: {{`{{_source.agent.id}}`}}) |\\n| Rule ID | {{`{{_source.rule.id}}`}} |\\n| Level | {{`{{_source.rule.level}}`}} |\\n| Description | {{`{{_source.rule.description}}`}} |\\n| Time | {{`{{_source.@timestamp}}`}} |\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n### Immediate Actions\\n- [ ] Isolate affected system\\n- [ ] Terminate malicious process\\n- [ ] Preserve evidence\\n- [ ] Scan connected systems\\n- [ ] Notify security team\\n\\n---\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"critical\",\"hacking-tool\",\"incident-response\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Critical Hacking Tools Monitor" "$CRITICAL_TOOLS_MONITOR"
+
+    # ================================================================
+    # MONITOR 3: Remote Access Tools Detection
+    # Monitors for unauthorized remote access software
+    # ================================================================
+
+    REMOTE_ACCESS_MONITOR='{
+      "name": "Remote Access Tools Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.remoteAccess.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.remoteAccess.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "remote_access"}},
+                          {"term": {"rule.id": 750010}},
+                          {"term": {"rule.id": 750070}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Remote Access Tool Detected",
+          "severity": "2",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Remote Access",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.remoteAccess.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":computer: *ALERT: Remote Access Tool Detected*\n\n*Potential unauthorized remote access software found!*\n\n{{`{{#ctx.results[0].hits.hits}}`}}\n:warning: *Agent:* {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\n*Tool:* {{`{{_source.data.program.name}}`}}\n*Rule:* {{`{{_source.rule.description}}`}}\n*MITRE:* T1219 (Remote Access Software)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:eyes: Please verify if this is authorized.",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Remote Access",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.remoteAccess.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH] Remote Access Tool Detected",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "ALERT: Remote Access Tool Detected\n\nPotential unauthorized remote access software found!\n\n{{`{{#ctx.results[0].hits.hits}}`}}\nAgent: {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\nTool: {{`{{_source.data.program.name}}`}}\nRule: {{`{{_source.rule.description}}`}}\nMITRE: T1219 (Remote Access Software)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\nPlease verify if this is authorized.",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Remote Access",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.remoteAccess.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH] Remote Access Tool Detected\",\"body\":\"## Remote Access Tool Alert\\n\\n**Potential unauthorized remote access software found!**\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Detection Details\\n- **Agent:** {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\\n- **Tool:** {{`{{_source.data.program.name}}`}}\\n- **Rule:** {{`{{_source.rule.description}}`}}\\n- **MITRE:** T1219 (Remote Access Software)\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n⚠️ Please verify if this is authorized.\\n\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"remote-access\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Remote Access Tools Monitor" "$REMOTE_ACCESS_MONITOR"
+
+    # ================================================================
+    # MONITOR 4: Security Software Removal Detection
+    # Detects when security software is uninstalled
+    # ================================================================
+
+    SECURITY_REMOVAL_MONITOR='{
+      "name": "Security Software Removal Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.securityRemoval.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.securityRemoval.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "security_software_removed"}},
+                          {"match": {"rule.groups": "defense_evasion"}},
+                          {"term": {"rule.id": 750091}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Security Software Removed",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - Security Removal",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.securityRemoval.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":shield: *CRITICAL: Security Software Removed*\n\n*Potential defense evasion detected!*\n\n{{`{{#ctx.results[0].hits.hits}}`}}\n:rotating_light: *Agent:* {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\n*Removed:* {{`{{_source.data.program.name}}`}}\n*MITRE:* T1562.001 (Disable or Modify Tools)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:warning: *Immediate investigation required!*",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Security Removal",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.securityRemoval.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL] Security Software Removed - Defense Evasion Detected",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "CRITICAL: Security Software Removed\n\nPotential defense evasion detected!\n\n{{`{{#ctx.results[0].hits.hits}}`}}\nAgent: {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\nRemoved: {{`{{_source.data.program.name}}`}}\nMITRE: T1562.001 (Disable or Modify Tools)\n---\n{{`{{/ctx.results[0].hits.hits}}`}}\n\nIMMEDIATE INVESTIGATION REQUIRED!",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Security Removal",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.securityRemoval.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL] Security Software Removed - Defense Evasion\",\"body\":\"## Critical Security Alert\\n\\n**Potential defense evasion detected!**\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Detection Details\\n- **Agent:** {{`{{_source.agent.name}}`}} ({{`{{_source.agent.ip}}`}})\\n- **Removed:** {{`{{_source.data.program.name}}`}}\\n- **MITRE:** T1562.001 (Disable or Modify Tools)\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n⚠️ **IMMEDIATE INVESTIGATION REQUIRED!**\\n\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"critical\",\"defense-evasion\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Security Software Removal Monitor" "$SECURITY_REMOVAL_MONITOR"
+
+    # ================================================================
+    # MONITOR 5: New Agent Registered
+    # Detects when a new agent connects to the manager
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.newAgentRegistered.enabled }}
+
+    NEW_AGENT_MONITOR='{
+      "name": "New Agent Registered Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.newAgentRegistered.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.newAgentRegistered.intervalMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"term": {"rule.id": "501"}},
+                          {"term": {"rule.id": "503"}},
+                          {"match": {"rule.description": "New agent registered"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "New Agent Registered",
+          "severity": "3",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - New Agent",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.newAgentRegistered.throttleMinutes | default 60 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH] New Agent Registered - Validation Required",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "NEW AGENT REGISTRATION ALERT\n\nA new agent has been registered to the Wazuh manager.\n\n{{`{{#ctx.results[0].hits.hits}}`}}\n=== Agent Details ===\n- Agent ID: {{`{{_source.agent.id}}`}}\n- Agent Name: {{`{{_source.agent.name}}`}}\n- Agent IP: {{`{{_source.agent.ip}}`}}\n- Registration Time: {{`{{_source.@timestamp}}`}}\n- Rule: {{`{{_source.rule.description}}`}}\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n=== ACTION REQUIRED ===\nPlease validate this agent registration:\n1. Verify the agent is authorized\n2. Check agent configuration is correct\n3. Confirm agent health status\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - New Agent",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.newAgentRegistered.throttleMinutes | default 60 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH] New Agent Registered - Validation Required\",\"body\":\"## New Agent Registration\\n\\nA new agent has been registered to the Wazuh manager.\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Agent Details\\n- **Agent ID:** {{`{{_source.agent.id}}`}}\\n- **Agent Name:** {{`{{_source.agent.name}}`}}\\n- **Agent IP:** {{`{{_source.agent.ip}}`}}\\n- **Registration Time:** {{`{{_source.@timestamp}}`}}\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n\\n## Validation Checklist\\n\\n- [ ] Agent is authorized to connect\\n- [ ] Agent configuration is correct\\n- [ ] Agent health status verified\\n- [ ] Agent assigned to correct group\\n\\n---\\n*Generated by Wazuh Alerting*\",\"labels\":[\"wazuh\",\"new-agent\",\"validation-required\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "New Agent Registered Monitor" "$NEW_AGENT_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 6: Anomaly Detected
+    # Triggered when any anomaly detector finds something
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.anomalyDetected.enabled }}
+
+    ANOMALY_DETECTED_MONITOR='{
+      "name": "Anomaly Detected Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.anomalyDetected.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": [".opendistro-anomaly-results*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "data_end_time": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.anomalyDetected.intervalMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "range": {
+                        "anomaly_grade": {
+                          "gt": 0
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_detector": {
+                  "terms": {
+                    "field": "detector_id",
+                    "size": 20
+                  },
+                  "aggs": {
+                    "max_grade": {
+                      "max": { "field": "anomaly_grade" }
+                    },
+                    "max_score": {
+                      "max": { "field": "anomaly_score" }
+                    },
+                    "avg_confidence": {
+                      "avg": { "field": "confidence" }
+                    },
+                    "latest_anomaly": {
+                      "top_hits": {
+                        "size": 1,
+                        "sort": [{"data_end_time": {"order": "desc"}}],
+                        "_source": ["feature_data", "anomaly_grade", "anomaly_score", "confidence", "data_start_time", "data_end_time"]
+                      }
+                    }
+                  }
+                },
+                "total_anomalies": {
+                  "value_count": { "field": "anomaly_grade" }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Anomaly Detected",
+          "severity": "2",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].aggregations.total_anomalies.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGitHub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- $actionCount := 0 }}
+            {{- if $hasEmail }}
+            {{- $actionCount = add $actionCount 1 }}
+            {
+              "name": "Email Alert - Anomaly Detected",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.anomalyDetected.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH] Anomaly Detected - {{`{{ctx.results.0.aggregations.total_anomalies.value}}`}} anomalies from ML detectors",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "==================================================\nWAZUH ANOMALY DETECTION ALERT\n==================================================\n\nTotal Anomalies Detected: {{`{{ctx.results.0.aggregations.total_anomalies.value}}`}}\nAlert Time: {{`{{ctx.periodEnd}}`}}\n\n==================================================\nANOMALY DETAILS BY DETECTOR\n==================================================\n{{`{{#ctx.results.0.aggregations.by_detector.buckets}}`}}\n\n--------------------------------------------------\nDetector ID: {{`{{key}}`}}\nAnomalies: {{`{{doc_count}}`}}\nMax Anomaly Grade: {{`{{max_grade.value}}`}}\nMax Anomaly Score: {{`{{max_score.value}}`}}\nAvg Confidence: {{`{{avg_confidence.value}}`}}\n{{`{{#latest_anomaly.hits.hits}}`}}\nLatest Anomaly:\n  Time: {{`{{_source.data_start_time}}`}} - {{`{{_source.data_end_time}}`}}\n  Grade: {{`{{_source.anomaly_grade}}`}}\n  Score: {{`{{_source.anomaly_score}}`}}\n  Features:{{`{{#_source.feature_data}}`}}\n    - {{`{{feature_name}}`}}: {{`{{data}}`}}{{`{{/_source.feature_data}}`}}\n{{`{{/latest_anomaly.hits.hits}}`}}\n{{`{{/ctx.results.0.aggregations.by_detector.buckets}}`}}\n\n==================================================\nCONFIGURED DETECTORS\n==================================================\nMatch detector_id with names in Wazuh Dashboard:\n{{- range $name, $config := .Values.indexer.anomalyDetection.detectors }}\n{{- if $config.enabled }}\n- {{ $name }}\n{{- end }}\n{{- end }}\n\n==================================================\nRECOMMENDED ACTIONS\n==================================================\n1. Review anomalies in Wazuh Dashboard > Anomaly Detection\n2. Investigate the affected features and data sources\n3. Check if this is expected behavior or a real threat\n4. Tune detector sensitivity if needed\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+            {{- if $hasGitHub }}
+            {{- if $hasEmail }},{{- end }}
+            {
+              "name": "GitHub Issue - Anomaly Detected",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.anomalyDetected.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH] Anomaly Detected - {{`{{ctx.results.0.aggregations.total_anomalies.value}}`}} anomalies\",\"body\":\"## Wazuh ML Anomaly Detection Alert\\n\\n**Total Anomalies:** {{`{{ctx.results.0.aggregations.total_anomalies.value}}`}}\\n**Alert Time:** {{`{{ctx.periodEnd}}`}}\\n\\n### Anomalies by Detector\\n\\n| Detector ID | Count | Max Grade | Max Score |\\n|-------------|-------|-----------|-----------|\\n{{`{{#ctx.results.0.aggregations.by_detector.buckets}}`}}| {{`{{key}}`}} | {{`{{doc_count}}`}} | {{`{{max_grade.value}}`}} | {{`{{max_score.value}}`}} |\\n{{`{{/ctx.results.0.aggregations.by_detector.buckets}}`}}\\n\\n### Investigation Checklist\\n- [ ] Review anomalies in Wazuh Dashboard\\n- [ ] Investigate affected features\\n- [ ] Determine if expected or threat\\n- [ ] Tune detector if needed\\n\\n---\\n*Generated by Wazuh Alerting*\",\"labels\":[\"wazuh\",\"anomaly-detection\",\"ml-alert\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Anomaly Detected Monitor" "$ANOMALY_DETECTED_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 7: Agent Disconnected
+    # Detects agents that haven't sent events for configured period
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.agentDisconnected.enabled }}
+
+    AGENT_DISCONNECTED_MONITOR='{
+      "name": "Agent Disconnected Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.agentDisconnected.intervalMinutes | default 60 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*", "wazuh-archives-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.agentDisconnected.noEventPeriodDays | default 7 }}d",
+                          "lte": "now"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "agents_with_recent_events": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 1000
+                  },
+                  "aggs": {
+                    "last_event": {
+                      "max": {
+                        "field": "@timestamp"
+                      }
+                    }
+                  }
+                },
+                "all_known_agents": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Agent Disconnected Check",
+          "severity": "2",
+          "condition": {
+            "script": {
+              "source": "def buckets = ctx.results[0].aggregations.agents_with_recent_events.buckets; for (b in buckets) { def lastEvent = b.last_event.value; def now = System.currentTimeMillis(); def diff = now - lastEvent; def days = diff / (1000 * 60 * 60 * 24); if (days >= {{ .Values.indexer.alerting.monitors.agentDisconnected.noEventPeriodDays | default 7 }}) { return true; } } return false;",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Agent Disconnected",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.agentDisconnected.throttleMinutes | default 1440 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH] Agent Disconnected - No events for {{ .Values.indexer.alerting.monitors.agentDisconnected.noEventPeriodDays | default 7 }} days",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "AGENT DISCONNECTION ALERT\n\nOne or more agents have not sent events for {{ .Values.indexer.alerting.monitors.agentDisconnected.noEventPeriodDays | default 7 }} days or more.\n\n=== Agents with Recent Activity ===\n{{`{{#ctx.results.0.aggregations.agents_with_recent_events.buckets}}`}}\n- Agent: {{`{{key}}`}}\n  Last Event: {{`{{last_event.value_as_string}}`}}\n  Event Count: {{`{{doc_count}}`}}\n{{`{{/ctx.results.0.aggregations.agents_with_recent_events.buckets}}`}}\n\n=== ACTION REQUIRED ===\n1. Check agent connectivity\n2. Verify agent service is running\n3. Check network connectivity\n4. Review agent logs for errors\n\nConfiguration: Alert threshold is {{ .Values.indexer.alerting.monitors.agentDisconnected.noEventPeriodDays | default 7 }} days without events.\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Agent Disconnected Monitor" "$AGENT_DISCONNECTED_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 8: Brute Force Attack
+    # Detects multiple failed authentication attempts
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.bruteForceAttack.enabled }}
+
+    BRUTE_FORCE_MONITOR='{
+      "name": "Brute Force Attack Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.bruteForceAttack.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.bruteForceAttack.lookbackMinutes | default 10 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["authentication_failed", "authentication_failure", "invalid_login"]}},
+                          {"match": {"rule.description": "authentication failure"}},
+                          {"match": {"rule.description": "failed password"}},
+                          {"match": {"rule.description": "Invalid user"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 20
+                  },
+                  "aggs": {
+                    "by_source_ip": {
+                      "terms": {
+                        "field": "data.srcip",
+                        "size": 10
+                      }
+                    },
+                    "by_user": {
+                      "terms": {
+                        "field": "data.srcuser",
+                        "size": 10
+                      }
+                    },
+                    "sample_events": {
+                      "top_hits": {
+                        "size": 3,
+                        "_source": ["rule.description", "data.srcip", "data.srcuser", "data.dstuser", "@timestamp"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Brute Force Attack Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value >= {{ .Values.indexer.alerting.monitors.bruteForceAttack.threshold | default 5 }}",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Brute Force",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.bruteForceAttack.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL] Brute Force Attack Detected - {{`{{ctx.results[0].hits.total.value}}`}} failed attempts",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "BRUTE FORCE ATTACK ALERT\n\n{{`{{ctx.results.0.hits.total.value}}`}} failed authentication attempts detected in the last {{ .Values.indexer.alerting.monitors.bruteForceAttack.lookbackMinutes | default 10 }} minutes.\n\n=== Attack Details by Agent ===\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n--- Agent: {{`{{key}}`}} ({{`{{doc_count}}`}} failures) ---\n\nSource IPs:\n{{`{{#by_source_ip.buckets}}`}}\n  - {{`{{key}}`}}: {{`{{doc_count}}`}} attempts\n{{`{{/by_source_ip.buckets}}`}}\n\nTargeted Users:\n{{`{{#by_user.buckets}}`}}\n  - {{`{{key}}`}}: {{`{{doc_count}}`}} attempts\n{{`{{/by_user.buckets}}`}}\n\nSample Events:\n{{`{{#sample_events.hits.hits}}`}}\n  - {{`{{_source.rule.description}}`}}\n    User: {{`{{_source.data.srcuser}}`}} -> {{`{{_source.data.dstuser}}`}}\n    Source: {{`{{_source.data.srcip}}`}}\n    Time: {{`{{_source.@timestamp}}`}}\n{{`{{/sample_events.hits.hits}}`}}\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n=== RECOMMENDED ACTIONS ===\n1. Block attacking IP addresses\n2. Review targeted user accounts\n3. Enable account lockout policies\n4. Check for successful logins from attacking IPs\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Brute Force Attack Monitor" "$BRUTE_FORCE_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 9: Rootkit/Malware Detected
+    # Immediate alert on rootkit or malware detection
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.rootkitMalwareDetected.enabled }}
+
+    ROOTKIT_MALWARE_MONITOR='{
+      "name": "Rootkit Malware Detection Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.rootkitMalwareDetected.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.rootkitMalwareDetected.intervalMinutes | default 1 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["rootkit", "malware", "trojan", "virus", "worm", "ransomware"]}},
+                          {"match": {"rule.description": "rootkit"}},
+                          {"match": {"rule.description": "malware"}},
+                          {"match": {"rule.description": "trojan"}},
+                          {"range": {"rule.id": {"gte": 510, "lte": 520}}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Rootkit/Malware Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Rootkit/Malware",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.rootkitMalwareDetected.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL] Rootkit/Malware Detected!",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "CRITICAL SECURITY ALERT - ROOTKIT/MALWARE DETECTED\n\nMalicious software has been detected on one or more agents.\n\n=== Detection Details ===\n{{`{{#ctx.results[0].hits.hits}}`}}\n--- THREAT DETECTED ---\nAgent: {{`{{_source.agent.name}}`}} ({{`{{_source.agent.id}}`}})\nAgent IP: {{`{{_source.agent.ip}}`}}\nRule ID: {{`{{_source.rule.id}}`}}\nRule Level: {{`{{_source.rule.level}}`}}\nDescription: {{`{{_source.rule.description}}`}}\nGroups: {{`{{_source.rule.groups}}`}}\nTime: {{`{{_source.@timestamp}}`}}\n\nFull Log: {{`{{_source.full_log}}`}}\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n=== IMMEDIATE ACTIONS REQUIRED ===\n1. ISOLATE the affected system from the network\n2. DO NOT power off (preserve memory for forensics)\n3. Initiate incident response procedures\n4. Collect forensic evidence\n5. Scan all connected systems\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Rootkit/Malware",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.rootkitMalwareDetected.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL] Rootkit/Malware Detected!\",\"body\":\"## Critical Security Alert - Malware Detection\\n\\n**Malicious software has been detected!**\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Threat Details\\n| Field | Value |\\n|-------|-------|\\n| Agent | {{`{{_source.agent.name}}`}} ({{`{{_source.agent.id}}`}}) |\\n| Agent IP | {{`{{_source.agent.ip}}`}} |\\n| Rule ID | {{`{{_source.rule.id}}`}} |\\n| Rule Level | {{`{{_source.rule.level}}`}} |\\n| Description | {{`{{_source.rule.description}}`}} |\\n| Time | {{`{{_source.@timestamp}}`}} |\\n\\n**Full Log:**\\n```\\n{{`{{_source.full_log}}`}}\\n```\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n\\n## Incident Response Checklist\\n\\n- [ ] System isolated from network\\n- [ ] Memory preserved (no reboot)\\n- [ ] Incident response team notified\\n- [ ] Forensic evidence collection started\\n- [ ] Connected systems scanned\\n- [ ] Root cause analysis initiated\\n\\n---\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"critical\",\"malware\",\"incident-response\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Rootkit Malware Detection Monitor" "$ROOTKIT_MALWARE_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 10: Critical Severity Alert
+    # Immediate alert on critical severity events (level >= 12)
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.criticalSeverityAlert.enabled }}
+
+    CRITICAL_SEVERITY_MONITOR='{
+      "name": "Critical Severity Alert Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.criticalSeverityAlert.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.criticalSeverityAlert.intervalMinutes | default 1 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "range": {
+                        "rule.level": {
+                          "gte": {{ .Values.indexer.alerting.monitors.criticalSeverityAlert.minLevel | default 12 }}
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "sort": [{"rule.level": "desc"}]
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Critical Severity Alert",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - Critical Severity",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalSeverityAlert.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL] High Severity Alert (Level >= {{ .Values.indexer.alerting.monitors.criticalSeverityAlert.minLevel | default 12 }})",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "CRITICAL SEVERITY ALERT\n\nHigh severity events detected (Level >= {{ .Values.indexer.alerting.monitors.criticalSeverityAlert.minLevel | default 12 }}).\n\n=== Event Details ===\n{{`{{#ctx.results[0].hits.hits}}`}}\n--- CRITICAL EVENT ---\nAgent: {{`{{_source.agent.name}}`}} ({{`{{_source.agent.id}}`}})\nAgent IP: {{`{{_source.agent.ip}}`}}\nRule ID: {{`{{_source.rule.id}}`}}\nRule Level: {{`{{_source.rule.level}}`}}\nDescription: {{`{{_source.rule.description}}`}}\nGroups: {{`{{_source.rule.groups}}`}}\nMITRE: {{`{{_source.rule.mitre}}`}}\nTime: {{`{{_source.@timestamp}}`}}\n\nFull Log: {{`{{_source.full_log}}`}}\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n=== ACTION REQUIRED ===\nInvestigate these critical events immediately.\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - Critical Severity",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.criticalSeverityAlert.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL] High Severity Alert (Level >= {{ .Values.indexer.alerting.monitors.criticalSeverityAlert.minLevel | default 12 }})\",\"body\":\"## Critical Severity Alert\\n\\n**High severity events detected requiring immediate attention.**\\n\\n{{`{{#ctx.results[0].hits.hits}}`}}\\n### Event Details\\n| Field | Value |\\n|-------|-------|\\n| Agent | {{`{{_source.agent.name}}`}} ({{`{{_source.agent.id}}`}}) |\\n| Agent IP | {{`{{_source.agent.ip}}`}} |\\n| Rule ID | {{`{{_source.rule.id}}`}} |\\n| Rule Level | {{`{{_source.rule.level}}`}} |\\n| Description | {{`{{_source.rule.description}}`}} |\\n| Groups | {{`{{_source.rule.groups}}`}} |\\n| Time | {{`{{_source.@timestamp}}`}} |\\n\\n**Full Log:**\\n```\\n{{`{{_source.full_log}}`}}\\n```\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n---\\n\\n## Investigation Checklist\\n\\n- [ ] Event analyzed and understood\\n- [ ] Root cause identified\\n- [ ] Remediation actions taken\\n- [ ] Similar events checked across all agents\\n\\n---\\n*Generated by Wazuh Alerting*\",\"labels\":[\"security-alert\",\"critical\",\"high-severity\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Critical Severity Alert Monitor" "$CRITICAL_SEVERITY_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 11: Daily Security Summary
+    # Sends a daily summary of security events at 8:00 AM
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.dailySecuritySummary.enabled }}
+
+    DAILY_SUMMARY_MONITOR='{
+      "name": "Daily Security Summary",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "cron": {
+          "expression": "{{ .Values.indexer.alerting.monitors.dailySecuritySummary.scheduleMinute | default 0 }} {{ .Values.indexer.alerting.monitors.dailySecuritySummary.scheduleHour | default 8 }} * * *",
+          "timezone": "{{ .Values.indexer.alerting.monitors.dailySecuritySummary.scheduleTimezone | default "UTC" }}"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "range": {
+                  "@timestamp": {
+                    "gte": "now-24h",
+                    "lte": "now"
+                  }
+                }
+              },
+              "aggs": {
+                "total_alerts": {
+                  "value_count": {
+                    "field": "rule.id"
+                  }
+                },
+                "by_severity": {
+                  "range": {
+                    "field": "rule.level",
+                    "ranges": [
+                      {"key": "Low (0-4)", "from": 0, "to": 5},
+                      {"key": "Medium (5-7)", "from": 5, "to": 8},
+                      {"key": "High (8-11)", "from": 8, "to": 12},
+                      {"key": "Critical (12+)", "from": 12}
+                    ]
+                  }
+                },
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 10
+                  }
+                },
+                "by_rule_group": {
+                  "terms": {
+                    "field": "rule.groups",
+                    "size": 15
+                  }
+                },
+                "top_rules": {
+                  "terms": {
+                    "field": "rule.description",
+                    "size": 10
+                  }
+                },
+                "critical_events": {
+                  "filter": {
+                    "range": {
+                      "rule.level": {
+                        "gte": 12
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Daily Summary Trigger",
+          "severity": "5",
+          "condition": {
+            "script": {
+              "source": "return true",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email - Daily Summary",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": false,
+              "subject_template": {
+                "source": "[WAZUH] Daily Security Summary - {{`{{ctx.periodEnd}}`}}",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "WAZUH DAILY SECURITY SUMMARY\nReport Date: {{`{{ctx.periodEnd}}`}}\n\n=====================================\nOVERVIEW (Last 24 Hours)\n=====================================\n\nTotal Alerts: {{`{{ctx.results.0.aggregations.total_alerts.value}}`}}\nCritical Events: {{`{{ctx.results.0.aggregations.critical_events.doc_count}}`}}\n\n=====================================\nALERTS BY SEVERITY\n=====================================\n{{`{{#ctx.results.0.aggregations.by_severity.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}}\n{{`{{/ctx.results.0.aggregations.by_severity.buckets}}`}}\n\n=====================================\nTOP AGENTS BY ALERT COUNT\n=====================================\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} alerts\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n=====================================\nTOP RULE CATEGORIES\n=====================================\n{{`{{#ctx.results.0.aggregations.by_rule_group.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}}\n{{`{{/ctx.results.0.aggregations.by_rule_group.buckets}}`}}\n\n=====================================\nTOP TRIGGERED RULES\n=====================================\n{{`{{#ctx.results.0.aggregations.top_rules.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}}\n{{`{{/ctx.results.0.aggregations.top_rules.buckets}}`}}\n\n=====================================\n\nFor detailed analysis, please visit the Wazuh Dashboard.\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Daily Security Summary" "$DAILY_SUMMARY_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 12: Weekly Compliance Report
+    # Sends a weekly SCA compliance summary on Monday at 8:00 AM
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.weeklyComplianceReport.enabled }}
+
+    WEEKLY_COMPLIANCE_MONITOR='{
+      "name": "Weekly Compliance Report",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "cron": {
+          "expression": "{{ .Values.indexer.alerting.monitors.weeklyComplianceReport.scheduleMinute | default 0 }} {{ .Values.indexer.alerting.monitors.weeklyComplianceReport.scheduleHour | default 8 }} * * {{ .Values.indexer.alerting.monitors.weeklyComplianceReport.scheduleDay | default "1" }}",
+          "timezone": "{{ .Values.indexer.alerting.monitors.weeklyComplianceReport.scheduleTimezone | default "UTC" }}"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-7d",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "term": {
+                        "rule.groups": "sca"
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 50
+                  },
+                  "aggs": {
+                    "by_result": {
+                      "terms": {
+                        "field": "data.sca.check.result",
+                        "size": 5
+                      }
+                    },
+                    "by_policy": {
+                      "terms": {
+                        "field": "data.sca.policy",
+                        "size": 10
+                      }
+                    },
+                    "failed_checks": {
+                      "filter": {
+                        "term": {
+                          "data.sca.check.result": "failed"
+                        }
+                      }
+                    },
+                    "passed_checks": {
+                      "filter": {
+                        "term": {
+                          "data.sca.check.result": "passed"
+                        }
+                      }
+                    }
+                  }
+                },
+                "total_sca_events": {
+                  "value_count": {
+                    "field": "rule.id"
+                  }
+                },
+                "failed_total": {
+                  "filter": {
+                    "term": {
+                      "data.sca.check.result": "failed"
+                    }
+                  }
+                },
+                "passed_total": {
+                  "filter": {
+                    "term": {
+                      "data.sca.check.result": "passed"
+                    }
+                  }
+                },
+                "top_failed_checks": {
+                  "filter": {
+                    "term": {
+                      "data.sca.check.result": "failed"
+                    }
+                  },
+                  "aggs": {
+                    "by_check": {
+                      "terms": {
+                        "field": "data.sca.check.title",
+                        "size": 10
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Weekly Compliance Trigger",
+          "severity": "5",
+          "condition": {
+            "script": {
+              "source": "return true",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email - Weekly Compliance",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": false,
+              "subject_template": {
+                "source": "[WAZUH] Weekly Compliance Report - {{`{{ctx.periodEnd}}`}}",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "WAZUH WEEKLY COMPLIANCE REPORT\nReport Period: Last 7 Days\nGenerated: {{`{{ctx.periodEnd}}`}}\n\n=====================================\nCOMPLIANCE OVERVIEW\n=====================================\n\nTotal SCA Events: {{`{{ctx.results.0.aggregations.total_sca_events.value}}`}}\nPassed Checks: {{`{{ctx.results.0.aggregations.passed_total.doc_count}}`}}\nFailed Checks: {{`{{ctx.results.0.aggregations.failed_total.doc_count}}`}}\n\n=====================================\nCOMPLIANCE BY AGENT\n=====================================\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n--- {{`{{key}}`}} ---\nPassed: {{`{{passed_checks.doc_count}}`}}\nFailed: {{`{{failed_checks.doc_count}}`}}\n\nPolicies:\n{{`{{#by_policy.buckets}}`}}\n  - {{`{{key}}`}}: {{`{{doc_count}}`}} checks\n{{`{{/by_policy.buckets}}`}}\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n=====================================\nTOP FAILED COMPLIANCE CHECKS\n=====================================\n{{`{{#ctx.results.0.aggregations.top_failed_checks.by_check.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} failures\n{{`{{/ctx.results.0.aggregations.top_failed_checks.by_check.buckets}}`}}\n\n=====================================\nRECOMMENDATIONS\n=====================================\n1. Review and remediate top failing checks\n2. Ensure all agents have SCA enabled\n3. Update SCA policies as needed\n4. Schedule remediation for critical failures\n\nFor detailed compliance analysis, please visit the Wazuh Dashboard.\n\n---\nGenerated by Wazuh Alerting",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Weekly Compliance Report" "$WEEKLY_COMPLIANCE_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 13: Deprecated OS Report
+    # Detects agents running end-of-life operating systems
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.deprecatedOsReport.enabled }}
+
+    DEPRECATED_OS_MONITOR='{
+      "name": "Daily System Health - Deprecated OS",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "cron": {
+          "expression": "{{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleMinute | default 1 }} {{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleHour | default 8 }} * * *",
+          "timezone": "{{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleTimezone | default "UTC" }}"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-monitoring-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "should": [
+                    {"bool": {"must": [{"term": {"os.platform": "windows"}}, {"bool": {"should": [
+                      {"wildcard": {"os.uname": "*Windows 7*"}},
+                      {"wildcard": {"os.uname": "*Windows 8*"}},
+                      {"wildcard": {"os.uname": "*Server 2008*"}},
+                      {"wildcard": {"os.uname": "*Server 2012*"}},
+                      {"wildcard": {"os.uname": "*Windows XP*"}},
+                      {"wildcard": {"os.uname": "*Windows Vista*"}}
+                    ]}}]}},
+                    {"bool": {"must": [{"term": {"os.platform": "ubuntu"}}, {"terms": {"os.major": ["14", "16", "18", "19", "21", "23"]}}]}},
+                    {"bool": {"must": [{"term": {"os.platform": "centos"}}, {"terms": {"os.major": ["5", "6", "7", "8"]}}]}},
+                    {"bool": {"must": [{"term": {"os.platform": "rhel"}}, {"terms": {"os.major": ["5", "6", "7"]}}]}},
+                    {"bool": {"must": [{"term": {"os.platform": "debian"}}, {"terms": {"os.major": ["7", "8", "9", "10"]}}]}},
+                    {"bool": {"must": [{"term": {"os.platform": "amzn"}}, {"terms": {"os.version": ["1", "2", "2018.03"]}}]}},
+                    {"bool": {"must": [{"term": {"os.platform": "darwin"}}, {"bool": {"should": [
+                      {"terms": {"os.major": ["10", "11", "12"]}},
+                      {"wildcard": {"os.name": "*Mavericks*"}},
+                      {"wildcard": {"os.name": "*Yosemite*"}},
+                      {"wildcard": {"os.name": "*El Capitan*"}},
+                      {"wildcard": {"os.name": "*Sierra*"}},
+                      {"wildcard": {"os.name": "*High Sierra*"}},
+                      {"wildcard": {"os.name": "*Mojave*"}},
+                      {"wildcard": {"os.name": "*Catalina*"}},
+                      {"wildcard": {"os.name": "*Big Sur*"}},
+                      {"wildcard": {"os.name": "*Monterey*"}}
+                    ]}}]}}
+                  ],
+                  "minimum_should_match": 1
+                }
+              },
+              "aggs": {
+                "deprecated_agents": {
+                  "terms": {
+                    "field": "name",
+                    "size": 50
+                  },
+                  "aggs": {
+                    "os_details": {
+                      "top_hits": {
+                        "size": 1,
+                        "_source": ["os.name", "os.version", "os.platform"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Deprecated OS Check",
+          "severity": "5",
+          "condition": {
+            "script": {
+              "source": "return true",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email - Deprecated OS Report",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": false,
+              "subject_template": {
+                "source": "[WAZUH] Daily System Health - Deprecated OS Report",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "╔══════════════════════════════════════════════════════════════════╗\n║              WAZUH DAILY SYSTEM HEALTH REPORT                    ║\n║              Deprecated Operating Systems Check                   ║\n╠══════════════════════════════════════════════════════════════════╣\n║  Report Date: {{`{{ctx.periodEnd}}`}}\n╚══════════════════════════════════════════════════════════════════╝\n\n┌──────────────────────────────────────────────────────────────────┐\n│  SUMMARY                                                          │\n├──────────────────────────────────────────────────────────────────┤\n│  Agents with EOL Operating Systems: {{`{{ctx.results.0.hits.total.value}}`}}                              │\n└──────────────────────────────────────────────────────────────────┘\n\n┌──────────────────────────────────────────────────────────────────┐\n│  AFFECTED SYSTEMS                                                 │\n├──────────────────────────────────────────────────────────────────┤\n{{`{{#ctx.results.0.aggregations.deprecated_agents.buckets}}`}}│  ⚠ {{`{{key}}`}}{{`{{#os_details.hits.hits}}`}}\n│    OS: {{`{{_source.os.name}}`}} {{`{{_source.os.version}}`}} ({{`{{_source.os.platform}}`}}){{`{{/os_details.hits.hits}}`}}\n{{`{{/ctx.results.0.aggregations.deprecated_agents.buckets}}`}}{{`{{^ctx.results.0.aggregations.deprecated_agents.buckets}}`}}│  ✓ All Clear - No deprecated operating systems detected.         │\n│    All monitored systems are running supported OS versions.      │\n{{`{{/ctx.results.0.aggregations.deprecated_agents.buckets}}`}}└──────────────────────────────────────────────────────────────────┘\n\n┌──────────────────────────────────────────────────────────────────┐\n│  END-OF-LIFE REFERENCE                                            │\n├──────────────────────────────────────────────────────────────────┤\n│  Operating System              │ EOL Date                        │\n│  ──────────────────────────────┼─────────────────────────────────│\n│  Windows 7/8/8.1               │ Jan 2020 - Jan 2023             │\n│  Windows Server 2008/2012      │ Jan 2020 - Oct 2023             │\n│  Ubuntu 16.04/18.04            │ Apr 2021 - May 2023             │\n│  CentOS 6/7/8                  │ Nov 2020 - Jun 2024             │\n│  Debian 8/9/10                 │ Jun 2020 - Jun 2024             │\n│  Amazon Linux 2                │ Jun 2025                        │\n│  macOS 10.15 Catalina          │ Sep 2022                        │\n│  macOS 11 Big Sur              │ Sep 2023                        │\n│  macOS 12 Monterey             │ Sep 2024                        │\n│  macOS 13 Ventura              │ Oct 2025                        │\n│  macOS 14 Sonoma               │ Oct 2026                        │\n└──────────────────────────────────────────────────────────────────┘\n\n┌──────────────────────────────────────────────────────────────────┐\n│  RECOMMENDED ACTIONS                                              │\n├──────────────────────────────────────────────────────────────────┤\n│  1. Plan OS upgrade for affected systems                         │\n│  2. Evaluate extended support options (ESU/ELS)                  │\n│  3. Implement compensating security controls                     │\n│  4. Document risk acceptance for systems that cannot upgrade     │\n└──────────────────────────────────────────────────────────────────┘\n\n────────────────────────────────────────────────────────────────────\nGenerated by Wazuh SIEM | Security Operations Center\nThis is an automated report - Do not reply\n────────────────────────────────────────────────────────────────────",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Daily System Health - Deprecated OS" "$DEPRECATED_OS_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 14: Phishing Detection
+    # Detects DNS queries to known phishing patterns and brand impersonation
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.phishingDetection.enabled }}
+
+    PHISHING_MONITOR='{
+      "name": "Phishing Detection Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.phishingDetection.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 100,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.phishingDetection.lookbackMinutes | default 10 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["phishing"]}},
+                          {"terms": {"rule.groups": ["brand_impersonation"]}},
+                          {"range": {"rule.id": {"gte": 760020, "lte": 760025}}},
+                          {"range": {"rule.id": {"gte": 760055, "lte": 760056}}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {"field": "agent.name", "size": 20},
+                  "aggs": {
+                    "domains": {
+                      "terms": {"field": "data.win.eventdata.queryName", "size": 10}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "query_level_trigger": {
+            "id": "phishing_trigger",
+            "name": "Phishing Domain Detected",
+            "severity": "2",
+            "condition": {
+              "script": {
+                "source": "ctx.results[0].hits.total.value > 0",
+                "lang": "painless"
+              }
+            },
+            "actions": [
+              {{- if .Values.notification.slack.enabled }}
+              {
+                "id": "phishing_slack_action",
+                "name": "Notify Slack",
+                "destination_id": "",
+                "message_template": {
+                  "source": "🎣 *PHISHING ALERT*\n\n*Phishing domain access detected!*\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\n*Affected Systems:*\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n• {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n⚠️ *Action Required:* Investigate potential credential theft attempt",
+                  "lang": "mustache"
+                },
+                "throttle_enabled": true,
+                "throttle": {
+                  "value": {{ .Values.indexer.alerting.monitors.phishingDetection.throttleMinutes | default 15 }},
+                  "unit": "MINUTES"
+                },
+                "action_execution_policy": {
+                  "action_execution_scope": {
+                    "per_alert": {
+                      "actionable_alerts": []
+                    }
+                  }
+                }
+              }
+              {{- end }}
+              {{- if and .Values.notification.email .Values.notification.email.enabled }}
+              {{- if .Values.notification.slack.enabled }},{{- end }}
+              {
+                "id": "phishing_email_action",
+                "name": "Notify Email",
+                "destination_id": "",
+                "message_template": {
+                  "source": "WAZUH PHISHING ALERT\n\nPhishing domain access detected!\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\nAffected Systems:\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\nAction Required: Investigate potential credential theft attempt\n\n---\nGenerated by Wazuh Alerting",
+                  "lang": "mustache"
+                }
+              }
+              {{- end }}
+            ]
+          }
+        }
+      ]
+    }'
+    create_monitor "Phishing Detection Monitor" "$PHISHING_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 15: Anonymizer/Tor Detection
+    # Detects DNS queries to Tor, anonymizers, and VPN services
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.anonymizerTorDetection.enabled }}
+
+    ANONYMIZER_MONITOR='{
+      "name": "Anonymizer Tor Detection Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.anonymizerTorDetection.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 100,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.anonymizerTorDetection.lookbackMinutes | default 10 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["anonymizer"]}},
+                          {"terms": {"rule.groups": ["vpn"]}},
+                          {"match": {"rule.description": "Tor"}},
+                          {"match": {"rule.description": "Anonymizer"}},
+                          {"term": {"rule.id": "760011"}},
+                          {"term": {"rule.id": "760052"}},
+                          {"term": {"rule.id": "750050"}},
+                          {"term": {"rule.id": "750074"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {"field": "agent.name", "size": 20},
+                  "aggs": {
+                    "by_type": {
+                      "terms": {"field": "rule.groups", "size": 5}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "query_level_trigger": {
+            "id": "anonymizer_trigger",
+            "name": "Anonymizer Tor Usage Detected",
+            "severity": "2",
+            "condition": {
+              "script": {
+                "source": "ctx.results[0].hits.total.value > 0",
+                "lang": "painless"
+              }
+            },
+            "actions": [
+              {{- if .Values.notification.slack.enabled }}
+              {
+                "id": "anonymizer_slack_action",
+                "name": "Notify Slack",
+                "destination_id": "",
+                "message_template": {
+                  "source": "🧅 *ANONYMIZER/TOR ALERT*\n\n*Tor or anonymization service usage detected!*\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\n*Affected Systems:*\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n• {{`{{key}}`}}: {{`{{doc_count}}`}} events\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n⚠️ *Policy Violation:* Anonymization tools violate security policy",
+                  "lang": "mustache"
+                },
+                "throttle_enabled": true,
+                "throttle": {
+                  "value": {{ .Values.indexer.alerting.monitors.anonymizerTorDetection.throttleMinutes | default 30 }},
+                  "unit": "MINUTES"
+                },
+                "action_execution_policy": {
+                  "action_execution_scope": {
+                    "per_alert": {
+                      "actionable_alerts": []
+                    }
+                  }
+                }
+              }
+              {{- end }}
+              {{- if and .Values.notification.email .Values.notification.email.enabled }}
+              {{- if .Values.notification.slack.enabled }},{{- end }}
+              {
+                "id": "anonymizer_email_action",
+                "name": "Notify Email",
+                "destination_id": "",
+                "message_template": {
+                  "source": "WAZUH ANONYMIZER/TOR ALERT\n\nTor or anonymization service usage detected!\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\nAffected Systems:\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} events\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\nPolicy Violation: Anonymization tools violate security policy\n\n---\nGenerated by Wazuh Alerting",
+                  "lang": "mustache"
+                }
+              }
+              {{- end }}
+            ]
+          }
+        }
+      ]
+    }'
+    create_monitor "Anonymizer Tor Detection Monitor" "$ANONYMIZER_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 16: Cryptomining DNS Detection
+    # Detects DNS queries to known cryptomining pools
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.cryptominingDns.enabled }}
+
+    CRYPTOMINING_DNS_MONITOR='{
+      "name": "Cryptomining DNS Detection Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.cryptominingDns.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 100,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.cryptominingDns.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"terms": {"rule.groups": ["cryptomining"]}},
+                          {"term": {"rule.id": "760010"}},
+                          {"term": {"rule.id": "760032"}},
+                          {"term": {"rule.id": "760042"}},
+                          {"term": {"rule.id": "760051"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {"field": "agent.name", "size": 20},
+                  "aggs": {
+                    "pools": {
+                      "terms": {"field": "data.win.eventdata.queryName", "size": 10}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "query_level_trigger": {
+            "id": "cryptomining_dns_trigger",
+            "name": "Cryptomining Pool DNS Detected",
+            "severity": "1",
+            "condition": {
+              "script": {
+                "source": "ctx.results[0].hits.total.value > 0",
+                "lang": "painless"
+              }
+            },
+            "actions": [
+              {{- if .Values.notification.slack.enabled }}
+              {
+                "id": "cryptomining_dns_slack_action",
+                "name": "Notify Slack",
+                "destination_id": "",
+                "message_template": {
+                  "source": "⛏️ *CRITICAL: CRYPTOMINING DETECTED*\n\n*Mining pool DNS query detected!*\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\n*Compromised Systems:*\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n• {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n🚨 *IMMEDIATE ACTION REQUIRED:*\n1. Isolate affected systems\n2. Investigate for malware\n3. Check for unauthorized processes",
+                  "lang": "mustache"
+                },
+                "throttle_enabled": true,
+                "throttle": {
+                  "value": {{ .Values.indexer.alerting.monitors.cryptominingDns.throttleMinutes | default 5 }},
+                  "unit": "MINUTES"
+                },
+                "action_execution_policy": {
+                  "action_execution_scope": {
+                    "per_alert": {
+                      "actionable_alerts": []
+                    }
+                  }
+                }
+              }
+              {{- end }}
+              {{- if and .Values.notification.email .Values.notification.email.enabled }}
+              {{- if .Values.notification.slack.enabled }},{{- end }}
+              {
+                "id": "cryptomining_dns_email_action",
+                "name": "Notify Email",
+                "destination_id": "",
+                "message_template": {
+                  "source": "WAZUH CRITICAL ALERT - CRYPTOMINING DETECTED\n\nMining pool DNS query detected!\n\nDetections: {{`{{ctx.results.0.hits.total.value}}`}}\nTime: {{`{{ctx.periodEnd}}`}}\n\nCompromised Systems:\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} queries\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\nIMMEDIATE ACTION REQUIRED:\n1. Isolate affected systems\n2. Investigate for malware\n3. Check for unauthorized processes\n\n---\nGenerated by Wazuh Alerting",
+                  "lang": "mustache"
+                }
+              }
+              {{- end }}
+            ]
+          }
+        }
+      ]
+    }'
+    create_monitor "Cryptomining DNS Detection Monitor" "$CRYPTOMINING_DNS_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 17: Daily Unauthorized Apps Report
+    # Sends daily report of all unauthorized apps detected with agent IDs
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.enabled }}
+
+    DAILY_UNAUTHORIZED_APPS_MONITOR='{
+      "name": "Daily Unauthorized Apps Report",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "cron": {
+          "expression": "{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleMinute | default 0 }} {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleHour | default 8 }} * * *",
+          "timezone": "{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleTimezone | default "UTC" }}"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 0,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "rule.id": {
+                          "gte": 750010,
+                          "lte": 750099
+                        }
+                      }
+                    },
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-24h",
+                          "lte": "now"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "total_violations": {
+                  "value_count": {
+                    "field": "rule.id"
+                  }
+                },
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 100
+                  },
+                  "aggs": {
+                    "agent_id": {
+                      "terms": {
+                        "field": "agent.id",
+                        "size": 1
+                      }
+                    },
+                    "agent_ip": {
+                      "terms": {
+                        "field": "agent.ip",
+                        "size": 1
+                      }
+                    },
+                    "by_app": {
+                      "terms": {
+                        "field": "data.program.name",
+                        "size": 20
+                      }
+                    },
+                    "by_category": {
+                      "terms": {
+                        "field": "rule.groups",
+                        "size": 10
+                      }
+                    },
+                    "by_severity": {
+                      "terms": {
+                        "field": "rule.level",
+                        "size": 5
+                      }
+                    }
+                  }
+                },
+                "by_category": {
+                  "terms": {
+                    "field": "rule.groups",
+                    "size": 10
+                  }
+                },
+                "by_application": {
+                  "terms": {
+                    "field": "data.program.name",
+                    "size": 50
+                  }
+                },
+                "critical_violations": {
+                  "filter": {
+                    "range": {
+                      "rule.level": {
+                        "gte": 12
+                      }
+                    }
+                  }
+                },
+                "high_violations": {
+                  "filter": {
+                    "range": {
+                      "rule.level": {
+                        "gte": 10,
+                        "lt": 12
+                      }
+                    }
+                  }
+                },
+                "medium_violations": {
+                  "filter": {
+                    "range": {
+                      "rule.level": {
+                        "gte": 6,
+                        "lt": 10
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Daily Unauthorized Apps Trigger",
+          "severity": "4",
+          "condition": {
+            "script": {
+              "source": "return true",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email - Daily Unauthorized Apps",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": false,
+              "subject_template": {
+                "source": "[WAZUH] Daily Unauthorized Apps Report - {{`{{ctx.periodEnd}}`}}",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "=====================================\nWAZUH DAILY UNAUTHORIZED APPS REPORT\n=====================================\nReport Period: Last 24 Hours\nGenerated: {{`{{ctx.periodEnd}}`}}\n\n=====================================\nSUMMARY\n=====================================\n\nTotal Violations: {{`{{ctx.results.0.aggregations.total_violations.value}}`}}\nCritical (Level 12+): {{`{{ctx.results.0.aggregations.critical_violations.doc_count}}`}}\nHigh (Level 10-11): {{`{{ctx.results.0.aggregations.high_violations.doc_count}}`}}\nMedium (Level 6-9): {{`{{ctx.results.0.aggregations.medium_violations.doc_count}}`}}\n\n=====================================\nVIOLATIONS BY CATEGORY\n=====================================\n{{`{{#ctx.results.0.aggregations.by_category.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} events\n{{`{{/ctx.results.0.aggregations.by_category.buckets}}`}}\n\n=====================================\nTOP UNAUTHORIZED APPLICATIONS\n=====================================\n{{`{{#ctx.results.0.aggregations.by_application.buckets}}`}}\n- {{`{{key}}`}}: {{`{{doc_count}}`}} detections\n{{`{{/ctx.results.0.aggregations.by_application.buckets}}`}}\n\n=====================================\nAFFECTED AGENTS (WITH IDs)\n=====================================\n{{`{{#ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n--- Agent: {{`{{key}}`}} ---\nAgent ID: {{`{{#agent_id.buckets}}`}}{{`{{key}}`}}{{`{{/agent_id.buckets}}`}}\nIP Address: {{`{{#agent_ip.buckets}}`}}{{`{{key}}`}}{{`{{/agent_ip.buckets}}`}}\nTotal Violations: {{`{{doc_count}}`}}\n\nApplications Detected:\n{{`{{#by_app.buckets}}`}}\n  - {{`{{key}}`}}: {{`{{doc_count}}`}} times\n{{`{{/by_app.buckets}}`}}\n\nViolation Categories:\n{{`{{#by_category.buckets}}`}}\n  - {{`{{key}}`}}: {{`{{doc_count}}`}}\n{{`{{/by_category.buckets}}`}}\n{{`{{/ctx.results.0.aggregations.by_agent.buckets}}`}}\n\n=====================================\nRECOMMENDED ACTIONS\n=====================================\n1. Review agents with CRITICAL violations immediately\n2. Contact asset owners for HIGH severity violations\n3. Schedule remediation for MEDIUM violations\n4. Update software policies if false positives detected\n5. Review IRP-UnauthorizedApps playbook for guidance\n\n=====================================\nPLAYBOOK REFERENCE\n=====================================\nFollow the Unauthorized Apps Incident Response Playbook:\n- Rule IDs: 750010-750099\n- Categories: Remote Access, P2P, Hacking Tools, Crypto Miners, VPN/Proxy, Gaming\n- Escalation: Critical/High -> SOC Lead, Medium -> SOC L1, Low -> IT Help Desk\n\nFor detailed investigation, please visit the Wazuh Dashboard.\n\n---\nGenerated by Wazuh Alerting\nDaily Report Schedule: {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleHour | default 8 }}:{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleMinute | default "00" }} {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleTimezone | default "UTC" }}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "Daily Unauthorized Apps Report" "$DAILY_UNAUTHORIZED_APPS_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 18: DLP Cloud Storage Detection
+    # Detects cloud storage and file transfer service access
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.dlpCloudStorage.enabled }}
+    DLP_CLOUD_STORAGE_MONITOR='{
+      "name": "DLP Cloud Storage Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.dlpCloudStorage.intervalMinutes | default 5 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.dlpCloudStorage.lookbackMinutes | default 5 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"match": {"rule.groups": "dlp"}},
+                          {"match": {"rule.groups": "cloud_storage"}},
+                          {"match": {"rule.groups": "data_exfiltration"}},
+                          {"range": {"rule.id": {"gte": 800300, "lte": 800360}}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 10
+                  }
+                },
+                "by_service": {
+                  "terms": {
+                    "field": "rule.groups",
+                    "size": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "Cloud Storage Access Detected",
+          "severity": "3",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - DLP Cloud Storage",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpCloudStorage.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH DLP] Cloud Storage Access Detected - {{`{{ctx.results[0].hits.total.value}}`}} events",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "==================================================\nDLP ALERT: Cloud Storage Access Detected\n==================================================\n\nTotal Detections: {{`{{ctx.results[0].hits.total.value}}`}}\nAlert Time: {{`{{ctx.periodEnd}}`}}\n\n--------------------------------------------------\nEVENT DETAILS\n--------------------------------------------------\n{{`{{#ctx.results[0].hits.hits}}`}}\n* Agent: {{`{{_source.agent.name}}`}}\n  Rule: {{`{{_source.rule.description}}`}}\n  Level: {{`{{_source.rule.level}}`}}\n  Time: {{`{{_source.@timestamp}}`}}\n\n{{`{{/ctx.results[0].hits.hits}}`}}\n--------------------------------------------------\nAFFECTED AGENTS\n--------------------------------------------------\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\n* {{`{{key}}`}}: {{`{{doc_count}}`}} alert(s)\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\n\n--------------------------------------------------\nACTION REQUIRED\n--------------------------------------------------\n1. Review user activity and business justification\n2. Check for sensitive data access (FIM logs)\n3. Follow IRP-DLP-CloudEmail playbook\n4. Document findings and resolution\n\n--------------------------------------------------\nGenerated by Wazuh DLP Alerting\n",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - DLP Cloud Storage",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpCloudStorage.throttleMinutes | default 30 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH DLP] Cloud Storage Access - {{`{{ctx.results[0].hits.total.value}}`}} events\",\"body\":\"## DLP Alert: Cloud Storage Access\\n\\n**Total Detections:** {{`{{ctx.results[0].hits.total.value}}`}}\\n**Alert Time:** {{`{{ctx.periodEnd}}`}}\\n\\n### Event Details\\n\\n| Agent | Rule | Level |\\n|-------|------|-------|\\n{{`{{#ctx.results[0].hits.hits}}`}}| {{`{{_source.agent.name}}`}} | {{`{{_source.rule.description}}`}} | {{`{{_source.rule.level}}`}} |\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n### Action Items\\n- [ ] Review user activity\\n- [ ] Check business justification\\n- [ ] Follow IRP-DLP-CloudEmail playbook\\n\\n---\\n*Generated by Wazuh DLP Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"dlp\",\"cloud-storage\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "DLP Cloud Storage Monitor" "$DLP_CLOUD_STORAGE_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 19: DLP High-Risk Exfiltration
+    # Critical alerts for anonymous file sharing, encrypted email, etc.
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.dlpHighRiskExfiltration.enabled }}
+    DLP_HIGH_RISK_MONITOR='{
+      "name": "DLP High-Risk Exfiltration Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.dlpHighRiskExfiltration.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.dlpHighRiskExfiltration.lookbackMinutes | default 2 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"term": {"rule.id": "800306"}},
+                          {"term": {"rule.id": "800307"}},
+                          {"term": {"rule.id": "800323"}},
+                          {"term": {"rule.id": "800324"}},
+                          {"term": {"rule.id": "800325"}},
+                          {"term": {"rule.id": "800360"}},
+                          {"match": {"rule.groups": "high_risk"}},
+                          {"match": {"rule.groups": "critical"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "High-Risk Exfiltration Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - DLP High Risk",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpHighRiskExfiltration.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":rotating_light: *CRITICAL DLP ALERT: High-Risk Exfiltration Detected*\n\n*Total Detections:* {{`{{ctx.results[0].hits.total.value}}`}}\n*Time:* {{`{{ctx.periodEnd}}`}}\n\n*Event Details:*\n{{`{{#ctx.results[0].hits.hits}}`}}\n:warning: Agent: {{`{{_source.agent.name}}`}} | Rule: {{`{{_source.rule.description}}`}} | Level: {{`{{_source.rule.level}}`}}\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:mag: *IMMEDIATE ACTION REQUIRED* - Follow IRP-DLP-CloudEmail playbook",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - DLP High Risk",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpHighRiskExfiltration.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL DLP] High-Risk Exfiltration Detected - {{`{{ctx.results[0].hits.total.value}}`}} events",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "==================================================\nCRITICAL DLP ALERT: High-Risk Exfiltration\n==================================================\n\nSEVERITY: CRITICAL\nTotal Detections: {{`{{ctx.results[0].hits.total.value}}`}}\nAlert Time: {{`{{ctx.periodEnd}}`}}\n\n--------------------------------------------------\nEVENT DETAILS\n--------------------------------------------------\n{{`{{#ctx.results[0].hits.hits}}`}}\n* Agent: {{`{{_source.agent.name}}`}}\n  Rule: {{`{{_source.rule.description}}`}}\n  Level: {{`{{_source.rule.level}}`}}\n  Time: {{`{{_source.@timestamp}}`}}\n\n{{`{{/ctx.results[0].hits.hits}}`}}\n--------------------------------------------------\nIMMEDIATE ACTIONS REQUIRED\n--------------------------------------------------\n1. CONTAIN - Consider network isolation if ongoing\n2. INVESTIGATE - Identify data accessed\n3. ESCALATE - Notify SOC Lead and CISO\n4. PRESERVE - Collect evidence before containment\n5. FOLLOW - IRP-DLP-CloudEmail playbook\n\nHigh-Risk Services Detected:\n- MEGA.nz: Privacy-focused file hosting\n- Anonymous file sharing: anonfiles, file.io, transfer.sh\n- Encrypted email: ProtonMail, Tutanota\n- Disposable email: tempmail, 10minutemail\n\n--------------------------------------------------\nGenerated by Wazuh DLP Alerting\n",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - DLP High Risk",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpHighRiskExfiltration.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL DLP] High-Risk Exfiltration - {{`{{ctx.results[0].hits.total.value}}`}} events\",\"body\":\"## CRITICAL DLP Alert: High-Risk Exfiltration\\n\\n**Severity:** CRITICAL\\n**Total Detections:** {{`{{ctx.results[0].hits.total.value}}`}}\\n**Alert Time:** {{`{{ctx.periodEnd}}`}}\\n\\n### Event Details\\n\\n| Agent | Rule | Level |\\n|-------|------|-------|\\n{{`{{#ctx.results[0].hits.hits}}`}}| {{`{{_source.agent.name}}`}} | {{`{{_source.rule.description}}`}} | {{`{{_source.rule.level}}`}} |\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n### Immediate Actions\\n- [ ] CONTAIN - Consider network isolation\\n- [ ] INVESTIGATE - Identify data accessed\\n- [ ] ESCALATE - Notify SOC Lead and CISO\\n- [ ] PRESERVE - Collect evidence\\n- [ ] FOLLOW - IRP-DLP-CloudEmail playbook\\n\\n---\\n*Generated by Wazuh DLP Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"dlp\",\"critical\",\"exfiltration\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "DLP High-Risk Exfiltration Monitor" "$DLP_HIGH_RISK_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 20: DLP USB Mass Storage Detection
+    # Detects USB mass storage device connections across all platforms
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.dlpUsbMassStorage.enabled }}
+    DLP_USB_MASS_STORAGE_MONITOR='{
+      "name": "DLP USB Mass Storage Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.dlpUsbMassStorage.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.dlpUsbMassStorage.lookbackMinutes | default 2 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"term": {"rule.id": "800131"}},
+                          {"term": {"rule.id": "800132"}},
+                          {"term": {"rule.id": "800133"}},
+                          {"term": {"rule.id": "800134"}},
+                          {"term": {"rule.id": "800151"}},
+                          {"term": {"rule.id": "800152"}},
+                          {"term": {"rule.id": "800153"}},
+                          {"term": {"rule.id": "800154"}},
+                          {"term": {"rule.id": "800161"}},
+                          {"term": {"rule.id": "800162"}},
+                          {"term": {"rule.id": "800163"}},
+                          {"term": {"rule.id": "800164"}},
+                          {"term": {"rule.id": "800170"}},
+                          {"match": {"rule.groups": "usb_dlp"}},
+                          {"match": {"rule.groups": "usb_storage"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 10
+                  }
+                },
+                "by_rule": {
+                  "terms": {
+                    "field": "rule.description",
+                    "size": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "USB Mass Storage Detected",
+          "severity": "2",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - USB Mass Storage",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpUsbMassStorage.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[WAZUH DLP] USB Mass Storage Detected - {{`{{ctx.results[0].hits.total.value}}`}} events",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "==================================================\nDLP ALERT: USB Mass Storage Device Detected\n==================================================\n\nSEVERITY: HIGH\nTotal Detections: {{`{{ctx.results[0].hits.total.value}}`}}\nAlert Time: {{`{{ctx.periodEnd}}`}}\n\nMITRE ATT&CK: T1052.001 (Exfiltration over USB)\n\n--------------------------------------------------\nEVENT DETAILS\n--------------------------------------------------\n{{`{{#ctx.results[0].hits.hits}}`}}\n* Agent: {{`{{_source.agent.name}}`}}\n  Rule: {{`{{_source.rule.description}}`}}\n  Level: {{`{{_source.rule.level}}`}}\n  Time: {{`{{_source.@timestamp}}`}}\n\n{{`{{/ctx.results[0].hits.hits}}`}}\n--------------------------------------------------\nAFFECTED AGENTS\n--------------------------------------------------\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\n* {{`{{key}}`}}: {{`{{doc_count}}`}} alert(s)\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\n\n--------------------------------------------------\nACTION REQUIRED\n--------------------------------------------------\n1. Identify user who connected the device\n2. Verify business justification\n3. Check for sensitive file access (FIM)\n4. Follow IRP-DLP-USB playbook\n\n--------------------------------------------------\nGenerated by Wazuh DLP Alerting\n",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - USB Mass Storage",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpUsbMassStorage.throttleMinutes | default 15 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[WAZUH DLP] USB Mass Storage Detected - {{`{{ctx.results[0].hits.total.value}}`}} events\",\"body\":\"## DLP Alert: USB Mass Storage Device\\n\\n**Severity:** HIGH\\n**Total Detections:** {{`{{ctx.results[0].hits.total.value}}`}}\\n**Alert Time:** {{`{{ctx.periodEnd}}`}}\\n**MITRE ATT&CK:** T1052.001\\n\\n### Event Details\\n\\n| Agent | Rule | Level |\\n|-------|------|-------|\\n{{`{{#ctx.results[0].hits.hits}}`}}| {{`{{_source.agent.name}}`}} | {{`{{_source.rule.description}}`}} | {{`{{_source.rule.level}}`}} |\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n### Action Items\\n- [ ] Identify user who connected device\\n- [ ] Verify business justification\\n- [ ] Check FIM logs for sensitive file access\\n- [ ] Follow IRP-DLP-USB playbook\\n\\n---\\n*Generated by Wazuh DLP Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"dlp\",\"usb\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "DLP USB Mass Storage Monitor" "$DLP_USB_MASS_STORAGE_MONITOR"
+    {{- end }}
+
+    # ================================================================
+    # MONITOR 21: DLP USB HID/BadUSB Detection
+    # CRITICAL: Detects potential BadUSB attacks (keyboard/HID devices)
+    # ================================================================
+    {{- if .Values.indexer.alerting.monitors.dlpUsbHidBadusb.enabled }}
+    DLP_USB_HID_MONITOR='{
+      "name": "DLP USB HID BadUSB Monitor",
+      "type": "monitor",
+      "monitor_type": "query_level_monitor",
+      "enabled": true,
+      "schedule": {
+        "period": {
+          "interval": {{ .Values.indexer.alerting.monitors.dlpUsbHidBadusb.intervalMinutes | default 1 }},
+          "unit": "MINUTES"
+        }
+      },
+      "inputs": [
+        {
+          "search": {
+            "indices": ["wazuh-alerts-*"],
+            "query": {
+              "size": 10,
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "range": {
+                        "@timestamp": {
+                          "gte": "now-{{ .Values.indexer.alerting.monitors.dlpUsbHidBadusb.lookbackMinutes | default 1 }}m",
+                          "lte": "now"
+                        }
+                      }
+                    },
+                    {
+                      "bool": {
+                        "should": [
+                          {"term": {"rule.id": "800140"}},
+                          {"term": {"rule.id": "800141"}},
+                          {"term": {"rule.id": "800142"}},
+                          {"term": {"rule.id": "800143"}},
+                          {"term": {"rule.id": "800144"}},
+                          {"term": {"rule.id": "800145"}},
+                          {"term": {"rule.id": "800146"}},
+                          {"term": {"rule.id": "800155"}},
+                          {"term": {"rule.id": "800156"}},
+                          {"term": {"rule.id": "800157"}},
+                          {"term": {"rule.id": "800165"}},
+                          {"term": {"rule.id": "800166"}},
+                          {"term": {"rule.id": "800167"}},
+                          {"term": {"rule.id": "800171"}},
+                          {"match": {"rule.groups": "badusb"}},
+                          {"match": {"rule.groups": "usb_hid"}}
+                        ],
+                        "minimum_should_match": 1
+                      }
+                    }
+                  ]
+                }
+              },
+              "aggs": {
+                "by_agent": {
+                  "terms": {
+                    "field": "agent.name",
+                    "size": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "triggers": [
+        {
+          "name": "USB HID BadUSB Detected",
+          "severity": "1",
+          "condition": {
+            "script": {
+              "source": "ctx.results[0].hits.total.value > 0",
+              "lang": "painless"
+            }
+          },
+          "actions": [
+            {{- $hasSlack := .Values.notification.slack.enabled }}
+            {{- $hasEmail := and .Values.notification.email .Values.notification.email.enabled }}
+            {{- $hasGithub := and .Values.notification.github .Values.notification.github.enabled }}
+            {{- if $hasSlack }}
+            {
+              "name": "Slack Alert - USB HID BadUSB",
+              "destination_id": "'"${SLACK_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpUsbHidBadusb.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": ":rotating_light: *CRITICAL DLP ALERT: Potential BadUSB Attack*\n\n*Total Detections:* {{`{{ctx.results[0].hits.total.value}}`}}\n*Time:* {{`{{ctx.periodEnd}}`}}\n\n*Event Details:*\n{{`{{#ctx.results[0].hits.hits}}`}}\n:warning: Agent: {{`{{_source.agent.name}}`}} | Rule: {{`{{_source.rule.description}}`}} | Level: {{`{{_source.rule.level}}`}}\n{{`{{/ctx.results[0].hits.hits}}`}}\n\n:mag: *IMMEDIATE ACTION REQUIRED* - Potential BadUSB attack in progress!",
+                "lang": "mustache"
+              }
+            }{{- if or $hasEmail $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasEmail }}
+            {
+              "name": "Email Alert - USB HID BadUSB",
+              "destination_id": "'"${EMAIL_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpUsbHidBadusb.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "subject_template": {
+                "source": "[CRITICAL DLP] Potential BadUSB Attack - {{`{{ctx.results[0].hits.total.value}}`}} events",
+                "lang": "mustache"
+              },
+              "message_template": {
+                "source": "==================================================\nCRITICAL DLP ALERT: Potential BadUSB Attack\n==================================================\n\nSEVERITY: CRITICAL\nTotal Detections: {{`{{ctx.results[0].hits.total.value}}`}}\nAlert Time: {{`{{ctx.periodEnd}}`}}\n\nMITRE ATT&CK: T1200 (Hardware Additions)\n                T1052.001 (Exfiltration over USB)\n\n--------------------------------------------------\nEVENT DETAILS\n--------------------------------------------------\n{{`{{#ctx.results[0].hits.hits}}`}}\n* Agent: {{`{{_source.agent.name}}`}}\n  Rule: {{`{{_source.rule.description}}`}}\n  Level: {{`{{_source.rule.level}}`}}\n  Time: {{`{{_source.@timestamp}}`}}\n\n{{`{{/ctx.results[0].hits.hits}}`}}\n--------------------------------------------------\nAFFECTED AGENTS\n--------------------------------------------------\n{{`{{#ctx.results[0].aggregations.by_agent.buckets}}`}}\n* {{`{{key}}`}}: {{`{{doc_count}}`}} alert(s)\n{{`{{/ctx.results[0].aggregations.by_agent.buckets}}`}}\n\n--------------------------------------------------\nIMMEDIATE ACTIONS REQUIRED\n--------------------------------------------------\n1. CONTAIN - Request immediate device removal\n2. IDENTIFY - Who connected the device?\n3. INVESTIGATE - Was this a rapid HID connection?\n4. PRESERVE - Collect evidence before containment\n5. FOLLOW - IRP-DLP-USB playbook\n\nRapid HID (keyboard) connections may indicate:\n- BadUSB/Rubber Ducky attack\n- Malicious USB device masquerading as keyboard\n- Automated keystroke injection\n\n--------------------------------------------------\nGenerated by Wazuh DLP Alerting\n",
+                "lang": "mustache"
+              }
+            }{{- if $hasGithub }},{{ end }}
+            {{- end }}
+            {{- if $hasGithub }}
+            {
+              "name": "GitHub Issue - USB HID BadUSB",
+              "destination_id": "'"${GITHUB_DEST_ID}"'",
+              "throttle_enabled": true,
+              "throttle": {
+                "value": {{ .Values.indexer.alerting.monitors.dlpUsbHidBadusb.throttleMinutes | default 5 }},
+                "unit": "MINUTES"
+              },
+              "message_template": {
+                "source": "{\"title\":\"[CRITICAL DLP] Potential BadUSB Attack - {{`{{ctx.results[0].hits.total.value}}`}} events\",\"body\":\"## CRITICAL DLP Alert: Potential BadUSB Attack\\n\\n**Severity:** CRITICAL\\n**Total Detections:** {{`{{ctx.results[0].hits.total.value}}`}}\\n**Alert Time:** {{`{{ctx.periodEnd}}`}}\\n**MITRE ATT&CK:** T1200, T1052.001\\n\\n### Event Details\\n\\n| Agent | Rule | Level |\\n|-------|------|-------|\\n{{`{{#ctx.results[0].hits.hits}}`}}| {{`{{_source.agent.name}}`}} | {{`{{_source.rule.description}}`}} | {{`{{_source.rule.level}}`}} |\\n{{`{{/ctx.results[0].hits.hits}}`}}\\n\\n### Immediate Actions\\n- [ ] CONTAIN - Request immediate device removal\\n- [ ] IDENTIFY - Who connected the device?\\n- [ ] INVESTIGATE - Was this a rapid HID connection?\\n- [ ] PRESERVE - Collect evidence\\n- [ ] FOLLOW - IRP-DLP-USB playbook\\n\\n### Risk Assessment\\nRapid HID connections may indicate:\\n- BadUSB/Rubber Ducky attack\\n- Malicious USB device masquerading as keyboard\\n- Automated keystroke injection\\n\\n---\\n*Generated by Wazuh DLP Alerting*\",\"labels\":[\"security-alert\",\"wazuh\",\"dlp\",\"critical\",\"badusb\"]}",
+                "lang": "mustache"
+              }
+            }
+            {{- end }}
+          ]
+        }
+      ]
+    }'
+    create_monitor "DLP USB HID BadUSB Monitor" "$DLP_USB_HID_MONITOR"
+    {{- end }}
+
+    echo ""
+    echo "========================================"
+    echo "Alerting monitors setup completed!"
+    echo "========================================"
+    echo ""
+    echo "Created monitors:"
+    echo "  1. Unauthorized Application Monitor"
+    echo "  2. Critical Hacking Tools Monitor"
+    echo "  3. Remote Access Tools Monitor"
+    echo "  4. Security Software Removal Monitor"
+    {{- if .Values.indexer.alerting.monitors.newAgentRegistered.enabled }}
+    echo "  5. New Agent Registered Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.anomalyDetected.enabled }}
+    echo "  6. Anomaly Detected Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.agentDisconnected.enabled }}
+    echo "  7. Agent Disconnected Monitor ({{ .Values.indexer.alerting.monitors.agentDisconnected.noEventPeriodDays | default 7 }} days threshold)"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.bruteForceAttack.enabled }}
+    echo "  8. Brute Force Attack Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.rootkitMalwareDetected.enabled }}
+    echo "  9. Rootkit/Malware Detection Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.criticalSeverityAlert.enabled }}
+    echo "  10. Critical Severity Alert Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.dailySecuritySummary.enabled }}
+    echo "  11. Daily Security Summary ({{ .Values.indexer.alerting.monitors.dailySecuritySummary.scheduleHour | default 8 }}:00 {{ .Values.indexer.alerting.monitors.dailySecuritySummary.scheduleTimezone | default "UTC" }})"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.weeklyComplianceReport.enabled }}
+    echo "  12. Weekly Compliance Report ({{ .Values.indexer.alerting.monitors.weeklyComplianceReport.scheduleDay | default "MON" }} {{ .Values.indexer.alerting.monitors.weeklyComplianceReport.scheduleHour | default 8 }}:00 {{ .Values.indexer.alerting.monitors.weeklyComplianceReport.scheduleTimezone | default "UTC" }})"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.deprecatedOsReport.enabled }}
+    echo "  13. Deprecated OS Report ({{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleHour | default 8 }}:0{{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleMinute | default 1 }} {{ .Values.indexer.alerting.monitors.deprecatedOsReport.scheduleTimezone | default "UTC" }})"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.phishingDetection.enabled }}
+    echo "  14. Phishing Detection Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.anonymizerTorDetection.enabled }}
+    echo "  15. Anonymizer/Tor Detection Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.cryptominingDns.enabled }}
+    echo "  16. Cryptomining DNS Detection Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.enabled }}
+    echo "  17. Daily Unauthorized Apps Report ({{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleHour | default 8 }}:0{{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleMinute | default 0 }} {{ .Values.indexer.alerting.monitors.dailyUnauthorizedAppsReport.scheduleTimezone | default "UTC" }})"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.dlpCloudStorage.enabled }}
+    echo "  18. DLP Cloud Storage Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.dlpHighRiskExfiltration.enabled }}
+    echo "  19. DLP High-Risk Exfiltration Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.dlpUsbMassStorage.enabled }}
+    echo "  20. DLP USB Mass Storage Monitor"
+    {{- end }}
+    {{- if .Values.indexer.alerting.monitors.dlpUsbHidBadusb.enabled }}
+    echo "  21. DLP USB HID/BadUSB Monitor"
+    {{- end }}
+    echo ""
+{{- end }}

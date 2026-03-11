@@ -10,96 +10,49 @@ data:
   {{ $template := $.Files.Get "files/configs/template.config.conf.xml" -}}
   "template.config.xml": |
     {{- include "common.tplvalues.render" (dict "value" $template "context" $) | nindent 4 }}
+  
   "0004-custom-decoder.xml":  |
-<<<<<<< ours
     {{ $.Files.Get "files/configs/decoders/decoder.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.yara.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.adguard.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.santa.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/decoders/decoder.docker.xml" | nindent 6 }}
   
   "7005-audit-mitre_rules.xml": |
-{{ $.Files.Get "files/configs/rules/rules.audit-mitre.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.audit-mitre.xml" | nindent 4 }}
   "7006-fim-macos.xml": |
-{{ $.Files.Get "files/configs/rules/rules.FIM-MacOS.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.FIM-MacOS.xml" | nindent 4 }}
   "7006-macos-syslog.xml": |
-{{ $.Files.Get "files/configs/rules.MacOS-Syslog.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.macos-syslog.xml" | nindent 4 }}
   "7006-macos-auth.xml": |
-{{ $.Files.Get "files/configs/rules.MacOS-Auth.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.MacOS-Auth.xml" | nindent 4 }}
   "7007-fim-linux.xml": |
-{{ $.Files.Get "files/configs/rules/rules.FIM-Linux.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.FIM-Linux.xml" | nindent 4 }}
   "7008-custom-yara.xml": |
-{{ $.Files.Get "files/configs/rules/rules.custom-yara.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.custom-yara.xml" | nindent 4 }}
   "7009-fim-windows.xml": |
-{{ $.Files.Get "files/configs/rules/rules.custom-windows.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.custom-windows.xml" | nindent 4 }}
   "7010-app-blacklist.xml": |
-{{ $.Files.Get "files/configs/rules/rules.app-blacklist.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.app-blacklist.xml" | nindent 4 }}
   "7011-dns-monitoring.xml": |
-{{ $.Files.Get "files/configs/rules/rules.dns-monitoring.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.dns-monitoring.xml" | nindent 4 }}
   "7012-suricata-custom.xml": |
-{{ $.Files.Get "files/configs/rules/rules.suricata-custom.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.suricata-custom.xml" | nindent 4 }}
   "7013-adguard.xml": |
-{{ $.Files.Get "files/configs/rules/rules.adguard.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.adguard.xml" | nindent 4 }}
   "7014-usb-dlp.xml": |
-{{ $.Files.Get "files/configs/rules/rules.usb-dlp.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.usb-dlp.xml" | nindent 4 }}
   "7015-dlp-cloud-email.xml": |
-{{ $.Files.Get "files/configs/rules/rules.dlp-cloud-email.xml" | indent 4 }}
+    {{ $.Files.Get "files/configs/rules/rules.dlp-cloud-email.xml" | nindent 4 }}
   "7016-lotl-detection.xml": |
-{{ $.Files.Get "files/configs/rules/rules.lotl-detection.xml" | indent 4 }}
-  "7017-macos-syslog.xml": |
-{{ $.Files.Get "files/configs/rules/rules.macos-syslog.xml" | indent 4 }}
-=======
-    {{ $.Files.Get "files/configs/decoder.owasp_zap.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/decoder.trivy.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/decoder.yara.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/decoder.docker.xml" | nindent 6 }}
-  
-  "7005-audit-mitre_rules.xml":  |
-    {{ $.Files.Get "files/configs/rules.audit-mitre.xml" | nindent 6 }}
-
-  "7012-docker-runtime.xml":  |
-    {{ $.Files.Get "files/configs/rules.docker-runtime.xml" | nindent 6 }}
+    {{ $.Files.Get "files/configs/rules/rules.lotl-detection.xml" | nindent 4 }}
+  "7012-docker-runtime.xml": |
+    {{ $.Files.Get "files/configs/rules/rules.docker-runtime.xml" | nindent 6 }}
 
   {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
   "docker-agent.xml": |
-    <agent_config>
-      <wodle name="docker-listener">
-        <disabled>{{ $.Values.integration.docker.listener.disabled }}</disabled>
-        <attempts>{{ $.Values.integration.docker.listener.attempts }}</attempts>
-        <run_on_start>{{ $.Values.integration.docker.listener.run_on_start }}</run_on_start>
-      </wodle>
-      {{- if $.Values.integration.docker.logCollection.enabled }}
-      <localfile>
-        <log_format>{{ $.Values.integration.docker.logCollection.log_format }}</log_format>
-        <location>{{ $.Values.integration.docker.logCollection.location }}</location>
-      </localfile>
-      {{- end }}
-    </agent_config>
+    {{ $.Files.Get "files/configs/docker-agent.xml" | nindent 6 }}
   {{- end }}
-
-  "7006-fim-macos.xml":  |
-    {{ $.Files.Get "files/configs/rules.FIM-MacOS.xml" | nindent 6 }}
-
-  "7006-macos-syslog.xml":  |
-    {{ $.Files.Get "files/configs/rules.MacOS-Syslog.xml" | nindent 6 }}
-
-  "7006-macos-auth.xml":  |
-    {{ $.Files.Get "files/configs/rules.MacOS-Auth.xml" | nindent 6 }}
-
-  "7007-fim-linux.xml":  |
-    {{ $.Files.Get "files/configs/rules.FIM-Linux.xml" | nindent 6 }}
-
-  "7008-custom-yara.xml":  |
-    {{ $.Files.Get "files/configs/rules.custom-yara.xml" | nindent 6 }}  
-
-  "7009-fim-windows.xml":  |
-    {{ $.Files.Get "files/configs/rules.custom-windows.xml" | nindent 6 }}
-
-  "7010-custom-suricata.xml":  |
-    {{ $.Files.Get "files/configs/rules.suricata.xml" | nindent 6 }}      
-
-  "7011-lotl-detection.xml":  |
-    {{ $.Files.Get "files/configs/lotl-detection.xml" | nindent 6 }}
->>>>>>> theirs
 
   "dlp.xml": |
     {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}

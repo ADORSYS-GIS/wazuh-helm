@@ -1,5 +1,6 @@
 global:
   domain: 'dev.wazuh.adorsys.team'
+  storageClassName: 'wazuh-ebs'
 
 svcs:
   '{{ include "common.names.fullname" $ }}':
@@ -103,14 +104,6 @@ dashboard:
 
 extraVolumeConfigs:
   '{{ include "common.names.fullname" $ }}-manager-backup':
-    resources:
-      requests:
-        storage: 10Gi
-  snort-alerts:
-    resources:
-      requests:
-        storage: 10Gi
-  owasp-zap-alerts:
     resources:
       requests:
         storage: 10Gi

@@ -6,4 +6,6 @@ test.yaml
 *.csr
 *.srl
 *.tgz
-*tmp*
+
+# Prompts folder
+prompts/

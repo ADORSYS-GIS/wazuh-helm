@@ -37,6 +37,9 @@ false
 {{- if $aws.awsOrganizationId }}
     <aws_organization_id>{{ include "common.tplvalues.render" (dict "value" $aws.awsOrganizationId "context" $) }}</aws_organization_id>
 {{- end }}
+{{- if $aws.cloudtrail.onlyLogsAfter }}
+    <only_logs_after>{{ include "common.tplvalues.render" (dict "value" $aws.cloudtrail.onlyLogsAfter "context" $) }}</only_logs_after>
+{{- end }}
   </bucket>
 {{- end }}
 {{- if and $aws.config $aws.config.enabled }}
@@ -78,6 +81,9 @@ false
 {{- end }}
 {{- if $aws.guardduty.awsAccountIds }}
     <aws_account_id>{{ include "common.tplvalues.render" (dict "value" $aws.guardduty.awsAccountIds "context" $) }}</aws_account_id>
+{{- end }}
+{{- if $aws.guardduty.onlyLogsAfter }}
+    <only_logs_after>{{ include "common.tplvalues.render" (dict "value" $aws.guardduty.onlyLogsAfter "context" $) }}</only_logs_after>
 {{- end }}
   </bucket>
 {{- end }}

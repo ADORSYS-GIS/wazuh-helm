@@ -410,29 +410,25 @@ spec:
 
             # macOS Syslog monitoring rules
             - name: config
-<<<<<<< ours
               mountPath: /wazuh-config-mount/etc/rules/7017-macos-syslog.xml
               subPath: 7017-macos-syslog.xml
               readOnly: true
 
-            # DLP agent configuration (log collection for DLP monitoring)
             - name: config
-              mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf
-=======
               mountPath: /wazuh-config-mount/etc/rules/7012-docker-runtime.xml
-              subPath: 7012-docker-runtime.xml
+              subPath: rules.docker-runtime.xml
               readOnly: true
 
             {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
             - name: config
-              mountPath: /var/ossec/etc/shared/docker/agent.conf
+              mountPath: /wazuh-config-mount/etc/shared/docker/agent.conf
               subPath: docker-agent.xml
               readOnly: true
             {{- end }}
 
+            # DLP agent configuration (log collection for DLP monitoring)
             - name: config
-              mountPath: /var/ossec/etc/shared/dlp/agent.conf
->>>>>>> theirs
+              mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf
               subPath: dlp.xml
               readOnly: true
 
