@@ -1,0 +1,52 @@
+<group name="docker_runtime">
+
+  <!-- HIGH: Interactive shell session or shell command execution -->
+  <rule id="107001" level="10">
+    <if_sid>87907</if_sid>
+    <field name="docker.status" type="pcre2">^exec_start: (?:/bin/)?(?:bash|sh|dash|zsh)\b</field>
+    <description>Docker: Shell session or command execution in container $(docker.Actor.Attributes.name)</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>pci_dss_10.2.7,gdpr_IV_32.2,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- MEDIUM: Image pulled from untrusted registry (not docker.io or ghcr.io) -->
+  <rule id="107010" level="8">
+    <if_sid>87932</if_sid>
+    <field name="docker.Actor.Attributes.name" negate="yes">^docker.io|^ghcr.io|^registry.hub.docker.com</field>
+    <description>Docker: Image pulled from untrusted registry: $(docker.Actor.Attributes.name)</description>
+    <mitre>
+      <id>T1204.003</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- HIGH: Multiple containers destroyed in short time (potential cleanup/cover-up) -->
+  <rule id="107020" level="10" frequency="5" timeframe="60">
+    <if_matched_sid>87902</if_matched_sid>
+    <description>Docker: Multiple containers destroyed rapidly - potential evidence cleanup</description>
+    <mitre>
+      <id>T1070.004</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- LOW: Informational - container died -->
+  <rule id="107030" level="3">
+    <if_sid>87900</if_sid>
+    <field name="docker.status">^die$</field>
+    <description>Docker: Container $(docker.Actor.Attributes.name) died with exit code $(docker.Actor.Attributes.exitCode)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- MEDIUM: Container died with non-zero exit code (crash or kill) -->
+  <rule id="107031" level="7">
+    <if_sid>107030</if_sid>
+    <field name="docker.Actor.Attributes.exitCode" negate="yes">^0$</field>
+    <description>Docker: Container $(docker.Actor.Attributes.name) crashed with exit code $(docker.Actor.Attributes.exitCode)</description>
+    <options>no_full_log</options>
+  </rule>
+
+</group>

@@ -703,6 +703,14 @@ notification:
 # =============================================================================
 
 integration:
+  ##
+  ## Docker container monitoring configuration
+  ## When enabled, the manager pushes these settings to agents via shared agent.conf
+  ## Agents with Docker installed will start the Docker listener automatically
+  docker:
+    ## Enable pushing Docker monitoring config to agents
+    enabled: true
+
   jira:
     enabled: false
     webhookUrl: https://<example>.jira.com/services/hooks/<webhook>

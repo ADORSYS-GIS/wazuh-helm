@@ -414,6 +414,19 @@ spec:
               subPath: 7017-macos-syslog.xml
               readOnly: true
 
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7012-docker-runtime.xml
+              subPath: 7012-docker-runtime.xml
+              readOnly: true
+
+            # Docker group configuration (Centralized groups)
+            {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
+            - name: config
+              mountPath: /wazuh-config-mount/etc/shared/docker/agent.conf
+              subPath: agent-docker.conf
+              readOnly: true
+            {{- end }}
+
             # DLP agent configuration (log collection for DLP monitoring)
             - name: config
               mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf

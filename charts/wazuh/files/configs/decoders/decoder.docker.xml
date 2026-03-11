@@ -1,0 +1,4 @@
+<decoder name="wazuh-docker-json">
+  <prematch type="pcre2">^Wazuh-Docker:\s*\{</prematch>
+  <plugin_decoder offset="after_prematch">JSON_Decoder</plugin_decoder>
+</decoder>
