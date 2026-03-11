@@ -292,6 +292,9 @@ spec:
               readOnly: true
 
             - name: config
+<<<<<<< ours
+              mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf
+=======
               mountPath: /wazuh-config-mount/etc/rules/7012-docker-runtime.xml
               subPath: 7012-docker-runtime.xml
               readOnly: true
@@ -305,6 +308,7 @@ spec:
 
             - name: config
               mountPath: /var/ossec/etc/shared/dlp/agent.conf
+>>>>>>> theirs
               subPath: dlp.xml
               readOnly: true
               
