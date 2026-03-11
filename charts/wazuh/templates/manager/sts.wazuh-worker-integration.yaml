@@ -419,6 +419,7 @@ spec:
               subPath: 7012-docker-runtime.xml
               readOnly: true
 
+            # Docker group configuration (Centralized groups)
             {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
             - name: config
               mountPath: /wazuh-config-mount/etc/shared/docker/agent.conf
