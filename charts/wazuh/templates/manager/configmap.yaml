@@ -49,10 +49,7 @@ data:
   "7012-docker-runtime.xml": |
     {{ $.Files.Get "files/configs/rules/rules.docker-runtime.xml" | nindent 6 }}
 
-  {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
-  "docker-agent.xml": |
-    {{ $.Files.Get "files/configs/docker-agent.xml" | nindent 6 }}
-  {{- end }}
+
 
   "dlp.xml": |
     {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}

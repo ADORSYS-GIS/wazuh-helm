@@ -323,71 +323,88 @@ spec:
               mountPath: /wazuh-config-mount/etc/rules/7005-audit-mitre_rules.xml
               subPath: 7005-audit-mitre_rules.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7006-fim-macos.xml
               subPath: 7006-fim-macos.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7006-macos-syslog.xml
               subPath: 7006-macos-syslog.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7006-macos-auth.xml
               subPath: 7006-macos-auth.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
               subPath: 7007-fim-linux.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7008-custom-yara.xml
               subPath: 7008-custom-yara.xml
               readOnly: true  
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml
               subPath: 7009-fim-windows.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7010-app-blacklist.xml
               subPath: 7010-app-blacklist.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7011-dns-monitoring.xml
               subPath: 7011-dns-monitoring.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7012-suricata-custom.xml
               subPath: 7012-suricata-custom.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7013-adguard.xml
               subPath: 7013-adguard.xml
               readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7014-usb-dlp.xml
               subPath: 7014-usb-dlp.xml
               readOnly: true
+
+            # DLP Cloud/Email rules - re-enabled with increased memory (10Gi)
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7015-dlp-cloud-email.xml
               subPath: 7015-dlp-cloud-email.xml
               readOnly: true
+
+            # LOTL (Living Off The Land) detection rules
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7016-lotl-detection.xml
               subPath: 7016-lotl-detection.xml
               readOnly: true
 
+            # macOS Syslog monitoring rules
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7017-macos-syslog.xml
+              subPath: 7017-macos-syslog.xml
+              readOnly: true
+
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7012-docker-runtime.xml
-              subPath: rules.docker-runtime.xml
+              subPath: 7012-docker-runtime.xml
               readOnly: true
 
-            {{- if and $.Values.integration $.Values.integration.docker $.Values.integration.docker.enabled }}
-            - name: config
-              mountPath: /wazuh-config-mount/etc/shared/docker/agent.conf
-              subPath: docker-agent.xml
-              readOnly: true
-            {{- end }}
 
+
+            # DLP agent configuration (log collection for DLP monitoring)
             - name: config
               mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf
               subPath: dlp.xml
@@ -425,10 +442,14 @@ spec:
               subPath: agent-windows.conf
               readOnly: true
 
-            # Docker group (integrated from main)
             - name: config
-              mountPath: /wazuh-config-mount/etc/shared/docker/agent.conf
-              subPath: agent-docker.conf
+              mountPath: /wazuh-config-mount/etc/rules/7010-custom-suricata.xml
+              subPath: 7010-custom-suricata.xml
+              readOnly: true        
+
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
+              subPath: 7011-lotl-detection.xml
               readOnly: true
 
             {{ range $k, $v := $.Values.cluster.decoders }}
