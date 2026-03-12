@@ -176,6 +176,7 @@ spec:
             - name: wazuh-config-temp
               mountPath: /processed
         # Copy Filebeat config from ConfigMap to PVC on startup
+        # Also clean stale rules from previous deployments
         - name: filebeat-config-init
           image: busybox:1.36
           command:
@@ -186,6 +187,18 @@ spec:
               cp /filebeat-template/filebeat.yml /etc/filebeat/filebeat.yml
               echo "Filebeat config copied successfully"
               cat /etc/filebeat/filebeat.yml | grep -A1 archives:
+              # Clean ALL custom rules (70*.xml) - the container entrypoint will recreate enabled ones
+              echo "Cleaning custom rules from persistent storage..."
+              RULES_DIR="/var/ossec/etc/rules"
+              if [ -d "$RULES_DIR" ]; then
+                ls -la "$RULES_DIR"/ || true
+                rm -rf "$RULES_DIR"/70* 2>/dev/null || true
+                echo "Removed all 70* files and directories"
+                ls -la "$RULES_DIR"/ || true
+              else
+                echo "Rules directory does not exist yet"
+              fi
+              echo "Rule cleanup complete"
           volumeMounts:
             - name: filebeat-config
               mountPath: /filebeat-template
@@ -193,6 +206,9 @@ spec:
             - name: {{ include "common.names.fullname" $ }}-manager-master
               mountPath: /etc/filebeat
               subPath: filebeat/etc/filebeat
+            - name: {{ include "common.names.fullname" $ }}-manager-master
+              mountPath: /var/ossec/etc/rules
+              subPath: wazuh/var/ossec/etc/rules
       securityContext:
         fsGroup: 999
       containers:
@@ -297,14 +313,18 @@ spec:
               readOnly: true
             {{- end }}
 
+            {{- if $.Values.customRules.localRules }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/local_rules.xml
               subPath: local_rules.xml
               readOnly: true
+            {{- end }}
+            {{- if $.Values.customRules.decoders }}
             - name: config
               mountPath: /wazuh-config-mount/etc/decoders/0004-custom-decoder.xml
               subPath: 0004-custom-decoder.xml
               readOnly: true
+            {{- end }}
             - name: config
               mountPath: /wazuh-config-mount/etc/local_internal_options.conf
               subPath: local_internal_options.conf
@@ -319,16 +339,21 @@ spec:
               subPath: custom-jira.py
             {{- end }}
 
+            {{- if $.Values.customRules.auditMitre }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7005-audit-mitre_rules.xml
               subPath: 7005-audit-mitre_rules.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.fimMacos }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7006-fim-macos.xml
               subPath: 7006-fim-macos.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.macosSyslog }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7006-macos-syslog.xml
               subPath: 7006-macos-syslog.xml
@@ -338,70 +363,98 @@ spec:
               mountPath: /wazuh-config-mount/etc/rules/7006-macos-auth.xml
               subPath: 7006-macos-auth.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.fimLinux }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7007-fim-linux.xml
               subPath: 7007-fim-linux.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.yara }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7008-custom-yara.xml
               subPath: 7008-custom-yara.xml
-              readOnly: true  
+              readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.trivy }}
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7018-trivy.xml
+              subPath: 7018-trivy.xml
+              readOnly: true
+            {{- end }}
+
+            {{- if $.Values.customRules.fimWindows }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml
               subPath: 7009-fim-windows.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.appBlacklist }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7010-app-blacklist.xml
               subPath: 7010-app-blacklist.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.dnsMonitoring }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7011-dns-monitoring.xml
               subPath: 7011-dns-monitoring.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.suricata }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7012-suricata-custom.xml
               subPath: 7012-suricata-custom.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.adguard }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7013-adguard.xml
               subPath: 7013-adguard.xml
               readOnly: true
+            {{- end }}
 
+            {{- if $.Values.customRules.usbDlp }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7014-usb-dlp.xml
               subPath: 7014-usb-dlp.xml
               readOnly: true
+            {{- end }}
 
-            # DLP Cloud/Email rules - re-enabled with increased memory (10Gi)
+            {{- if $.Values.customRules.dlpCloudEmail }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7015-dlp-cloud-email.xml
               subPath: 7015-dlp-cloud-email.xml
               readOnly: true
+            {{- end }}
 
-            # LOTL (Living Off The Land) detection rules
+            {{- if $.Values.customRules.lotlDetection }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7016-lotl-detection.xml
               subPath: 7016-lotl-detection.xml
               readOnly: true
+            {{- end }}
 
-            # macOS Syslog monitoring rules
+            {{- if $.Values.customRules.macosSyslogRules }}
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7017-macos-syslog.xml
               subPath: 7017-macos-syslog.xml
               readOnly: true
+            {{- end }}
 
-            # DLP agent configuration (log collection for DLP monitoring)
+            {{- if $.Values.customRules.dlp }}
             - name: config
               mountPath: /wazuh-config-mount/etc/shared/dlp/agent.conf
               subPath: dlp.xml
               readOnly: true
+            {{- end }}
 
             # Default group (common settings only)
             - name: config
@@ -435,15 +488,12 @@ spec:
               subPath: agent-windows.conf
               readOnly: true
 
+            {{- if $.Values.customRules.suricata | default false }}
             - name: config
-              mountPath: /wazuh-config-mount/etc/rules/7010-custom-suricata.xml
-              subPath: 7010-custom-suricata.xml
-              readOnly: true        
-
-            - name: config
-              mountPath: /wazuh-config-mount/etc/rules/7011-lotl-detection.xml
-              subPath: 7011-lotl-detection.xml
+              mountPath: /wazuh-config-mount/etc/rules/7012-suricata-custom.xml
+              subPath: 7012-suricata-custom.xml
               readOnly: true
+            {{- end }}
 
             {{ range $k, $v := $.Values.cluster.decoders }}
             {{- $f := include "common.tplvalues.render" (dict "value" $v "context" $) -}}

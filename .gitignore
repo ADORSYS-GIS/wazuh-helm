@@ -9,3 +9,4 @@ test.yaml
 
 # Prompts folder
 prompts/
+./charts/wazuh/wazuh-dev-values.yaml

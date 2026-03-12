@@ -364,7 +364,14 @@ spec:
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7008-custom-yara.xml
               subPath: 7008-custom-yara.xml
-              readOnly: true  
+              readOnly: true
+
+            {{- if $.Values.customRules.trivy }}
+            - name: config
+              mountPath: /wazuh-config-mount/etc/rules/7018-trivy.xml
+              subPath: 7018-trivy.xml
+              readOnly: true
+            {{- end }}
 
             - name: config
               mountPath: /wazuh-config-mount/etc/rules/7009-fim-windows.xml

@@ -1,3 +1,39 @@
+<!--
+  Living off the Land (LOTL) Detection Rules
+  ===========================================
+
+  Purpose:
+  Detect data exfiltration attempts using legitimate system binaries (LOTL binaries).
+  Attackers use trusted tools like curl, wget, PowerShell, scp, rsync to evade detection
+  since these are normal system utilities.
+
+  Coverage:
+  - Windows: PowerShell (Invoke-WebRequest, Start-BitsTransfer), curl.exe, wget.exe, pscp.exe
+  - macOS: curl, wget, scp, rsync, nc, netcat, ftp, sftp (via Santa logs)
+  - Linux: curl, wget, scp, sftp, rsync, nc, netcat, ftp, tftp (via Auditd)
+
+  Detection Patterns:
+  - HTTP POST/PUT uploads with file data
+  - SCP/SFTP transfers to remote hosts (local-to-remote pattern)
+  - Command-line arguments indicating file upload operations
+
+  MITRE ATT&CK Techniques:
+  - T1059.001: Command and Scripting Interpreter: PowerShell
+  - T1041: Exfiltration Over C2 Channel
+  - T1048: Exfiltration Over Alternative Protocol
+  - T1567: Exfiltration Over Web Service
+  - T1021.004: Remote Services: SSH
+  - T1105: Ingress Tool Transfer
+
+  Rule IDs: 100530-100540
+  Alert Level: 12 (High) for exfiltration detection
+
+  Prerequisites:
+  - Windows: PowerShell Script Block Logging enabled
+  - macOS: Santa endpoint security tool installed
+  - Linux: Auditd configured with 'exfil' key for network binaries
+-->
+
 <group name="windows, lolt, exfiltration">
     <rule id="100530" level="0">
         <if_sid>60009</if_sid>
@@ -103,7 +139,7 @@
     </rule>
 
     <rule id="100540" level="12">
-        <if_sid>92603, 100538</if_sid>
+        <if_sid>100538</if_sid>
         <field name="audit.command" type="pcre2">(?i)^(scp|sftp|rsync)$</field>
         <regex type="pcre2">type=EXECVE.*?a\d+="(?![^"]*@[^"@]+:)(?!-)[^"]*".*?a\d+="[^"]*@[^"@]+:[^"]*"(?!.*a\d+=)</regex>
         <description>Potential data exfiltration via $(audit.command) to remote host</description>

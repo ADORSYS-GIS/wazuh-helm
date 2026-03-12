@@ -1,9 +1,0 @@
-<decoder name="santa">
-    <prematch>I santad:</prematch>
-</decoder>
-
-<decoder name="santa-kv">
-    <parent>santa</parent>
-    <regex type="pcre2">action=([^|]+)\|decision=([^|]+)\|reason=([^|]+).*?sha256=([^|]+).*?pid=([^|]+)\|pidversion=([^|]+)\|ppid=([^|]+)\|uid=([^|]+)\|user=([^|]+)\|gid=([^|]+)\|group=([^|]+)\|mode=([^|]+)\|path=([^|]+)\|args=(.+)$</regex>
-    <order>action,decision,reason,sha256,pid,pidversion,ppid,uid,user,gid,group,mode,path,args</order>
-</decoder>

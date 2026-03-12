@@ -10,45 +10,78 @@ data:
   {{ $template := $.Files.Get "files/configs/template.config.conf.xml" -}}
   "template.config.xml": |
     {{- include "common.tplvalues.render" (dict "value" $template "context" $) | nindent 4 }}
+  {{- if $.Values.customRules.decoders | default false }}
   "0004-custom-decoder.xml":  |
     {{ $.Files.Get "files/configs/decoders/decoder.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.yara.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.adguard.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/decoders/decoder.santa.xml" | nindent 6 }}
+  {{- end }}
   
+  {{/* PHASE 1: Minimal rules - Enable progressively */}}
+  {{- if $.Values.customRules.auditMitre | default false }}
   "7005-audit-mitre_rules.xml": |
 {{ $.Files.Get "files/configs/rules/rules.audit-mitre.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.fimMacos | default false }}
   "7006-fim-macos.xml": |
 {{ $.Files.Get "files/configs/rules/rules.FIM-MacOS.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.macosSyslog | default false }}
   "7006-macos-syslog.xml": |
 {{ $.Files.Get "files/configs/rules.MacOS-Syslog.xml" | indent 4 }}
   "7006-macos-auth.xml": |
 {{ $.Files.Get "files/configs/rules.MacOS-Auth.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.fimLinux | default false }}
   "7007-fim-linux.xml": |
 {{ $.Files.Get "files/configs/rules/rules.FIM-Linux.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.yara | default false }}
   "7008-custom-yara.xml": |
 {{ $.Files.Get "files/configs/rules/rules.custom-yara.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.fimWindows | default false }}
   "7009-fim-windows.xml": |
 {{ $.Files.Get "files/configs/rules/rules.custom-windows.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.appBlacklist | default false }}
   "7010-app-blacklist.xml": |
 {{ $.Files.Get "files/configs/rules/rules.app-blacklist.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.dnsMonitoring | default false }}
   "7011-dns-monitoring.xml": |
 {{ $.Files.Get "files/configs/rules/rules.dns-monitoring.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.suricata | default false }}
   "7012-suricata-custom.xml": |
 {{ $.Files.Get "files/configs/rules/rules.suricata-custom.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.adguard | default false }}
   "7013-adguard.xml": |
 {{ $.Files.Get "files/configs/rules/rules.adguard.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.usbDlp | default false }}
   "7014-usb-dlp.xml": |
 {{ $.Files.Get "files/configs/rules/rules.usb-dlp.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.dlpCloudEmail | default false }}
   "7015-dlp-cloud-email.xml": |
 {{ $.Files.Get "files/configs/rules/rules.dlp-cloud-email.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.lotlDetection | default false }}
   "7016-lotl-detection.xml": |
 {{ $.Files.Get "files/configs/rules/rules.lotl-detection.xml" | indent 4 }}
+  {{- end }}
+  {{- if $.Values.customRules.macosSyslogRules | default false }}
   "7017-macos-syslog.xml": |
 {{ $.Files.Get "files/configs/rules/rules.macos-syslog.xml" | indent 4 }}
+  {{- end }}
 
+  {{- if $.Values.customRules.dlp | default false }}
   "dlp.xml": |
     {{ $.Files.Get "files/configs/dlp.xml" | nindent 6 }}
+  {{- end }}
 
   "blacklist-apps.txt":  |
     {{ $.Files.Get "files/configs/lists/blacklist-apps.txt" | nindent 4 }}
@@ -86,11 +119,16 @@ data:
   "sync_sca_policies.sh":  |
     {{ $.Files.Get "files/configs/sync_sca_policies.sh" | nindent 4 }}
 
+  {{- if $.Values.customRules.localRules | default false }}
   "local_rules.xml":  |
     {{ $.Files.Get "files/configs/rules/rules.syscheck.xml" | nindent 6 }}
-    {{ $.Files.Get "files/configs/rules/rules.trivy.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules/rules.false-positive.xml" | nindent 6 }}
     {{ $.Files.Get "files/configs/rules/rules.overwrite.xml" | nindent 6 }}
+  {{- end }}
+  {{- if $.Values.customRules.trivy | default false }}
+  "7018-trivy.xml": |
+{{ $.Files.Get "files/configs/rules/rules.trivy.xml" | indent 4 }}
+  {{- end }}
 
   # Internal options for performance tuning
   "local_internal_options.conf":  |

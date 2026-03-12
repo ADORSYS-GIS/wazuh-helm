@@ -172,40 +172,4 @@
   </rule>
 </group>
 
-<group name="ids,suricata,">
-  <!-- Super simple test rule - match ANY event from eve.json -->
-  <rule id="200649" level="4">
-    <location>eve.json$</location>
-    <description>Suricata: Any event from eve.json</description>
-    <group>suricata,</group>
-  </rule>
-
-  <!-- Custom Suricata rules without parent dependency -->
-  <rule id="200650" level="4">
-    <location>eve.json$</location>
-    <field name="event_type">^dns$</field>
-    <description>Suricata: DNS event - $(data.dns.queries[0].rrname)</description>
-    <group>dns,suricata,</group>
-  </rule>
-
-  <rule id="200651" level="4">
-    <location>eve.json$</location>
-    <field name="event_type">^http$</field>
-    <description>Suricata: HTTP event</description>
-    <group>web,suricata,</group>
-  </rule>
-
-  <rule id="200652" level="4">
-    <location>eve.json$</location>
-    <field name="event_type">^tls$</field>
-    <description>Suricata: TLS event</description>
-    <group>ssl,suricata,</group>
-  </rule>
-
-  <rule id="200653" level="3">
-    <location>eve.json$</location>
-    <field name="event_type">^flow$</field>
-    <description>Suricata: Flow event</description>
-    <group>netflow,suricata,</group>
-  </rule>
-</group>
+<!-- Suricata rules moved to rules.suricata-custom.xml (use customRules.suricata: true) -->

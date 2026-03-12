@@ -2,14 +2,14 @@
     <prematch>wazuh-yara:</prematch>
 </decoder>
 
-<decoder name="yara_decoder">
+<decoder name="yara_decoder_result">
     <parent>yara_decoder</parent>
-    <regex>wazuh-yara: (\S+) - Scan result: (\S+) (\.+)</regex>
+    <regex offset="after_parent">(\S+) - Scan result: (\S+) (\.+)</regex>
     <order>log_type, yara_rule, yara_scanned_file</order>
 </decoder>
 
-<decoder name="yara_decoder">
+<decoder name="yara_decoder_action">
     <parent>yara_decoder</parent>
-    <regex>wazuh-yara: (\S+) - (\S+) file: (\.+)</regex>
+    <regex offset="after_parent">(\S+) - (\S+) file: (\.+)</regex>
     <order>log_type, yara_action, yara_scanned_file</order>
 </decoder>

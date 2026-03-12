@@ -28,6 +28,35 @@ global:
 nameOverride: ""
 fullnameOverride: ""
 
+# =============================================================================
+# CUSTOM RULES CONFIGURATION
+# =============================================================================
+# Enable/disable custom rules progressively for troubleshooting
+# All disabled by default for minimal deployment
+
+customRules:
+  # Custom decoders (trivy, yara, adguard, santa)
+  decoders: false
+  # Local rules (syscheck, false-positive, overwrite) - trivy is now separate
+  localRules: false
+  # Individual rule sets
+  auditMitre: false
+  fimMacos: false
+  macosSyslog: false
+  fimLinux: false
+  yara: false
+  trivy: false
+  fimWindows: false
+  appBlacklist: false
+  dnsMonitoring: false
+  suricata: false
+  adguard: false
+  usbDlp: false
+  dlpCloudEmail: false
+  lotlDetection: false
+  macosSyslogRules: false
+  dlp: false
+
 # Labels/annotations added to ALL resources
 commonLabels: {}
 commonAnnotations:
