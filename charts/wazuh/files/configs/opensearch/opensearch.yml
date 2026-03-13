@@ -3,12 +3,7 @@ node.name: ${NODE_NAME}
 network.host: ${NETWORK_HOST}
 discovery.seed_hosts:
   - ${RELEASE_FULLNAME}-indexer-0.${DISCOVERY_SERVICE}
-  - ${RELEASE_FULLNAME}-indexer-1.${DISCOVERY_SERVICE}
-  - ${RELEASE_FULLNAME}-indexer-2.${DISCOVERY_SERVICE}
-cluster.initial_master_nodes:
-  - ${RELEASE_FULLNAME}-indexer-0
-  - ${RELEASE_FULLNAME}-indexer-1
-  - ${RELEASE_FULLNAME}-indexer-2
+discovery.type: single-node
 node.max_local_storage_nodes: ${RELEASE_MAX_STORAGE_NODE}
 path.data: /var/lib/wazuh-indexer
 path.logs: /var/log/wazuh-indexer
